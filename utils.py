@@ -1,9 +1,13 @@
+import json
 import os
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QMovie
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QProgressBar, QLabel
+
+import config
+
 
 class CustomProgressDialog(QDialog):
     def __init__(self, parent=None):
@@ -106,3 +110,15 @@ def join_path(*args) -> str:
     拼接跨平台路径，强制args之中及其之间的分隔符为 /
     """
     return os.path.join(*args).replace("\\", "/")
+
+def update_metadata(key, value):
+    """
+    更新项目元数据
+    """
+    metadata_path = config.PROJECT_METADATA_PATH
+    if os.path.exists(metadata_path):
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        metadata[key] = value
+        with open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=4)
