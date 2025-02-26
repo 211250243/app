@@ -1,7 +1,5 @@
-import json
 import os
 import shutil
-from importlib.metadata import metadata
 
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QWidget, QDialog, QMessageBox, QFileDialog
@@ -77,6 +75,7 @@ class ModelHandler:
         result = new_model_dialog.ui.exec()
         if result == QDialog.Accepted:
             print("新建模型成功")
+            self.ui.curModelEdit.setText(config.MODEL_PATH)
         else:
             print("取消新建模型")
 
@@ -85,18 +84,19 @@ class ModelHandler:
         从本地导入模型
         """
         folder = QFileDialog.getExistingDirectory(self.ui, "选择模型")
-        base_folder = os.path.basename(folder)
+        model_name = os.path.basename(folder)
         if folder:
             model_folder = join_path(config.PROJECT_METADATA['project_path'], config.MODEL_FOLDER)
             if not os.path.exists(model_folder):
                 os.makedirs(model_folder)
             # 判断是否在项目文件夹下，不在则复制到项目文件夹下
-            if base_folder in os.listdir(model_folder):
+            if model_name in os.listdir(model_folder):
                 show_message_box("警告", "模型已存在！", QMessageBox.Warning)
             else:
-                shutil.copytree(folder, join_path(model_folder, base_folder))
+                shutil.copytree(folder, join_path(model_folder, model_name))
                 print(f"复制{folder}到{model_folder}")
                 # 修改项目的元数据
-                config.MODEL_PATH = folder
-                update_metadata('model', base_folder)
+                config.MODEL_PATH = os.path.join(model_folder, model_name)
+                update_metadata('model', model_name)
+                self.ui.curModelEdit.setText(config.MODEL_PATH)
                 show_message_box("成功", "导入模型成功！", QMessageBox.Information)

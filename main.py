@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtUiTools import QUiLoader
 
 import config
+from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler, UploadThread
 
@@ -29,6 +30,8 @@ class MainWindow(QMainWindow):
         self.sample_handler = SampleHandler(self.ui.sampleWidget)
         # 设置 ModelWidget
         self.model_handler = ModelHandler(self.ui.modelWidget)
+        # 设置 DetectWidget
+        self.detect_handler = DetectHandler(self.ui.detectWidget)
         # Connect tab change signal to a slot
         self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
         self.cur_index = self.ui.tabWidget.currentIndex()
