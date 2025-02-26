@@ -4,6 +4,7 @@ SERVER_PORT = 20045
 SERVER_USERNAME = 'nieercong'
 SERVER_PASSWORD = 'NAec19216800.'
 SERVER_UPLOAD_PATH = 'data/samples'
+SERVER_DOWNLOAD_PATH = 'patchcore/evaluated_results/2025_1_9'
 
 # 项目配置
 """

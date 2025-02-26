@@ -32,12 +32,44 @@ class Server:
             print(f"文件上传失败：{str(e)}")
             raise # 继续抛出异常
 
+    def download_file(self, remote_file_path, local_file_path):
+        """从远程服务器下载文件"""
+        try:
+            self.sftp_client.get(remote_file_path, local_file_path)
+            print(f"下载文件: {remote_file_path} -> {local_file_path}")
+        except Exception as e:
+            print(f"文件下载失败：{str(e)}")
+            raise
+
+    def listdir(self, remote_path):
+        """列出远程目录下的文件"""
+        try:
+            files = self.sftp_client.listdir(remote_path)
+            return files
+        except Exception as e:
+            print(f"列出目录失败：{str(e)}")
+            raise
+
+    def stat(self, remote_path):
+        """获取远程文件信息"""
+        try:
+            file_info = self.sftp_client.stat(remote_path)
+            return file_info
+        except Exception as e:
+            print(f"获取文件信息失败：{str(e)}")
+            raise
+
     def close_connection(self):
         """关闭连接"""
         if self.sftp_client:
             self.sftp_client.close()
         if self.ssh_client:
             self.ssh_client.close()
+
+
+
+
+
 
     def select_file_and_upload(self):
         """选择文件并上传"""
