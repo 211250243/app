@@ -16,6 +16,7 @@ class MainWindow(QMainWindow):
         self.ui = QUiLoader().load(r'ui\main.ui')
         # 将项目元数据保存为实例属性，便于使用
         config.SAMPLE_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+        config.DETECT_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
 
         # 添加按钮点击事件
         self.ui.startNextButton.clicked.connect(self.switch_to_page_1)
@@ -30,7 +31,7 @@ class MainWindow(QMainWindow):
         self.sample_handler = SampleHandler(self.ui.sampleWidget)
         # 设置 ModelWidget
         self.model_handler = ModelHandler(self.ui.modelWidget)
-        # 设置 DetectWidget
+        # 设置 DetectWidget    
         self.detect_handler = DetectHandler(self.ui.detectWidget)
         # Connect tab change signal to a slot
         self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)

@@ -22,3 +22,5 @@ SAMPLE_FOLDER = 'img'
 SAMPLE_PATH = None
 MODEL_FOLDER = 'model'
 MODEL_PATH = None
+DETECT_FOLDER = 'detect'
+DETECT_PATH = None

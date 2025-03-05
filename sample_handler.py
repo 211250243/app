@@ -21,6 +21,9 @@ class LoadImages:
         self.sample_path = config.SAMPLE_PATH
         self.ui = ui
         self.progressDialog = None
+        # 确保 img 文件夹存在
+        if not os.path.exists(self.sample_path):
+            os.makedirs(self.sample_path)
 
     def run_with_progress(self):
         self.progressDialog = QProgressDialog(self.ui)
@@ -50,9 +53,6 @@ class LoadImages:
         """
         # 清空图片列表
         self.ui.imageList.clear()
-        # 获取 img 文件夹中的所有图片
-        if not os.path.exists(self.sample_path):
-            os.makedirs(self.sample_path)
         # 遍历并上传图片
         images = [f for f in os.listdir(self.sample_path) if is_image(f)]
         total_images = len(images)
@@ -180,8 +180,6 @@ class SampleHandler:
         # 打开文件夹选择对话框
         folder = QFileDialog.getExistingDirectory(self.ui, "选择图片文件夹")
         if folder:
-            if not os.path.exists(self.sample_path):
-                os.makedirs(self.sample_path)
             # 遍历文件夹中的所有图片文件
             for file_name in os.listdir(folder):
                 if is_image(file_name):
@@ -207,8 +205,6 @@ class SampleHandler:
         file_dialog.setNameFilters(["Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"]) # 设置文件过滤器
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
-            if not os.path.exists(self.sample_path):
-                os.makedirs(self.sample_path)
             for file_path in selected_files:
                 self.copy_image(file_path)
             LoadImages(self.ui).run_with_progress()  # 重新加载图片列表
