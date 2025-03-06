@@ -4,7 +4,7 @@ import shutil
 import random
 import numpy as np
 from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer, QCoreApplication
-from PySide6.QtGui import QPixmap, QColor, QPen
+from PySide6.QtGui import QPixmap, QColor, QPen, QPainter
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
     QFileDialog, QAbstractItemView, QMessageBox, QProgressDialog
@@ -221,11 +221,12 @@ class SampleHandler:
         # 创建场景和视图
         self.ui.scene = QGraphicsScene(self.ui.detailFrame)
         self.ui.view = QGraphicsView(self.ui.scene, self.ui.detailFrame)
-        # 设置裁剪区域自适应 detailFrame 的大小
-        self.ui.view.setSceneRect(0, 0, 494, 400)
+        # 设置视图自适应 detailFrame 的大小
+        self.ui.view.setGeometry(0, 0, 494, 400)
+        # self.ui.view.setSceneRect(0, 0, 494, 400)
         # QTimer.singleShot(0, self.on_ui_ready)
-
-        # Connect buttons to their respective methods
+        
+        # 绑定按钮事件
         self.ui.cropButton.clicked.connect(self.show_crop_rect)
         self.ui.finishButton.clicked.connect(self.finish_crop)
         self.ui.saveButton.clicked.connect(self.save_image)
@@ -234,6 +235,7 @@ class SampleHandler:
         self.ui.rotateLeftButton.clicked.connect(self.rotate_left)
         self.ui.rotateRightButton.clicked.connect(self.rotate_right)
 
+        # 初始化变量
         self.ui.pixmap = None
         self.ui.crop_rect = None
         self.ui.cropped_item = None
@@ -269,10 +271,8 @@ class SampleHandler:
         """
         # 获取图片路径
         self.image_path = item.image_path
-
         # 创建 detailFrame 项
         self.refresh_detail_frame()
-
         # 获取该项的复选框（从 item 的数据中）
         checkbox = item.checkbox  # 通过 setData 和 getData 来存储和访问控件
         if checkbox and checkbox.isVisible():

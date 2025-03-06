@@ -44,10 +44,12 @@ class MainWindow(QMainWindow):
         #     show_message_box("警告", "请按顺序操作！", QMessageBox.Warning)
         # else:
         #     self.cur_index = index
-        if self.to_next: # 如果是点击下一步按钮，可切换 Tab 页
-            self.cur_index = index
-        else: # 如果是直接点击 Tab 栏，不可切换 Tab 页
-            self.ui.tabWidget.setCurrentIndex(self.cur_index)
+
+        # if self.to_next: # 如果是点击下一步按钮，可切换 Tab 页
+        #     self.cur_index = index
+        # else: # 如果是直接点击 Tab 栏，不可切换 Tab 页
+        #     self.ui.tabWidget.setCurrentIndex(self.cur_index)
+        self.ui.tabWidget.setCurrentIndex(index)
 
     # 切换 Tab 页
     def switch_to_page(self, page_index):
