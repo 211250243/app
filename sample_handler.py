@@ -3,8 +3,8 @@ import os
 import shutil
 import random
 import numpy as np
-from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer, QCoreApplication
-from PySide6.QtGui import QPixmap, QColor, QPen, QPainter
+from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer
+from PySide6.QtGui import QPixmap, QColor, QPen
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
     QFileDialog, QAbstractItemView, QMessageBox, QProgressDialog

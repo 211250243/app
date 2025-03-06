@@ -1,6 +1,5 @@
 import os
-
-from PySide6.QtWidgets import QMainWindow, QApplication
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
 from PySide6.QtUiTools import QUiLoader
 
 import config
@@ -34,9 +33,39 @@ class MainWindow(QMainWindow):
         # 设置 DetectWidget    
         self.detect_handler = DetectHandler(self.ui.detectWidget)
         # Connect tab change signal to a slot
-        # self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
+        self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
         # self.cur_index = self.ui.tabWidget.currentIndex()
         # self.to_next = False # 用于判断是否点击下一步按钮
+
+        # 初始化计时器标签
+        self.init_timer_labels()
+
+    def init_timer_labels(self):
+        """初始化所有标签页的计时器标签"""
+        # 为每个标签页创建计时器标签
+        for i in range(self.ui.tabWidget.count()):
+            page = self.ui.tabWidget.widget(i)
+            timer_label = QLabel(page)
+            timer_label.setGeometry(10, 10, 100, 20)
+            timer_label.setStyleSheet("color: #666; font-size: 12px;")
+            timer_label.setText("00:00:00")
+            page.timerLabel = timer_label  # 保存标签引用
+            if hasattr(self, 'timer'):
+                self.timer.add_label(timer_label)
+
+    def on_tab_changed(self, index):
+        """标签页切换时的处理"""
+        if hasattr(self, 'timer'):
+            # 移除所有标签页的计时器标签
+            for i in range(self.ui.tabWidget.count()):
+                page = self.ui.tabWidget.widget(i)
+                if hasattr(page, 'timerLabel'):
+                    self.timer.remove_label(page.timerLabel)
+            
+            # 添加当前标签页的计时器标签
+            current_page = self.ui.tabWidget.currentWidget()
+            if hasattr(current_page, 'timerLabel'):
+                self.timer.add_label(current_page.timerLabel)
 
     def switch_to_page_1(self):
         self.ui.tabWidget.setCurrentIndex(1)

@@ -1,10 +1,9 @@
 import json
 import os
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, QDateTime
 from PySide6.QtGui import QMovie
-from PySide6.QtWidgets import QMessageBox
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QProgressBar, QLabel
+from PySide6.QtWidgets import QMessageBox, QLabel, QVBoxLayout, QDialog
 
 import config
 
@@ -35,6 +34,7 @@ class CustomProgressDialog(QDialog):
 
     def setValue(self, value):
         self.progress_bar.setValue(value)
+
 class ProgressDialog(QDialog):
     """
     进度展示框
@@ -123,3 +123,41 @@ def update_metadata(key, value):
         with open(metadata_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
     config.PROJECT_METADATA = metadata
+
+class GlobalTimer:
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(GlobalTimer, cls).__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        if not GlobalTimer._initialized:
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.update_time)
+            self.timer.start(1000)  # 每秒更新一次
+            self.start_time = QDateTime.currentDateTime()
+            self.labels = []  # 存储所有需要更新的标签
+            GlobalTimer._initialized = True
+    
+    def update_time(self):
+        current_time = QDateTime.currentDateTime()
+        elapsed = self.start_time.msecsTo(current_time)
+        hours = elapsed // (1000 * 60 * 60)
+        minutes = (elapsed % (1000 * 60 * 60)) // (1000 * 60)
+        seconds = (elapsed % (1000 * 60)) // 1000
+        
+        time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        for label in self.labels:
+            if label and not label.isHidden():
+                label.setText(time_str)
+    
+    def add_label(self, label):
+        if label not in self.labels:
+            self.labels.append(label)
+    
+    def remove_label(self, label):
+        if label in self.labels:
+            self.labels.remove(label)

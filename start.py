@@ -2,12 +2,12 @@ import json
 import os
 from pathlib import Path  # 用于处理文件路径
 from PySide6.QtCore import QDateTime, Signal
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, QLabel
 from PySide6.QtUiTools import QUiLoader
 
 import config
 from main import MainWindow
-from utils import show_message_box, check_and_create_path
+from utils import show_message_box, check_and_create_path, GlobalTimer
 
 
 class NewProjectDialog(QDialog):
@@ -100,6 +100,18 @@ class StartWindow(QMainWindow):
         self.ui.newButton.clicked.connect(self.create_new_archive)
         self.ui.openButton.clicked.connect(self.open_existing_archive)
 
+        # 初始化全局计时器
+        self.timer = GlobalTimer()
+        
+        # 创建计时器标签
+        self.timer_label = QLabel(self.ui.centralwidget)
+        self.timer_label.setGeometry(10, 10, 100, 20)
+        self.timer_label.setStyleSheet("color: #666; font-size: 12px;")
+        self.timer_label.setText("00:00:00")
+        
+        # 添加计时器标签到全局计时器
+        self.timer.add_label(self.timer_label)
+
     def create_new_archive(self):
         """
         打开新建项目窗口
@@ -152,6 +164,8 @@ class StartWindow(QMainWindow):
         跳转到主窗口，显示项目的详细信息
         """
         self.main_window = MainWindow()
+        # 将计时器传递给主窗口
+        self.main_window.timer = self.timer
         self.main_window.ui.show()  # 显示主窗口
         self.ui.close()  # 关闭开始窗口
 
