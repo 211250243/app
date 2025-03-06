@@ -34,11 +34,22 @@ class MainWindow(QMainWindow):
         # 设置 DetectWidget    
         self.detect_handler = DetectHandler(self.ui.detectWidget)
         # Connect tab change signal to a slot
-        self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
-        self.cur_index = self.ui.tabWidget.currentIndex()
-        self.to_next = False # 用于判断是否点击下一步按钮
+        # self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
+        # self.cur_index = self.ui.tabWidget.currentIndex()
+        # self.to_next = False # 用于判断是否点击下一步按钮
 
-    def on_tab_changed(self, index):
+    def switch_to_page_1(self):
+        self.ui.tabWidget.setCurrentIndex(1)
+    def switch_to_page_2(self):
+        # 上传样本到服务器
+        self.ui.upload_result = False  # 上传结果
+        UploadThread(self.ui).execute()
+        # 上传成功后切换到下一页
+        if self.ui.upload_result:
+            self.ui.tabWidget.setCurrentIndex(2)
+    def switch_to_page_3(self):
+        self.ui.tabWidget.setCurrentIndex(3)
+    # def on_tab_changed(self, index):
         # if index < self.cur_index:
         #     self.ui.tabWidget.setCurrentIndex(self.cur_index)
         #     show_message_box("警告", "请按顺序操作！", QMessageBox.Warning)
@@ -49,24 +60,12 @@ class MainWindow(QMainWindow):
         #     self.cur_index = index
         # else: # 如果是直接点击 Tab 栏，不可切换 Tab 页
         #     self.ui.tabWidget.setCurrentIndex(self.cur_index)
-        self.ui.tabWidget.setCurrentIndex(index)
 
     # 切换 Tab 页
-    def switch_to_page(self, page_index):
-        self.to_next = True
-        self.ui.tabWidget.setCurrentIndex(page_index)
-        self.to_next = False
-    def switch_to_page_1(self):
-        self.switch_to_page(1)
-    def switch_to_page_2(self):
-        # 上传样本到服务器
-        self.ui.upload_result = False  # 上传结果
-        UploadThread(self.ui).execute()
-        # 上传成功后切换到下一页
-        if self.ui.upload_result:
-            self.switch_to_page(2)
-    def switch_to_page_3(self):
-        self.switch_to_page(3)
+    # def switch_to_page(self, page_index):
+    #     self.to_next = True
+    #     self.ui.tabWidget.setCurrentIndex(page_index)
+    #     self.to_next = False
 
 
 if __name__ == "__main__":
