@@ -161,8 +161,8 @@ class FloatingTimer(QWidget):
             parent_pos = parent_window.pos()
             
             # 计算右上角位置
-            x = parent_pos.x() + parent_window.width() - self.width() - 20
-            y = parent_pos.y() + 20
+            x = parent_pos.x() + parent_window.width() - self.width() - 8
+            y = parent_pos.y() + 36
             
             # 移动到计算位置
             self.move(x, y)
