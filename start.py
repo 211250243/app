@@ -1,13 +1,13 @@
 import json
 import os
 from pathlib import Path  # 用于处理文件路径
-from PySide6.QtCore import QDateTime, Signal
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox
+from PySide6.QtCore import QDateTime, Signal, Qt
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, QLabel
 from PySide6.QtUiTools import QUiLoader
 
 import config
 from main import MainWindow
-from utils import show_message_box, check_and_create_path
+from utils import show_message_box, check_and_create_path, FloatingTimer
 
 
 class NewProjectDialog(QDialog):
@@ -99,6 +99,10 @@ class StartWindow(QMainWindow):
         # 设置按钮点击事件
         self.ui.newButton.clicked.connect(self.create_new_archive)
         self.ui.openButton.clicked.connect(self.open_existing_archive)
+        
+        # 创建悬浮计时器
+        self.floating_timer = FloatingTimer(self.ui)
+        self.floating_timer.show()
 
     def create_new_archive(self):
         """
@@ -151,7 +155,8 @@ class StartWindow(QMainWindow):
         """
         跳转到主窗口，显示项目的详细信息
         """
-        self.main_window = MainWindow()
+        # 创建主窗口并传递计时器
+        self.main_window = MainWindow(floating_timer=self.floating_timer)
         self.main_window.ui.show()  # 显示主窗口
         self.ui.close()  # 关闭开始窗口
 

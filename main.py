@@ -2,21 +2,34 @@ import os
 
 from PySide6.QtWidgets import QMainWindow, QApplication
 from PySide6.QtUiTools import QUiLoader
+from PySide6.QtCore import Qt, QTimer
 
 import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler, UploadThread
+from utils import FloatingTimer
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, floating_timer=None):
         super().__init__()
         # 加载 UI
         self.ui = QUiLoader().load(r'ui\main.ui')
         # 将项目元数据保存为实例属性，便于使用
         config.SAMPLE_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
         config.DETECT_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
+
+        # 处理悬浮计时器
+        if floating_timer:
+            # 从StartWindow继承计时器
+            self.floating_timer = floating_timer
+            # 确保计时器使用当前窗口
+            QTimer.singleShot(200, self.reset_timer_parent)
+        else:
+            # 创建新的计时器
+            self.floating_timer = FloatingTimer(self.ui)
+            self.floating_timer.show()
 
         # 添加按钮点击事件
         self.ui.startNextButton.clicked.connect(self.switch_to_page_1)
@@ -66,6 +79,15 @@ class MainWindow(QMainWindow):
     #     self.to_next = True
     #     self.ui.tabWidget.setCurrentIndex(page_index)
     #     self.to_next = False
+
+    def reset_timer_parent(self):
+        """重设计时器父窗口并显示"""
+        if hasattr(self, 'floating_timer') and self.floating_timer:
+            self.floating_timer.setParent(self.ui)
+            self.floating_timer.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+            self.floating_timer.show()
+            # 重新定位
+            self.floating_timer.set_initial_position()
 
 
 if __name__ == "__main__":
