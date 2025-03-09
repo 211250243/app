@@ -29,10 +29,10 @@ class NewModelDialog(QDialog):
             show_message_box("错误", "模型名称不合法！", QMessageBox.Critical)
             return
         # 创建模型文件夹
-        model_folder = os.path.join(config.PROJECT_METADATA['project_path'], config.MODEL_FOLDER)
+        model_folder = join_path(config.PROJECT_METADATA['project_path'], config.MODEL_FOLDER)
         if not os.path.exists(model_folder):
             os.makedirs(model_folder)
-        model_path = os.path.join(model_folder, model_name)
+        model_path = join_path(model_folder, model_name)
         if not os.path.exists(model_path):
             os.makedirs(model_path)
             config.MODEL_PATH = model_path
@@ -96,7 +96,7 @@ class ModelHandler:
                 shutil.copytree(folder, join_path(model_folder, model_name))
                 print(f"复制{folder}到{model_folder}")
                 # 修改项目的元数据
-                config.MODEL_PATH = os.path.join(model_folder, model_name)
+                config.MODEL_PATH = join_path(model_folder, model_name)
                 update_metadata('model', model_name)
                 self.ui.curModelEdit.setText(config.MODEL_PATH)
                 show_message_box("成功", "导入模型成功！", QMessageBox.Information)

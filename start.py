@@ -7,7 +7,7 @@ from PySide6.QtUiTools import QUiLoader
 
 import config
 from main import MainWindow
-from utils import show_message_box, check_and_create_path, FloatingTimer
+from utils import join_path, show_message_box, check_and_create_path, FloatingTimer
 
 
 class NewProjectDialog(QDialog):
@@ -43,7 +43,7 @@ class NewProjectDialog(QDialog):
             return  # 如果没有指定路径或路径非法，返回
 
         # 在指定路径下创建一个名为 project_name 的文件夹
-        project_folder = Path(self.path) / project_name  # os.path.join(self.path, project_name)
+        project_folder = join_path(self.path, project_name)
         # 检查该文件夹是否已经存在，如果不存在则创建，如果存在则提示用户
         if not os.path.exists(project_folder):
             os.makedirs(project_folder)
@@ -61,7 +61,7 @@ class NewProjectDialog(QDialog):
         }
 
         # 保存到 metadata.json
-        metadata_file_path = os.path.join(project_folder, "metadata.json")
+        metadata_file_path = join_path(project_folder, "metadata.json")
         with open(metadata_file_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
 
@@ -137,7 +137,7 @@ class StartWindow(QMainWindow):
             folder = QFileDialog.getExistingDirectory(self, "选择项目文件夹")
         if folder:
             # 检查文件夹中是否存在 metadata.json
-            metadata_path = config.PROJECT_METADATA_PATH = os.path.join(folder, config.PROJECT_METADATA_FILE)
+            metadata_path = config.PROJECT_METADATA_PATH = join_path(folder, config.PROJECT_METADATA_FILE)
             if os.path.exists(metadata_path):
                 try:
                     # 读取 metadata.json

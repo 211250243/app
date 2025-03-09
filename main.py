@@ -8,7 +8,7 @@ import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler, UploadThread
-from utils import FloatingTimer
+from utils import FloatingTimer, join_path
 
 
 class MainWindow(QMainWindow):
@@ -17,8 +17,8 @@ class MainWindow(QMainWindow):
         # 加载 UI
         self.ui = QUiLoader().load(r'ui\main.ui')
         # 将项目元数据保存为实例属性，便于使用
-        config.SAMPLE_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
-        config.DETECT_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
+        config.SAMPLE_PATH = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+        config.DETECT_PATH = join_path(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
 
         # 处理悬浮计时器
         if floating_timer:
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         "create_time": "2024-12-20 19:47:57"
     }
 
-    config.PROJECT_METADATA_PATH = os.path.join(config.PROJECT_METADATA['project_path'], config.PROJECT_METADATA_FILE)
+    config.PROJECT_METADATA_PATH = join_path(config.PROJECT_METADATA['project_path'], config.PROJECT_METADATA_FILE)
     app = QApplication([])
     window = MainWindow()
     window.ui.show()

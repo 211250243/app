@@ -21,9 +21,6 @@ class LoadImages:
         self.sample_path = config.SAMPLE_PATH
         self.ui = ui
         self.progressDialog = None
-        # 确保 img 文件夹存在
-        if not os.path.exists(self.sample_path):
-            os.makedirs(self.sample_path)
 
     def run_with_progress(self):
         self.progressDialog = QProgressDialog(self.ui)
@@ -56,9 +53,13 @@ class LoadImages:
         # 遍历并上传图片
         images = [f for f in os.listdir(self.sample_path) if is_image(f)]
         total_images = len(images)
+        # 如果没有图片，直接设置进度为100%并返回
+        if total_images == 0 and self.progressDialog:
+            self.progressDialog.setValue(100)
+            return
         for index, image in enumerate(images):
             # 向图片列表中添加一张图片
-            image_path = os.path.join(self.sample_path, image)
+            image_path = join_path(self.sample_path, image)
             self.add_image_to_list(image_path, image, index)
             # 更新进度条
             if self.progressDialog:
@@ -85,6 +86,9 @@ class SampleHandler:
         super().__init__()
         self.ui = ui
         self.sample_path = config.SAMPLE_PATH
+        # 确保 img 文件夹存在
+        if not os.path.exists(self.sample_path):
+            os.makedirs(self.sample_path)
         # 将所有子控件添加为实例属性
         for child in self.ui.findChildren(QWidget):
             setattr(self.ui, child.objectName(), child)
@@ -183,7 +187,7 @@ class SampleHandler:
             # 遍历文件夹中的所有图片文件
             for file_name in os.listdir(folder):
                 if is_image(file_name):
-                    file_path = os.path.join(folder, file_name)
+                    file_path = join_path(folder, file_name)
                     self.copy_image(file_path)
             LoadImages(self.ui).run_with_progress()  # 重新加载图片列表
 
@@ -191,7 +195,7 @@ class SampleHandler:
         """
         复制图片到 img 文件夹, 并修改权限为可读写
         """
-        destination_path = os.path.join(self.sample_path, os.path.basename(file_path))
+        destination_path = join_path(self.sample_path, os.path.basename(file_path))
         shutil.copy(file_path, destination_path)
         os.chmod(destination_path, 0o777)
 
@@ -683,7 +687,7 @@ class UploadThread(QThread):
         total_files = len(files)
         # 遍历并上传每个文件
         for index, file_name in enumerate(files):
-            file_path = os.path.join(self.sample_path, file_name)
+            file_path = join_path(self.sample_path, file_name)
             remote_path = join_path(self.remote_dir, file_name)
             # 上传文件，若失败则停止上传
             try:

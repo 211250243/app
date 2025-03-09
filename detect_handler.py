@@ -54,8 +54,8 @@ class DetectHandler:
             # 遍历文件夹中的所有图片文件
             for file_name in os.listdir(folder):
                 if is_image(file_name):
-                    src_path = os.path.join(folder, file_name)
-                    dst_path = os.path.join(self.detect_path, file_name)
+                    src_path = join_path(folder, file_name)
+                    dst_path = join_path(self.detect_path, file_name)
                     shutil.copy2(src_path, dst_path)
                     
             # 重新加载图片列表
@@ -71,7 +71,7 @@ class DetectHandler:
         
         # 添加图片到列表
         for index, image_name in enumerate(images):
-            image_path = os.path.join(self.detect_path, image_name)
+            image_path = join_path(self.detect_path, image_name)
             item = CustomListWidgetItem(image_path, image_name, index)
             self.ui.detectList.addItem(item)
             self.ui.detectList.setItemWidget(item, item.item_widget)
