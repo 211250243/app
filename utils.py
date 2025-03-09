@@ -3,62 +3,48 @@ import os
 
 from PySide6.QtCore import Signal, Qt, QTimer, QDateTime, QPoint
 from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
-from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QProgressBar, QLabel, QWidget, QApplication
+from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QProgressBar, QLabel, QWidget, QApplication, QProgressDialog
 
 import config
 
 
-class CustomProgressDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Loading")
-        self.setModal(True)
-        self.setFixedSize(300, 150)
 
-        layout = QVBoxLayout()
 
-        self.label = QLabel("Loading, please wait...", self)
-        layout.addWidget(self.label)
-
-        self.movie_label = QLabel(self)
-        self.movie = QMovie("B:/Development/GraduationDesign/app/ui/gif/loading.gif")
-        self.movie_label.setMovie(self.movie)
-        layout.addWidget(self.movie_label)
-
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-        layout.addWidget(self.progress_bar)
-
-        self.setLayout(layout)
-        self.movie.start()
-
-    def setValue(self, value):
-        self.progress_bar.setValue(value)
-
-class ProgressDialog(QDialog):
+class ProgressDialog(QProgressDialog):
     """
-    进度展示框
+    基于QProgressDialog的进度展示框
     """
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, msg="请稍等..."):
         super().__init__(parent)
-        self.setWindowTitle("Upload Progress")
-        self.setModal(True)
-        self.setFixedSize(300, 100)
+        self.setWindowTitle(msg["title"])
+        self.setLabelText(msg["text"])
+        self.setRange(0, 100)
+        self.setCancelButton(None)
 
-        layout = QVBoxLayout()
-        self.label = QLabel("Uploading files...", self)
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True) # 显示进度值
+# class ProgressDialog(QDialog):
+#     """
+#     进度展示框
+#     """
+#     def __init__(self, parent=None, msg="请稍等..."):
+#         super().__init__(parent)
+#         self.setWindowTitle("Upload Progress")
+#         self.setModal(True)
+#         self.setFixedSize(300, 100)
 
-        layout.addWidget(self.label)
-        layout.addWidget(self.progress_bar)
-        self.setLayout(layout)
+#         layout = QVBoxLayout()
+#         self.label = QLabel(msg, self)
+#         self.progress_bar = QProgressBar(self)
+#         self.progress_bar.setRange(0, 100)
+#         self.progress_bar.setValue(0)
+#         self.progress_bar.setTextVisible(True) # 显示进度值
 
-    def setValue(self, value):
-        print(f"设置进度值：{value}")
-        self.progress_bar.setValue(value)
+#         layout.addWidget(self.label)
+#         layout.addWidget(self.progress_bar)
+#         self.setLayout(layout)
+
+#     def setValue(self, value):
+#         print(f"设置进度值：{value}")
+#         self.progress_bar.setValue(value)
 
 def show_message_box(title: str, message: str, icon_type: QMessageBox.Icon, parent=None):
     """

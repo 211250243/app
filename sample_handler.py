@@ -7,11 +7,11 @@ from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer, QCo
 from PySide6.QtGui import QPixmap, QColor, QPen, QPainter
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
-    QFileDialog, QAbstractItemView, QMessageBox, QProgressDialog
+    QFileDialog, QAbstractItemView, QMessageBox
 
 import config
 from server import Server
-from utils import is_image, join_path, ProgressDialog, show_message_box, CustomProgressDialog
+from utils import is_image, join_path, ProgressDialog, show_message_box
 from PySide6.QtCore import Signal
 
 
@@ -23,26 +23,18 @@ class LoadImages:
         self.progressDialog = None
 
     def run_with_progress(self):
-        self.progressDialog = QProgressDialog(self.ui)
-        self.progressDialog.setWindowTitle("加载图片")
-        self.progressDialog.setLabelText("正在加载图片...")
-        self.progressDialog.setRange(0, 100)
-        self.progressDialog.setCancelButton(None) # 隐藏取消按钮
+        msg = {
+            "title": "加载图片",
+            "text": "正在加载图片..."
+        }
+        self.progressDialog = ProgressDialog(self.ui, msg)
         # 执行加载图片的操作
         self.progressDialog.show()
         QTimer.singleShot(100, self.run)  # Run the image loading process after a short delay
         self.progressDialog.exec() # 阻塞当前代码的执行，直到对话框关闭
 
     def run_with_wait(self):
-        self.progressDialog = CustomProgressDialog(self.ui)
-        self.progressDialog.show()
-
-        # 启动一个定时器来逐步更新进度
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.run)  # 每隔一段时间更新一次进度
-        self.timer.start(100)  # 每 100 毫秒触发一次
-        # self.timer.stop()
-        # self.progressDialog.close()
+        pass
 
     def run(self):
         """
@@ -652,7 +644,11 @@ class UploadThread(QThread):
         self.ui = ui
         self.e = "未知错误"  # 用于存储异常信息
 
-        self.progressDialog = ProgressDialog(self.ui)
+        msg = {
+            "title": "上传样本",
+            "text": "正在上传样本..."
+        }
+        self.progressDialog = ProgressDialog(self.ui, msg)
         self.upload_finished.connect(self.on_upload_finished)
 
     def on_upload_finished(self, success):
