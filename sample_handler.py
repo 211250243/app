@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidg
 
 import config
 from server import Server
-from utils import is_image, join_path, ProgressDialog, show_message_box
+from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box
 from PySide6.QtCore import Signal
 
 
@@ -34,7 +34,9 @@ class LoadImages:
         self.progressDialog.exec() # 阻塞当前代码的执行，直到对话框关闭
 
     def run_with_wait(self):
-        pass
+        self.loading = LoadingAnimation(self.ui)
+        self.loading.show()
+        QTimer.singleShot(3000, self.loading.close_animation)
 
     def run(self):
         """

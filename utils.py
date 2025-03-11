@@ -1,7 +1,7 @@
 import json
 import os
 
-from PySide6.QtCore import Signal, Qt, QTimer, QDateTime, QPoint
+from PySide6.QtCore import Signal, Qt, QTimer, QDateTime, QPoint, QSize
 from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
 from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QProgressBar, QLabel, QWidget, QApplication, QProgressDialog
 
@@ -221,3 +221,69 @@ class FloatingTimer(QWidget):
         if event.button() == Qt.LeftButton:
             self.start_time = QDateTime.currentDateTime()
             self.update_time()
+
+class LoadingAnimation(QWidget):
+    """通用加载动画类，在UI上显示一个旋转的加载动画"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # 设置为无边框窗口并使背景透明
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        
+        # 创建半透明背景
+        self.background = QWidget(self)
+        self.background.setStyleSheet("background-color: rgba(0, 0, 0, 120);")
+        
+        # 创建加载动画标签
+        self.loading_label = QLabel(self)
+        self.loading_label.setAlignment(Qt.AlignCenter)
+        
+        # 从资源文件加载动画GIF
+        self.movie = QMovie("ui/gif/loading.gif")
+        self.loading_label.setMovie(self.movie)
+        
+        # 设置动画大小
+        self.movie.setScaledSize(QSize(50, 50))
+        
+        # 创建显示文本标签
+        self.text_label = QLabel("加载中...", self)
+        self.text_label.setAlignment(Qt.AlignCenter)
+        self.text_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold;")
+        
+        # 创建垂直布局放置加载图标和文本
+        layout = QVBoxLayout()
+        layout.addWidget(self.loading_label)
+        layout.addWidget(self.text_label)
+        layout.setAlignment(Qt.AlignCenter)
+        
+        # 设置主布局
+        main_layout = QVBoxLayout(self)
+        main_layout.addLayout(layout)
+        main_layout.setAlignment(Qt.AlignCenter)
+        self.setLayout(main_layout)
+        
+    def showEvent(self, event):
+        """窗口显示时开始播放动画"""
+        if self.parent():
+            # 调整大小以匹配父窗口
+            self.setGeometry(self.parent().rect())
+            self.background.setGeometry(self.rect())
+        
+        # 开始播放动画
+        self.movie.start()
+        super().showEvent(event)
+        
+    def resizeEvent(self, event):
+        """调整大小时确保背景覆盖整个区域"""
+        self.background.setGeometry(self.rect())
+        super().resizeEvent(event)
+        
+    def set_text(self, text):
+        """设置加载时显示的文本"""
+        self.text_label.setText(text)
+        
+    def close_animation(self):
+        """停止动画并关闭窗口"""
+        self.movie.stop()
+        self.close()
