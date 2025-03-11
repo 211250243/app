@@ -1,5 +1,24 @@
 """
-纯文本动画
+纯文本动画：使用Unicode字符（⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏）创建旋转动画，不需要额外的GIF文件。
+
+美观的界面：
+    半透明黑色背景覆盖整个父窗口
+    带圆角的深色容器放置动画和文本
+    清晰的白色文字显示状态信息
+
+易于使用：
+   # 创建加载动画
+   loading = LoadingAnimation(parent_widget)
+   # 设置显示文本（可选）
+   loading.set_text("正在处理数据...")
+   # 显示动画
+   loading.show()
+   # 在合适的时机关闭动画
+   loading.close_animation()
+
+自动适应：会自动调整大小以匹配父窗口，确保覆盖整个UI区域。
+可自定义：提供了set_text方法更改显示的文本。
+使用示例：创建了loading_example.py，演示如何在实际应用中使用这个类。
 """
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt, QTimer

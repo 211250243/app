@@ -20,6 +20,7 @@ class ProgressDialog(QProgressDialog):
         self.setLabelText(msg["text"])
         self.setRange(0, 100)
         self.setCancelButton(None)
+        self.setModal(True)
 
 # class ProgressDialog(QDialog):
 #     """

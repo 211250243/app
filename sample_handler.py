@@ -16,54 +16,91 @@ from PySide6.QtCore import Signal
 
 
 class LoadImages:
+    """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
     def __init__(self, ui):
-        super().__init__()
         self.sample_path = config.SAMPLE_PATH
         self.ui = ui
-        self.progressDialog = None
-
-    def run_with_progress(self):
-        msg = {
+    
+    def load_with_progress(self):
+        """使用进度条加载图片"""
+        # 创建进度对话框
+        progress_dialog = ProgressDialog(self.ui, {
             "title": "加载图片",
             "text": "正在加载图片..."
-        }
-        self.progressDialog = ProgressDialog(self.ui, msg)
-        # 执行加载图片的操作
-        self.progressDialog.show()
-        QTimer.singleShot(100, self.run)  # Run the image loading process after a short delay
-        self.progressDialog.exec() # 阻塞当前代码的执行，直到对话框关闭
+        })
+        # 显示对话框并开始加载
+        progress_dialog.show()
+        QCoreApplication.processEvents() # 确保进度条显示！！！
 
-    def run_with_wait(self):
-        self.loading = LoadingAnimation(self.ui)
-        self.loading.show()
-        QTimer.singleShot(3000, self.loading.close_animation)
-
-    def run(self):
-        """
-        加载工作目录下的 img 文件夹中的图片，并添加到列表中
-        """
-        # 清空图片列表
+        # 重新获取图片列表
         self.ui.imageList.clear()
-        # 遍历并上传图片
         images = [f for f in os.listdir(self.sample_path) if is_image(f)]
         total_images = len(images)
-        # 如果没有图片，直接设置进度为100%并返回
-        if total_images == 0 and self.progressDialog:
-            self.progressDialog.setValue(100)
+        # 处理空图片列表情况
+        if total_images == 0:
+            progress_dialog.setValue(100)
             return
+        # 加载图片
         for index, image in enumerate(images):
-            # 向图片列表中添加一张图片
+            # 添加图片到列表
             image_path = join_path(self.sample_path, image)
-            self.add_image_to_list(image_path, image, index)
-            # 更新进度条
-            if self.progressDialog:
-                progress = int((index + 1) / total_images * 100)
-                self.progressDialog.setValue(progress)
+            self._add_to_list(image_path, image, index)
+            # 更新进度
+            progress = int((index + 1) / total_images * 100)
+            progress_dialog.setValue(progress)
 
-    def add_image_to_list(self, image_path, image_name, index):
-        """
-        向图片列表中添加一张图片
-        """
+    # def load_with_progress(self):
+    #     """使用进度条加载图片"""
+    #     # 创建进度对话框
+    #     self.progress_dialog = ProgressDialog(self.ui, {
+    #         "title": "加载图片",
+    #         "text": "正在加载图片..."
+    #     })
+    #
+    #     # 显示对话框并开始加载
+    #     self.progress_dialog.show()
+    #     QTimer.singleShot(100, self.run)  # Run the image loading process after a short delay
+    #     self.progress_dialog.exec()  # 阻塞当前代码的执行，直到对话框关闭
+    #
+    # def run (self):
+    #     # 重新获取图片列表
+    #     self.ui.imageList.clear()
+    #     images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+    #     total_images = len(images)
+    #     # 处理空图片列表情况
+    #     if total_images == 0:
+    #         self.progress_dialog.setValue(100)
+    #         return
+    #     # 加载图片
+    #     for index, image in enumerate(images):
+    #         # 添加图片到列表
+    #         image_path = join_path(self.sample_path, image)
+    #         self._add_to_list(image_path, image, index)
+    #         # 更新进度
+    #         progress = int((index + 1) / total_images * 100)
+    #         self.progress_dialog.setValue(progress)
+
+    def load_with_animation(self):
+        """使用加载动画加载图片"""
+        # 创建加载动画
+        loading = LoadingAnimation(self.ui)
+        loading.set_text("正在加载图片...")
+        loading.show()
+        QCoreApplication.processEvents()  # 确保动画显示！！！
+
+        # 重新获取图片列表
+        self.ui.imageList.clear()
+        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+        # 添加所有图片到列表
+        for index, image in enumerate(images):
+            image_path = join_path(self.sample_path, image)
+            self._add_to_list(image_path, image, index)
+        # 加载完成后关闭动画
+        # QTimer.singleShot(2000, loading.close_animation)
+        loading.close_animation()
+    
+    def _add_to_list(self, image_path, image_name, index):
+        """将图片添加到列表中"""
         item = CustomListWidgetItem(image_path, image_name, index)
         self.ui.imageList.addItem(item) # 添加 QListWidgetItem
         self.ui.imageList.setItemWidget(item, item.item_widget) # 设置 QWidget 小部件作为项的显示内容
@@ -107,7 +144,7 @@ class SampleHandler:
         self.ui.selectButton.clicked.connect(self.select_enabled)
         self.ui.completeButton.clicked.connect(self.select_disabled)
         # 加载图片
-        LoadImages(self.ui).run_with_progress()
+        LoadImages(self.ui).load_with_progress()
 
     def fold(self):
         """
@@ -168,7 +205,7 @@ class SampleHandler:
             if os.path.exists(image_path):
                 os.remove(image_path)  # 删除文件
             # self.ui.imageList.takeItem(self.ui.imageList.row(item))  # 从列表中移除项
-        LoadImages(self.ui).run_with_wait()  # 重新加载图片列表
+        LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
         self.clear_detail_frame()  # 清除detailFrame
 
     def import_dir(self):
@@ -183,7 +220,7 @@ class SampleHandler:
                 if is_image(file_name):
                     file_path = join_path(folder, file_name)
                     self.copy_image(file_path)
-            LoadImages(self.ui).run_with_progress()  # 重新加载图片列表
+            LoadImages(self.ui).load_with_progress()  # 重新加载图片列表
 
     def copy_image(self, file_path):
         """
@@ -205,7 +242,7 @@ class SampleHandler:
             selected_files = file_dialog.selectedFiles()
             for file_path in selected_files:
                 self.copy_image(file_path)
-            LoadImages(self.ui).run_with_progress()  # 重新加载图片列表
+            LoadImages(self.ui).load_with_progress()  # 重新加载图片列表
 
 
 
@@ -430,7 +467,7 @@ class SampleHandler:
             self.refresh_image_item()
             self.refresh_detail_frame()
         else:
-            LoadImages(self.ui).run_with_wait()  # 重新加载图片列表
+            LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
         # LoadImages(self.ui).run()
         # if len(selected_items) == 1:
         #     self.ui.imageList.setCurrentItem(selected_items[0]) # 移动到当前项
@@ -466,7 +503,7 @@ class SampleHandler:
                 cv2.imwrite(augmented_image_path, augmented_image)
                 print(f"保存增强后的图像: {augmented_image_path}")
 
-        LoadImages(self.ui).run_with_wait()  # 重新加载图片列表
+        LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
 
     def random_augmentation(self, image):
         """
