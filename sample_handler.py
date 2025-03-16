@@ -4,110 +4,17 @@ import shutil
 import random
 import numpy as np
 from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer, QCoreApplication
-from PySide6.QtGui import QPixmap, QColor, QPen, QPainter
+from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
-    QFileDialog, QAbstractItemView, QMessageBox
+    QFileDialog, QAbstractItemView, QMessageBox, QDialog, QPushButton, QInputDialog, QLineEdit, QListWidget
 
 import config
 from server import Server
-from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box
+from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box, update_metadata
 from PySide6.QtCore import Signal
 
 
-class LoadImages:
-    """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
-    def __init__(self, ui):
-        self.sample_path = config.SAMPLE_PATH
-        self.ui = ui
-    
-    def load_with_progress(self):
-        """使用进度条加载图片"""
-        # 创建进度对话框
-        progress_dialog = ProgressDialog(self.ui, {
-            "title": "加载图片",
-            "text": "正在加载图片..."
-        })
-        # 显示对话框并开始加载
-        progress_dialog.show()
-        QCoreApplication.processEvents() # 确保进度条显示！！！
-
-        # 重新获取图片列表
-        self.ui.imageList.clear()
-        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
-        total_images = len(images)
-        # 处理空图片列表情况
-        if total_images == 0:
-            progress_dialog.setValue(100)
-            return
-        # 加载图片
-        for index, image in enumerate(images):
-            # 添加图片到列表
-            image_path = join_path(self.sample_path, image)
-            self._add_to_list(image_path, image, index)
-            # 更新进度
-            progress = int((index + 1) / total_images * 100)
-            progress_dialog.setValue(progress)
-
-    # def load_with_progress(self):
-    #     """使用进度条加载图片"""
-    #     # 创建进度对话框
-    #     self.progress_dialog = ProgressDialog(self.ui, {
-    #         "title": "加载图片",
-    #         "text": "正在加载图片..."
-    #     })
-    #
-    #     # 显示对话框并开始加载
-    #     self.progress_dialog.show()
-    #     QTimer.singleShot(100, self.run)  # Run the image loading process after a short delay
-    #     self.progress_dialog.exec()  # 阻塞当前代码的执行，直到对话框关闭
-    #
-    # def run (self):
-    #     # 重新获取图片列表
-    #     self.ui.imageList.clear()
-    #     images = [f for f in os.listdir(self.sample_path) if is_image(f)]
-    #     total_images = len(images)
-    #     # 处理空图片列表情况
-    #     if total_images == 0:
-    #         self.progress_dialog.setValue(100)
-    #         return
-    #     # 加载图片
-    #     for index, image in enumerate(images):
-    #         # 添加图片到列表
-    #         image_path = join_path(self.sample_path, image)
-    #         self._add_to_list(image_path, image, index)
-    #         # 更新进度
-    #         progress = int((index + 1) / total_images * 100)
-    #         self.progress_dialog.setValue(progress)
-
-    def load_with_animation(self):
-        """使用加载动画加载图片"""
-        # 创建加载动画
-        loading = LoadingAnimation(self.ui)
-        loading.set_text("正在加载图片...")
-        loading.show()
-        QCoreApplication.processEvents()  # 确保动画显示！！！
-
-        # 重新获取图片列表
-        self.ui.imageList.clear()
-        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
-        # 添加所有图片到列表
-        for index, image in enumerate(images):
-            image_path = join_path(self.sample_path, image)
-            self._add_to_list(image_path, image, index)
-        # 加载完成后关闭动画
-        # QTimer.singleShot(2000, loading.close_animation)
-        loading.close_animation()
-    
-    def _add_to_list(self, image_path, image_name, index):
-        """将图片添加到列表中"""
-        item = CustomListWidgetItem(image_path, image_name, index)
-        self.ui.imageList.addItem(item) # 添加 QListWidgetItem
-        self.ui.imageList.setItemWidget(item, item.item_widget) # 设置 QWidget 小部件作为项的显示内容
-        # 存储复选框（或其他控件）作为该项的数据
-        # 1: item.setData(0, checkbox) -> item.data(0)
-        # 2: 也可直接查找widget中的控件
-        # 3: 创建一个自定义的 QListWidgetItem 类，将复选框作为属性存储
 
 class SampleHandler:
     """
@@ -116,18 +23,150 @@ class SampleHandler:
     def __init__(self, ui):
         super().__init__()
         self.ui = ui
-        self.sample_path = config.SAMPLE_PATH
-        # 确保 img 文件夹存在
-        if not os.path.exists(self.sample_path):
-            os.makedirs(self.sample_path)
         # 将所有子控件添加为实例属性
         for child in self.ui.findChildren(QWidget):
             setattr(self.ui, child.objectName(), child)
         # 初始化各部分
+        self.init_sample_group()
         self.init_image_list()
         self.init_detail_frame()
         self.init_operate_column()
+        # 更新按钮显示状态
+        self.update_button_visibility()
+
+    def init_sample_group(self):
+        """
+        初始化样本组
+        """
+        self.ui.newSampleGroupButton.clicked.connect(self.new_sample_group)
+        self.ui.importSampleGroupButton.clicked.connect(self.import_sample_group)
+        self.ui.deleteSampleGroupButton.clicked.connect(self.delete_sample_group)
+        # 初始化样本组路径
+        if 'sample_path' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_path']:
+            self.sample_path = config.PROJECT_METADATA['sample_path']
+            self.sample_group = self.sample_path.split('/')[-1]
+        else:
+            self.sample_group = None
+            self.sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+        # 确保样本组路径存在
+        if not os.path.exists(self.sample_path):
+            os.makedirs(self.sample_path)
+            
+    def update_button_visibility(self):
+        """
+        根据当前样本组状态更新按钮显示
+        """
+        # 样本操作按钮区域仅当有当前样本组时显示
+        has_sample_group = self.sample_group is not None
+        self.ui.sampleOperationFrame.setVisible(has_sample_group)
         
+        # 更新当前样本组标签
+        if has_sample_group:
+            self.ui.currentGroupLabel.setText(f"当前样本组：{self.sample_group}")
+            self.ui.currentGroupLabel.setVisible(True)
+        else:
+            self.ui.currentGroupLabel.setVisible(False)
+
+    def new_sample_group(self):
+        """
+        新建样本组，弹出对话框让用户输入样本组名称
+        """
+        # 弹出输入对话框
+        text, ok = QInputDialog.getText(
+            self.ui, 
+            "新建样本组", 
+            "请输入样本组名称：", 
+            QLineEdit.Normal, 
+            ""
+        )
+        # 如果用户点击了确定按钮且输入了名称
+        if ok and text:
+            # 设置样本组名称
+            # 创建样本组文件夹
+            sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER, text)
+            if not os.path.exists(sample_path):
+                os.makedirs(sample_path)
+                # 更新数据
+                self.sample_group = text
+                config.SAMPLE_PATH = self.sample_path = sample_path
+                update_metadata('sample_path', self.sample_path)
+                # 更新按钮显示状态
+                self.update_button_visibility()
+                # 清空图片列表
+                self.ui.imageList.clear()
+                # 显示成功消息
+                show_message_box("成功", f"已创建样本组：{text}", QMessageBox.Information, self.ui)
+            else: # 如果样本组已存在，显示错误消息
+                show_message_box("错误", f"样本组已存在：{text}", QMessageBox.Critical, self.ui)
+
+    def import_sample_group(self):
+        """
+        导入样本组，弹出自定义对话框让用户选择样本组
+        """
+        # 创建并显示样本组选择对话框
+        dialog = SampleGroupDialog(self.ui)
+        result = dialog.exec()
+        
+        # 如果用户点击了确定按钮并选择了样本组
+        if result == QDialog.Accepted and dialog.selected_group:
+            # 更新数据
+            self.sample_group = dialog.selected_group
+            config.SAMPLE_PATH = self.sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER, self.sample_group)
+            update_metadata('sample_path', self.sample_path)
+            # 更新按钮显示状态
+            self.update_button_visibility()
+            # 加载样本组中的图片
+            LoadImages(self.ui).load_with_progress()
+            # 显示成功消息
+            show_message_box("成功", f"已导入样本组：{self.sample_group}", QMessageBox.Information, self.ui)
+
+    def delete_sample_group(self):
+        """
+        删除样本组，弹出样本组选择对话框让用户选择要删除的样本组
+        """
+        # 创建并显示样本组选择对话框
+        dialog = SampleGroupDialog(self.ui)
+        dialog.setWindowTitle("删除样本组")
+        # 修改对话框标签文本
+        for child in dialog.findChildren(QLabel):
+            if "请选择" in child.text():
+                child.setText("请选择要删除的样本组：")
+                break
+        result = dialog.exec()
+        # 如果用户点击了确定按钮并选择了样本组
+        if result == QDialog.Accepted and dialog.selected_group:
+            # 获取选中的样本组名称
+            group_name = dialog.selected_group
+            # 弹出确认对话框
+            confirm = QMessageBox.question(
+                self.ui,
+                "确认删除",
+                f"确定要删除样本组 {group_name} 吗？\n此操作将删除该样本组的所有图片，且不可恢复！",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            # 如果用户确认删除
+            if confirm == QMessageBox.Yes:
+                # 获取样本组路径
+                group_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER, group_name)
+                try:
+                    # 删除样本组文件夹及其内容
+                    shutil.rmtree(group_path)
+                    # 如果删除的是当前样本组，清空当前样本组
+                    if self.sample_group == group_name:
+                        self.sample_group = None
+                        config.SAMPLE_PATH = self.sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+                        update_metadata('sample_path', '')
+                        # 更新按钮显示状态
+                        self.update_button_visibility()
+                        # 清空图片列表
+                        self.ui.imageList.clear()
+                    # 显示成功消息
+                    show_message_box("成功", f"已删除样本组：{group_name}", QMessageBox.Information, self.ui)
+                except Exception as e:
+                    # 如果删除失败，显示错误消息
+                    show_message_box("错误", f"删除样本组失败：{str(e)}", QMessageBox.Critical, self.ui)
+
     def init_image_list(self):
         """
         初始化图片列表
@@ -736,3 +775,208 @@ class UploadThread(QThread):
             self.progressDialog.setValue(progress)
         self.upload_finished.emit(True)  # 上传成功
         server.close_connection()
+
+
+class LoadImages:
+    """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
+    def __init__(self, ui):
+        self.sample_path = config.SAMPLE_PATH
+        self.ui = ui
+    
+    def load_with_progress(self):
+        """使用进度条加载图片"""
+        # 创建进度对话框
+        progress_dialog = ProgressDialog(self.ui, {
+            "title": "加载图片",
+            "text": "正在加载图片..."
+        })
+        # 显示对话框并开始加载
+        progress_dialog.show()
+        QCoreApplication.processEvents() # 确保进度条显示！！！
+
+        # 重新获取图片列表
+        self.ui.imageList.clear()
+        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+        total_images = len(images)
+        # 处理空图片列表情况
+        if total_images == 0:
+            progress_dialog.setValue(100)
+            return
+        # 加载图片
+        for index, image in enumerate(images):
+            # 添加图片到列表
+            image_path = join_path(self.sample_path, image)
+            self._add_to_list(image_path, image, index)
+            # 更新进度
+            progress = int((index + 1) / total_images * 100)
+            progress_dialog.setValue(progress)
+
+    # def load_with_progress(self):
+    #     """使用进度条加载图片"""
+    #     # 创建进度对话框
+    #     self.progress_dialog = ProgressDialog(self.ui, {
+    #         "title": "加载图片",
+    #         "text": "正在加载图片..."
+    #     })
+    #
+    #     # 显示对话框并开始加载
+    #     self.progress_dialog.show()
+    #     QTimer.singleShot(100, self.run)  # Run the image loading process after a short delay
+    #     self.progress_dialog.exec()  # 阻塞当前代码的执行，直到对话框关闭
+    #
+    # def run (self):
+    #     # 重新获取图片列表
+    #     self.ui.imageList.clear()
+    #     images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+    #     total_images = len(images)
+    #     # 处理空图片列表情况
+    #     if total_images == 0:
+    #         self.progress_dialog.setValue(100)
+    #         return
+    #     # 加载图片
+    #     for index, image in enumerate(images):
+    #         # 添加图片到列表
+    #         image_path = join_path(self.sample_path, image)
+    #         self._add_to_list(image_path, image, index)
+    #         # 更新进度
+    #         progress = int((index + 1) / total_images * 100)
+    #         self.progress_dialog.setValue(progress)
+
+    def load_with_animation(self):
+        """使用加载动画加载图片"""
+        # 创建加载动画
+        loading = LoadingAnimation(self.ui)
+        loading.set_text("正在加载图片...")
+        loading.show()
+        QCoreApplication.processEvents()  # 确保动画显示！！！
+
+        # 重新获取图片列表
+        self.ui.imageList.clear()
+        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+        # 添加所有图片到列表
+        for index, image in enumerate(images):
+            image_path = join_path(self.sample_path, image)
+            self._add_to_list(image_path, image, index)
+        # 加载完成后关闭动画
+        # QTimer.singleShot(2000, loading.close_animation)
+        loading.close_animation()
+    
+    def _add_to_list(self, image_path, image_name, index):
+        """将图片添加到列表中"""
+        item = CustomListWidgetItem(image_path, image_name, index)
+        self.ui.imageList.addItem(item) # 添加 QListWidgetItem
+        self.ui.imageList.setItemWidget(item, item.item_widget) # 设置 QWidget 小部件作为项的显示内容
+        # 存储复选框（或其他控件）作为该项的数据
+        # 1: item.setData(0, checkbox) -> item.data(0)
+        # 2: 也可直接查找widget中的控件
+        # 3: 创建一个自定义的 QListWidgetItem 类，将复选框作为属性存储
+
+
+class SampleGroupDialog(QDialog):
+    """
+    样本组选择对话框
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.selected_group = None
+        self.init_ui()
+        self.load_sample_groups()
+
+    def init_ui(self):
+        """
+        初始化UI
+        """
+        # 设置对话框标题和大小
+        self.setWindowTitle("选择样本组")
+        self.resize(400, 300)
+        
+        # 创建布局
+        layout = QVBoxLayout(self)
+        
+        # 添加标签
+        label = QLabel("请选择要导入的样本组：")
+        label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
+        layout.addWidget(label)
+        
+        # 添加列表控件
+        self.list_widget = QListWidget()
+        self.list_widget.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.list_widget.itemDoubleClicked.connect(self.accept)
+        layout.addWidget(self.list_widget)
+        
+        # 添加按钮布局
+        button_layout = QHBoxLayout()
+        
+        # 添加刷新按钮
+        refresh_button = QPushButton("刷新")
+        refresh_button.clicked.connect(self.load_sample_groups)
+        button_layout.addWidget(refresh_button)
+        
+        # 添加空白区域
+        button_layout.addStretch()
+        
+        # 添加确定和取消按钮
+        ok_button = QPushButton("确定")
+        ok_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("取消")
+        cancel_button.clicked.connect(self.reject)
+        
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        
+        # 将按钮布局添加到主布局
+        layout.addLayout(button_layout)
+        
+        # 设置对话框布局
+        self.setLayout(layout)
+
+    def load_sample_groups(self):
+        """
+        加载样本组列表
+        """
+        # 清空列表
+        self.list_widget.clear()
+        # 获取样本文件夹路径
+        sample_folder = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+        # 获取样本文件夹下的所有子文件夹
+        sample_groups = []
+        for item in os.listdir(sample_folder):
+            item_path = os.path.join(sample_folder, item)
+            if os.path.isdir(item_path):
+                # 检查文件夹中是否有图片文件
+                has_images = any(is_image(f) for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f)))
+                sample_groups.append((item, has_images))
+        # 如果没有样本组，显示提示
+        if not sample_groups:
+            empty_item = QListWidgetItem("没有找到样本组")
+            empty_item.setFlags(Qt.NoItemFlags)  # 禁用选择
+            self.list_widget.addItem(empty_item)
+            return
+        # 添加样本组到列表
+        for group_name, has_images in sample_groups:
+            item = QListWidgetItem(group_name)
+            # 如果文件夹中有图片，设置图标
+            if has_images:
+                item.setIcon(QIcon("icon/image.svg"))  # 假设有图片图标
+            else:
+                item.setIcon(QIcon("icon/folder.svg"))  # 假设有文件夹图标
+            self.list_widget.addItem(item)
+    
+    def get_selected_group(self):
+        """
+        获取选中的样本组
+        """
+        selected_items = self.list_widget.selectedItems()
+        if selected_items:
+            return selected_items[0].text()
+        return None
+    
+    def accept(self):
+        """
+        确定按钮点击事件
+        """
+        self.selected_group = self.get_selected_group()
+        if self.selected_group:
+            super().accept()
+        else:
+            show_message_box("提示", "请选择一个样本组", QMessageBox.Information, self)

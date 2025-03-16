@@ -17,7 +17,6 @@ class MainWindow(QMainWindow):
         # 加载 UI
         self.ui = QUiLoader().load(r'ui\main.ui')
         # 将项目元数据保存为实例属性，便于使用
-        config.SAMPLE_PATH = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
         config.DETECT_PATH = join_path(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
 
         # 处理悬浮计时器

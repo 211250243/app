@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QWidget, QDialog, QMessageBox, QFileDialog,
 import config
 from sample_handler import CustomListWidgetItem
 from server import Server
-from utils import show_message_box, update_metadata, join_path, is_image
+from utils import show_message_box, join_path, is_image
 
 
 class DetectHandler:

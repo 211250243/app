@@ -36,11 +36,11 @@ class NewModelDialog(QDialog):
         if not os.path.exists(model_path):
             os.makedirs(model_path)
             config.MODEL_PATH = model_path
+            # 修改项目的元数据
+            update_metadata('model_path', model_path)
         else:
             show_message_box("错误", "模型已存在，请选择其他名称！", QMessageBox.Critical)
             return
-        # 修改项目的元数据
-        update_metadata('model', model_name)
         # 关闭新建模型窗口
         self.ui.accept()
 
@@ -97,6 +97,6 @@ class ModelHandler:
                 print(f"复制{folder}到{model_folder}")
                 # 修改项目的元数据
                 config.MODEL_PATH = join_path(model_folder, model_name)
-                update_metadata('model', model_name)
+                update_metadata('model_path', config.MODEL_PATH)
                 self.ui.curModelEdit.setText(config.MODEL_PATH)
                 show_message_box("成功", "导入模型成功！", QMessageBox.Information)

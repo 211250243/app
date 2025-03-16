@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>3</number>
+     <number>1</number>
     </property>
     <property name="iconSize">
      <size>
@@ -723,93 +723,357 @@
        </item>
       </layout>
      </widget>
-     <widget class="QPushButton" name="importButton">
+     
+     <!-- 样本组操作框架 -->
+     <widget class="QFrame" name="groupOperationFrame">
       <property name="geometry">
        <rect>
-        <x>0</x>
-        <y>10</y>
-        <width>51</width>
-        <height>26</height>
+        <x>500</x>
+        <y>5</y>
+        <width>500</width>
+        <height>35</height>
        </rect>
       </property>
-      <property name="text">
-       <string>导入</string>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
       </property>
+      <property name="frameShadow">
+       <enum>QFrame::Plain</enum>
+      </property>
+      <widget class="QLabel" name="groupOperationLabel">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>8</y>
+         <width>80</width>
+         <height>16</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #333;</string>
+       </property>
+       <property name="text">
+        <string>样本组操作：</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="newSampleGroupButton">
+       <property name="geometry">
+        <rect>
+         <x>85</x>
+         <y>5</y>
+         <width>75</width>
+         <height>24</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1890ff;
+}
+QPushButton:hover {
+    background-color: #bae7ff;
+    border: 1px solid #69c0ff;
+}
+QPushButton:pressed {
+    background-color: #91d5ff;
+}</string>
+       </property>
+       <property name="text">
+        <string>新建样本组</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="importSampleGroupButton">
+       <property name="geometry">
+        <rect>
+         <x>170</x>
+         <y>5</y>
+         <width>75</width>
+         <height>24</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1890ff;
+}
+QPushButton:hover {
+    background-color: #bae7ff;
+    border: 1px solid #69c0ff;
+}
+QPushButton:pressed {
+    background-color: #91d5ff;
+}</string>
+       </property>
+       <property name="text">
+        <string>导入样本组</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="deleteSampleGroupButton">
+       <property name="geometry">
+        <rect>
+         <x>255</x>
+         <y>5</y>
+         <width>75</width>
+         <height>24</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1890ff;
+}
+QPushButton:hover {
+    background-color: #bae7ff;
+    border: 1px solid #69c0ff;
+}
+QPushButton:pressed {
+    background-color: #91d5ff;
+}</string>
+       </property>
+       <property name="text">
+        <string>删除样本组</string>
+       </property>
+      </widget>
      </widget>
-     <widget class="QPushButton" name="selectAllButton">
+     
+     <!-- 样本操作框架 -->
+     <widget class="QFrame" name="sampleOperationFrame">
       <property name="geometry">
        <rect>
-        <x>50</x>
-        <y>10</y>
-        <width>51</width>
-        <height>26</height>
+        <x>10</x>
+        <y>5</y>
+        <width>450</width>
+        <height>35</height>
        </rect>
       </property>
-      <property name="text">
-       <string>全选</string>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
       </property>
+      <property name="frameShadow">
+       <enum>QFrame::Plain</enum>
+      </property>
+      <widget class="QLabel" name="sampleOperationLabel">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>8</y>
+         <width>70</width>
+         <height>16</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-weight: bold; color: #333;</string>
+       </property>
+       <property name="text">
+        <string>样本操作：</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="importButton">
+       <property name="geometry">
+        <rect>
+         <x>70</x>
+         <y>5</y>
+         <width>51</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #aaa;
+}
+QPushButton:pressed {
+    background-color: #d0d0d0;
+}</string>
+       </property>
+       <property name="text">
+        <string>导入</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="addButton">
+       <property name="geometry">
+        <rect>
+         <x>130</x>
+         <y>5</y>
+         <width>51</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #aaa;
+}
+QPushButton:pressed {
+    background-color: #d0d0d0;
+}</string>
+       </property>
+       <property name="text">
+        <string>添加</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="deleteButton">
+       <property name="geometry">
+        <rect>
+         <x>190</x>
+         <y>5</y>
+         <width>51</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #aaa;
+}
+QPushButton:pressed {
+    background-color: #d0d0d0;
+}</string>
+       </property>
+       <property name="text">
+        <string>删除</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="selectAllButton">
+       <property name="geometry">
+        <rect>
+         <x>250</x>
+         <y>5</y>
+         <width>51</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #aaa;
+}
+QPushButton:pressed {
+    background-color: #d0d0d0;
+}</string>
+       </property>
+       <property name="text">
+        <string>全选</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="selectButton">
+       <property name="geometry">
+        <rect>
+         <x>310</x>
+         <y>5</y>
+         <width>51</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #aaa;
+}
+QPushButton:pressed {
+    background-color: #d0d0d0;
+}</string>
+       </property>
+       <property name="text">
+        <string>选择</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="completeButton">
+       <property name="geometry">
+        <rect>
+         <x>370</x>
+         <y>5</y>
+         <width>51</width>
+         <height>26</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+QPushButton:hover {
+    background-color: #e0e0e0;
+    border: 1px solid #aaa;
+}
+QPushButton:pressed {
+    background-color: #d0d0d0;
+}</string>
+       </property>
+       <property name="text">
+        <string>完成</string>
+       </property>
+      </widget>
      </widget>
-     <widget class="QPushButton" name="deleteButton">
+     
+     <!-- 当前样本组标签 -->
+     <widget class="QLabel" name="currentGroupLabel">
       <property name="geometry">
        <rect>
-        <x>100</x>
-        <y>10</y>
-        <width>51</width>
-        <height>26</height>
+        <x>10</x>
+        <y>40</y>
+        <width>300</width>
+        <height>20</height>
        </rect>
       </property>
-      <property name="text">
-       <string>删除</string>
-      </property>
-     </widget>
-     <widget class="QPushButton" name="addButton">
-      <property name="geometry">
-       <rect>
-        <x>150</x>
-        <y>10</y>
-        <width>51</width>
-        <height>26</height>
-       </rect>
+      <property name="styleSheet">
+       <string notr="true">font-weight: bold; color: #1890ff; font-size: 12px;</string>
       </property>
       <property name="text">
-       <string>添加</string>
+       <string>当前样本组：</string>
+      </property>
+      <property name="visible">
+       <bool>false</bool>
       </property>
      </widget>
-     <widget class="QPushButton" name="selectButton">
-      <property name="geometry">
-       <rect>
-        <x>200</x>
-        <y>10</y>
-        <width>51</width>
-        <height>26</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>选择</string>
-      </property>
-     </widget>
-     <widget class="QPushButton" name="completeButton">
-      <property name="geometry">
-       <rect>
-        <x>250</x>
-        <y>10</y>
-        <width>51</width>
-        <height>26</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>完成</string>
-      </property>
-     </widget>
+     
      <zorder>horizontalLayoutWidget</zorder>
      <zorder>sampleNextButton</zorder>
      <zorder>foldButton</zorder>
-     <zorder>importButton</zorder>
-     <zorder>selectAllButton</zorder>
-     <zorder>deleteButton</zorder>
-     <zorder>addButton</zorder>
-     <zorder>selectButton</zorder>
-     <zorder>completeButton</zorder>
+     <zorder>groupOperationFrame</zorder>
+     <zorder>sampleOperationFrame</zorder>
+     <zorder>currentGroupLabel</zorder>
     </widget>
     <widget class="QWidget" name="modelWidget">
      <attribute name="title">
