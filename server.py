@@ -31,6 +31,22 @@ class Server:
         except Exception as e:
             print(f"文件上传失败：{str(e)}")
             raise # 继续抛出异常
+    
+    def upload_directory(self, local_path, remote_path):
+        """递归上传整个目录"""
+        # root, dirs, files 分别是当前目录、子目录、子文件
+        for root, dirs, files in os.walk(local_path):
+            # 创建对应的远程目录
+            remote_dir = root.replace(local_path, remote_path, 1)
+            try:
+                self.sftp_client.mkdir(remote_dir)
+            except IOError:
+                pass  # 目录已存在则跳过
+            # 上传所有文件
+            for file in files:
+                local_file = os.path.join(root, file)
+                remote_file = os.path.join(remote_dir, file)
+                self.upload_file(local_file, remote_file)
 
     def download_file(self, remote_file_path, local_file_path):
         """从远程服务器下载文件"""

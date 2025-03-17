@@ -42,15 +42,15 @@ class SampleHandler:
         self.ui.importSampleGroupButton.clicked.connect(self.import_sample_group)
         self.ui.deleteSampleGroupButton.clicked.connect(self.delete_sample_group)
         # 初始化样本组路径
-        if 'sample_path' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_path']:
-            self.sample_path = config.PROJECT_METADATA['sample_path']
-            self.sample_group = self.sample_path.split('/')[-1]
+        if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
+            self.sample_group = config.PROJECT_METADATA['sample_group']
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group)
         else:
             self.sample_group = None
-            self.sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+            self.group_path = config.SAMPLE_PATH
         # 确保样本组路径存在
-        if not os.path.exists(self.sample_path):
-            os.makedirs(self.sample_path)
+        if not os.path.exists(self.group_path):
+            os.makedirs(self.group_path)
             
     def update_button_visibility(self):
         """
@@ -83,13 +83,13 @@ class SampleHandler:
         if ok and text:
             # 设置样本组名称
             # 创建样本组文件夹
-            sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER, text)
-            if not os.path.exists(sample_path):
-                os.makedirs(sample_path)
+            group_path = join_path(config.SAMPLE_PATH, text)
+            if not os.path.exists(group_path):
+                os.makedirs(group_path)
                 # 更新数据
-                self.sample_group = text
-                config.SAMPLE_PATH = self.sample_path = sample_path
-                update_metadata('sample_path', self.sample_path)
+                config.SAMPLE_GROUP = self.sample_group = text
+                self.group_path = group_path
+                update_metadata('sample_group', text)
                 # 更新按钮显示状态
                 self.update_button_visibility()
                 # 清空图片列表
@@ -110,9 +110,9 @@ class SampleHandler:
         # 如果用户点击了确定按钮并选择了样本组
         if result == QDialog.Accepted and dialog.selected_group:
             # 更新数据
-            self.sample_group = dialog.selected_group
-            config.SAMPLE_PATH = self.sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER, self.sample_group)
-            update_metadata('sample_path', self.sample_path)
+            config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group)
+            update_metadata('sample_group', self.sample_group)
             # 更新按钮显示状态
             self.update_button_visibility()
             # 加载样本组中的图片
@@ -136,33 +136,33 @@ class SampleHandler:
         # 如果用户点击了确定按钮并选择了样本组
         if result == QDialog.Accepted and dialog.selected_group:
             # 获取选中的样本组名称
-            group_name = dialog.selected_group
+            sample_group = dialog.selected_group
             # 弹出确认对话框
             confirm = QMessageBox.question(
                 self.ui,
                 "确认删除",
-                f"确定要删除样本组 {group_name} 吗？\n此操作将删除该样本组的所有图片，且不可恢复！",
+                f"确定要删除样本组 {sample_group} 吗？\n此操作将删除该样本组的所有图片，且不可恢复！",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )
             # 如果用户确认删除
             if confirm == QMessageBox.Yes:
                 # 获取样本组路径
-                group_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER, group_name)
+                group_path = join_path(config.SAMPLE_PATH, sample_group)
                 try:
                     # 删除样本组文件夹及其内容
                     shutil.rmtree(group_path)
                     # 如果删除的是当前样本组，清空当前样本组
-                    if self.sample_group == group_name:
-                        self.sample_group = None
-                        config.SAMPLE_PATH = self.sample_path = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
-                        update_metadata('sample_path', '')
+                    if self.sample_group == sample_group:
+                        config.SAMPLE_GROUP = self.sample_group = None
+                        self.group_path = config.SAMPLE_PATH
+                        update_metadata('sample_group', None)
                         # 更新按钮显示状态
                         self.update_button_visibility()
                         # 清空图片列表
                         self.ui.imageList.clear()
                     # 显示成功消息
-                    show_message_box("成功", f"已删除样本组：{group_name}", QMessageBox.Information, self.ui)
+                    show_message_box("成功", f"已删除样本组：{sample_group}", QMessageBox.Information, self.ui)
                 except Exception as e:
                     # 如果删除失败，显示错误消息
                     show_message_box("错误", f"删除样本组失败：{str(e)}", QMessageBox.Critical, self.ui)
@@ -183,7 +183,8 @@ class SampleHandler:
         self.ui.selectButton.clicked.connect(self.select_enabled)
         self.ui.completeButton.clicked.connect(self.select_disabled)
         # 加载图片
-        LoadImages(self.ui).load_with_progress()
+        if self.sample_group:
+            LoadImages(self.ui).load_with_progress()
 
     def fold(self):
         """
@@ -265,7 +266,7 @@ class SampleHandler:
         """
         复制图片到 img 文件夹, 并修改权限为可读写
         """
-        destination_path = join_path(self.sample_path, os.path.basename(file_path))
+        destination_path = join_path(self.group_path, os.path.basename(file_path))
         shutil.copy(file_path, destination_path)
         os.chmod(destination_path, 0o777)
 
@@ -717,14 +718,16 @@ class UploadThread(QThread):
 
     def __init__(self, ui):
         super().__init__()
-        self.sample_path = config.SAMPLE_PATH
-        self.remote_dir = config.SERVER_UPLOAD_PATH
+        self.local_sample_path = config.SAMPLE_PATH
+        self.remote_sample_path = config.SERVER_SAMPLE_PATH
         self.ui = ui
         self.e = "未知错误"  # 用于存储异常信息
+        self.total_files = 0  # 总文件数
+        self.uploaded_files = 0  # 已上传文件数
 
         msg = {
             "title": "上传样本",
-            "text": "正在上传样本..."
+            "text": "正在上传样本组..."
         }
         self.progressDialog = ProgressDialog(self.ui, msg)
         self.upload_finished.connect(self.on_upload_finished)
@@ -747,6 +750,46 @@ class UploadThread(QThread):
         self.upload_finished.connect(loop.quit)
         loop.exec()
 
+    def count_files(self, directory):
+        """统计目录中的所有图片文件数量"""
+        count = 0
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if is_image(file):
+                    count += 1
+        return count
+
+    def upload_directory_with_progress(self, server, local_path, remote_path):
+        """递归上传整个目录，并更新进度条"""
+        # 确保远程目录存在
+        try:
+            server.sftp_client.mkdir(remote_path)
+        except IOError:
+            pass  # 目录已存在则跳过
+        # 遍历本地目录
+        for item in os.listdir(local_path):
+            local_item_path = join_path(local_path, item)
+            remote_item_path = join_path(remote_path, item)
+            
+            if os.path.isdir(local_item_path):
+                # 如果是目录，递归上传
+                try:
+                    server.sftp_client.mkdir(remote_item_path)
+                except IOError:
+                    pass  # 目录已存在则跳过
+                self.upload_directory_with_progress(server, local_item_path, remote_item_path)
+            elif os.path.isfile(local_item_path) and is_image(item):
+                # 如果是图片文件，上传
+                try:
+                    server.upload_file(local_item_path, remote_item_path)
+                    self.uploaded_files += 1
+                    # 更新进度条
+                    progress = int(self.uploaded_files / self.total_files * 100)
+                    self.progressDialog.setValue(progress)
+                except Exception as e:
+                    self.e = str(e) or "文件上传失败"
+                    raise  # 继续抛出异常
+
     def run(self):
         # 连接服务器
         server = Server()
@@ -756,31 +799,31 @@ class UploadThread(QThread):
             self.e = str(e) or "服务器连接失败"
             self.upload_finished.emit(False)
             return
-        # 获取所有图片文件
-        files = [f for f in os.listdir(self.sample_path) if is_image(f)]
-        total_files = len(files)
-        # 遍历并上传每个文件
-        for index, file_name in enumerate(files):
-            file_path = join_path(self.sample_path, file_name)
-            remote_path = join_path(self.remote_dir, file_name)
-            # 上传文件，若失败则停止上传
-            try:
-                server.upload_file(file_path, remote_path)
-            except Exception as e:
-                self.e = str(e) or "服务器连接断开"
+        try:
+            # 统计所有需要上传的文件数量
+            self.total_files = self.count_files(self.local_sample_path)
+            if self.total_files == 0:
+                self.e = "没有找到可上传的图片文件"
                 self.upload_finished.emit(False)
                 return
-            # 更新进度条
-            progress = int((index + 1) / total_files * 100)
-            self.progressDialog.setValue(progress)
-        self.upload_finished.emit(True)  # 上传成功
-        server.close_connection()
+            # 更新进度条文本
+            self.progressDialog.setLabelText(f"正在上传 {self.total_files} 个文件...")
+            # 上传整个样本组文件夹
+            self.uploaded_files = 0
+            self.upload_directory_with_progress(server, self.local_sample_path, self.remote_sample_path)
+            # 上传成功
+            self.upload_finished.emit(True)
+        except Exception as e:
+            self.e = str(e) or "上传过程中出错"
+            self.upload_finished.emit(False)
+        finally:
+            server.close_connection()
 
 
 class LoadImages:
     """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
     def __init__(self, ui):
-        self.sample_path = config.SAMPLE_PATH
+        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP)
         self.ui = ui
     
     def load_with_progress(self):
@@ -796,7 +839,7 @@ class LoadImages:
 
         # 重新获取图片列表
         self.ui.imageList.clear()
-        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+        images = [f for f in os.listdir(self.group_path) if is_image(f)]
         total_images = len(images)
         # 处理空图片列表情况
         if total_images == 0:
@@ -805,7 +848,7 @@ class LoadImages:
         # 加载图片
         for index, image in enumerate(images):
             # 添加图片到列表
-            image_path = join_path(self.sample_path, image)
+            image_path = join_path(self.group_path, image)
             self._add_to_list(image_path, image, index)
             # 更新进度
             progress = int((index + 1) / total_images * 100)
@@ -852,10 +895,10 @@ class LoadImages:
 
         # 重新获取图片列表
         self.ui.imageList.clear()
-        images = [f for f in os.listdir(self.sample_path) if is_image(f)]
+        images = [f for f in os.listdir(self.group_path) if is_image(f)]
         # 添加所有图片到列表
         for index, image in enumerate(images):
-            image_path = join_path(self.sample_path, image)
+            image_path = join_path(self.group_path, image)
             self._add_to_list(image_path, image, index)
         # 加载完成后关闭动画
         # QTimer.singleShot(2000, loading.close_animation)

@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>2</number>
     </property>
     <property name="iconSize">
      <size>
@@ -723,8 +723,6 @@
        </item>
       </layout>
      </widget>
-     
-     <!-- 样本组操作框架 -->
      <widget class="QFrame" name="groupOperationFrame">
       <property name="geometry">
        <rect>
@@ -735,10 +733,10 @@
        </rect>
       </property>
       <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+       <enum>QFrame::Shape::NoFrame</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Plain</enum>
+       <enum>QFrame::Shadow::Plain</enum>
       </property>
       <widget class="QLabel" name="groupOperationLabel">
        <property name="geometry">
@@ -844,8 +842,6 @@ QPushButton:pressed {
        </property>
       </widget>
      </widget>
-     
-     <!-- 样本操作框架 -->
      <widget class="QFrame" name="sampleOperationFrame">
       <property name="geometry">
        <rect>
@@ -856,10 +852,10 @@ QPushButton:pressed {
        </rect>
       </property>
       <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+       <enum>QFrame::Shape::NoFrame</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Plain</enum>
+       <enum>QFrame::Shadow::Plain</enum>
       </property>
       <widget class="QLabel" name="sampleOperationLabel">
        <property name="geometry">
@@ -1046,8 +1042,6 @@ QPushButton:pressed {
        </property>
       </widget>
      </widget>
-     
-     <!-- 当前样本组标签 -->
      <widget class="QLabel" name="currentGroupLabel">
       <property name="geometry">
        <rect>
@@ -1057,17 +1051,16 @@ QPushButton:pressed {
         <height>20</height>
        </rect>
       </property>
+      <property name="visible">
+       <bool>false</bool>
+      </property>
       <property name="styleSheet">
        <string notr="true">font-weight: bold; color: #1890ff; font-size: 12px;</string>
       </property>
       <property name="text">
        <string>当前样本组：</string>
       </property>
-      <property name="visible">
-       <bool>false</bool>
-      </property>
      </widget>
-     
      <zorder>horizontalLayoutWidget</zorder>
      <zorder>sampleNextButton</zorder>
      <zorder>foldButton</zorder>
@@ -1207,29 +1200,6 @@ QPushButton:pressed {
        <property name="title">
         <string>自动设置</string>
        </property>
-       <widget class="QComboBox" name="comboBox">
-        <property name="geometry">
-         <rect>
-          <x>140</x>
-          <y>30</y>
-          <width>201</width>
-          <height>26</height>
-         </rect>
-        </property>
-       </widget>
-       <widget class="QLabel" name="label">
-        <property name="geometry">
-         <rect>
-          <x>40</x>
-          <y>30</y>
-          <width>71</width>
-          <height>26</height>
-         </rect>
-        </property>
-        <property name="text">
-         <string>模型骨架：</string>
-        </property>
-       </widget>
        <widget class="QLabel" name="label_3">
         <property name="geometry">
          <rect>
@@ -1240,10 +1210,10 @@ QPushButton:pressed {
          </rect>
         </property>
         <property name="text">
-         <string>训练精度：</string>
+         <string>模型精度：</string>
         </property>
        </widget>
-       <widget class="QComboBox" name="comboBox_2">
+       <widget class="QComboBox" name="accuracyComboBox">
         <property name="geometry">
          <rect>
           <x>140</x>
@@ -1266,7 +1236,7 @@ QPushButton:pressed {
          <string>缺陷大小：</string>
         </property>
        </widget>
-       <widget class="QComboBox" name="comboBox_3">
+       <widget class="QComboBox" name="defectSizeComboBox">
         <property name="geometry">
          <rect>
           <x>140</x>
@@ -1289,7 +1259,7 @@ QPushButton:pressed {
          <string>训练速度：</string>
         </property>
        </widget>
-       <widget class="QComboBox" name="comboBox_4">
+       <widget class="QComboBox" name="speedComboBox">
         <property name="geometry">
          <rect>
           <x>140</x>
@@ -1445,6 +1415,32 @@ QPushButton:pressed {
         </property>
        </widget>
       </widget>
+     </widget>
+     <widget class="QPushButton" name="trainButton">
+      <property name="geometry">
+       <rect>
+        <x>250</x>
+        <y>570</y>
+        <width>75</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>训练</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="viewParamsButton">
+      <property name="geometry">
+       <rect>
+        <x>410</x>
+        <y>570</y>
+        <width>75</width>
+        <height>24</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>查看参数</string>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="detectWidget">
