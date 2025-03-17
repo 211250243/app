@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>1</number>
     </property>
     <property name="iconSize">
      <size>
@@ -545,19 +545,6 @@
        </item>
        <item>
         <widget class="QWidget" name="operateColumn" native="true">
-         <widget class="QPushButton" name="shrinkDoAndExcludeBgButton">
-          <property name="geometry">
-           <rect>
-            <x>170</x>
-            <y>140</y>
-            <width>51</width>
-            <height>26</height>
-           </rect>
-          </property>
-          <property name="text">
-           <string>确认</string>
-          </property>
-         </widget>
          <widget class="QGroupBox" name="groupBox_3">
           <property name="geometry">
            <rect>
@@ -673,6 +660,22 @@
             <height>26</height>
            </rect>
           </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+    background-color: #1890ff;
+    color: white;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QPushButton:hover {
+    background-color: #40a9ff;
+}
+
+QPushButton:pressed {
+    background-color: #096dd9;
+}</string>
+          </property>
           <property name="text">
            <string>确认</string>
           </property>
@@ -681,7 +684,7 @@
           <property name="geometry">
            <rect>
             <x>20</x>
-            <y>40</y>
+            <y>30</y>
             <width>211</width>
             <height>91</height>
            </rect>
@@ -719,6 +722,105 @@
            </property>
           </widget>
          </widget>
+         <widget class="QPushButton" name="shrinkDoAndExcludeBgButton">
+          <property name="geometry">
+           <rect>
+            <x>160</x>
+            <y>130</y>
+            <width>61</width>
+            <height>26</height>
+           </rect>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+    background-color: #1890ff;
+    color: white;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QPushButton:hover {
+    background-color: #40a9ff;
+}
+
+QPushButton:pressed {
+    background-color: #096dd9;
+}</string>
+          </property>
+          <property name="text">
+           <string>确认</string>
+          </property>
+         </widget>
+         <widget class="QGroupBox" name="groupBox_10">
+          <property name="geometry">
+           <rect>
+            <x>20</x>
+            <y>180</y>
+            <width>211</width>
+            <height>71</height>
+           </rect>
+          </property>
+          <property name="title">
+           <string>训练集设置</string>
+          </property>
+          <widget class="QCheckBox" name="autoSplitTestCheckBox">
+           <property name="geometry">
+            <rect>
+             <x>20</x>
+             <y>30</y>
+             <width>111</width>
+             <height>20</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>自动生成训练集</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+           <property name="autoExclusive">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </widget>
+         <widget class="QPushButton" name="autoSplitTestButton">
+          <property name="geometry">
+           <rect>
+            <x>160</x>
+            <y>260</y>
+            <width>61</width>
+            <height>26</height>
+           </rect>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+    background-color: #1890ff;
+    color: white;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+QPushButton:hover {
+    background-color: #40a9ff;
+}
+
+QPushButton:pressed {
+    background-color: #096dd9;
+}</string>
+          </property>
+          <property name="text">
+           <string>确认</string>
+          </property>
+         </widget>
+         <zorder>groupBox_10</zorder>
+         <zorder>groupBox_3</zorder>
+         <zorder>augmentButton</zorder>
+         <zorder>groupBox_4</zorder>
+         <zorder>shrinkDoAndExcludeBgButton</zorder>
+         <zorder>autoSplitTestButton</zorder>
         </widget>
        </item>
       </layout>
@@ -1432,7 +1534,7 @@ QPushButton:pressed {
      <widget class="QPushButton" name="viewParamsButton">
       <property name="geometry">
        <rect>
-        <x>410</x>
+        <x>350</x>
         <y>570</y>
         <width>75</width>
         <height>24</height>

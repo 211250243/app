@@ -1,11 +1,12 @@
 import os
 import shutil
+import random
 
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QWidget, QDialog, QMessageBox, QFileDialog
 
 import config
-from utils import show_message_box, update_metadata, join_path
+from utils import show_message_box, update_metadata, join_path, is_image
 
 
 class PatchCoreParamMapper:
@@ -186,6 +187,7 @@ class ModelHandler:
         self.ui.speedComboBox.clear()
         self.ui.speedComboBox.addItems(options["training_speed"])
         self.ui.speedComboBox.setCurrentIndex(1)  # 默认选中均衡
+        
 
     def create_new_model(self):
         """
@@ -230,9 +232,10 @@ class ModelHandler:
         if not config.MODEL_PATH or not os.path.exists(config.MODEL_PATH):
             show_message_box("错误", "请先创建或导入模型！", QMessageBox.Critical)
             return
-        if not config.PROJECT_METADATA.get('sample_path') or not os.path.exists(config.PROJECT_METADATA.get('sample_path')):
+        if not config.SAMPLE_GROUP:
             show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical)
             return
+
         # 从UI获取参数选择
         accuracy = self.ui.accuracyComboBox.currentText()
         defect_size = self.ui.defectSizeComboBox.currentText()
@@ -247,6 +250,7 @@ class ModelHandler:
         show_message_box("信息", "模型训练已开始，请耐心等待...", QMessageBox.Information)
         # 这里应该有实际的训练代码，可能需要多线程实现
         print(f"开始训练模型，参数：{params}")
+        
 
     def view_parameters(self):
         """

@@ -44,13 +44,15 @@ class SampleHandler:
         # 初始化样本组路径
         if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
             self.sample_group = config.PROJECT_METADATA['sample_group']
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN)
+            test_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TEST) 
+            # 确保训练集和测试集路径同时存在
+            os.makedirs(test_path, exist_ok=True)
         else:
             self.sample_group = None
             self.group_path = config.SAMPLE_PATH
         # 确保样本组路径存在
-        if not os.path.exists(self.group_path):
-            os.makedirs(self.group_path)
+        os.makedirs(self.group_path, exist_ok=True)
             
     def update_button_visibility(self):
         """
@@ -83,12 +85,15 @@ class SampleHandler:
         if ok and text:
             # 设置样本组名称
             # 创建样本组文件夹
-            group_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL)
-            if not os.path.exists(group_path):
-                os.makedirs(group_path)
+            train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN)
+            test_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TEST)
+            if not os.path.exists(train_path):
+                # 创建训练集和测试集文件夹
+                os.makedirs(train_path)
+                os.makedirs(test_path)
                 # 更新数据
                 config.SAMPLE_GROUP = self.sample_group = text
-                self.group_path = group_path
+                self.group_path = train_path
                 update_metadata('sample_group', text)
                 # 更新按钮显示状态
                 self.update_button_visibility()
@@ -111,7 +116,7 @@ class SampleHandler:
         if result == QDialog.Accepted and dialog.selected_group:
             # 更新数据
             config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN)
             update_metadata('sample_group', self.sample_group)
             # 更新按钮显示状态
             self.update_button_visibility()
@@ -167,6 +172,8 @@ class SampleHandler:
                     # 如果删除失败，显示错误消息
                     show_message_box("错误", f"删除样本组失败：{str(e)}", QMessageBox.Critical, self.ui)
 
+
+
     def init_image_list(self):
         """
         初始化图片列表
@@ -184,7 +191,8 @@ class SampleHandler:
         self.ui.completeButton.clicked.connect(self.select_disabled)
         # 加载图片
         if self.sample_group:
-            LoadImages(self.ui).load_with_progress()
+            LoadImages(self.ui).load_with_progress() # 加载图片列表
+            self.update_button_visibility() # 更新按钮显示状态
 
     def fold(self):
         """
@@ -464,7 +472,9 @@ class SampleHandler:
         初始化操作栏
         """
         self.ui.shrinkDoAndExcludeBgButton.clicked.connect(self.shrink_domain_exclude_background)
+        self.ui.autoSplitTestButton.clicked.connect(self.split_test_set)
         self.ui.augmentButton.clicked.connect(self.augment)
+        # 初始化augment中的选项组
         self.ui.randomOption.clicked.connect(self.random_option)
         self.ui.optionGroup.buttonClicked.connect(self.specified_option)
 
@@ -481,6 +491,8 @@ class SampleHandler:
         """
         缩小域并排除背景
         """
+        if not self.check_sample_group():
+            return
         # 获取选中的项并遍历处理
         selected_items = self.ui.imageList.selectedItems()
         for item in selected_items:
@@ -517,6 +529,8 @@ class SampleHandler:
         """
         对选中项进行数据增强，并将增强后的图片保存
         """
+        if not self.check_sample_group():
+            return
         selected_items = self.ui.imageList.selectedItems()
         for item in selected_items:
             image_path = item.image_path
@@ -600,6 +614,48 @@ class SampleHandler:
         final_hsv = cv2.merge((h, s, v))
         return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), "color_changed"
 
+    def split_test_set(self, ):
+        """
+        将部分训练样本移动到测试集文件夹
+        
+        Args:
+            test_ratio: 测试集比例，默认为0.2（20%）
+        """
+        if not self.check_sample_group():
+            return
+        # 获取训练集和测试集路径
+        train_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN)
+        test_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TEST)
+        # 测试集存在性检查
+        if os.path.exists(test_path) and len(os.listdir(test_path)) > 0:
+            show_message_box("警告", "已有测试集", QMessageBox.Warning)
+            return    
+        # 获取训练集中的所有图片
+        train_images = [f for f in os.listdir(train_path) if os.path.isfile(join_path(train_path, f)) and is_image(f)]
+        # 如果训练集为空，显示错误消息并返回
+        if not train_images:
+            show_message_box("错误", "训练集中没有图片！", QMessageBox.Critical)
+            return
+        # 计算需要移动到测试集的图片数量
+        test_count = max(1, int(len(train_images) * config.TEST_RATIO))
+        # 随机选择图片移动到测试集
+        test_images = random.sample(train_images, test_count)
+        # 移动图片到测试集
+        for image_name in test_images:
+            src_path = join_path(train_path, image_name)
+            dst_path = join_path(test_path, image_name)
+            shutil.move(src_path, dst_path)  # 移动文件
+        # 显示成功消息
+        show_message_box("成功", f"已自动分割测试集，将{test_count}张图片移动到测试集。", QMessageBox.Information)  # 修改提示语
+
+    def check_sample_group(self):
+        """
+        检查是否选择样本组
+        """
+        if not config.SAMPLE_GROUP:
+            show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical)
+            return False
+        return True
 
 
 class CustomListWidgetItem(QListWidgetItem):
@@ -823,7 +879,7 @@ class UploadThread(QThread):
 class LoadImages:
     """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
     def __init__(self, ui):
-        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL)
+        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN)
         self.ui = ui
     
     def load_with_progress(self):
