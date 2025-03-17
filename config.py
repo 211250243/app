@@ -21,12 +21,13 @@ PROJECT_METADATA_PATH = None
 SAMPLE_FOLDER = 'sample_groups'
 SAMPLE_GROUP = None
 SAMPLE_PATH = None
-SAMPLE_LABEL_TRAIN = 'train/good'
-SAMPLE_LABEL_TEST = 'test/good'
+SAMPLE_LABEL_TRAIN_GOOD = 'train/good'
+SAMPLE_LABEL_TEST = 'test'
+SAMPLE_LABEL_TEST_GOOD = 'test/good'
 MODEL_FOLDER = 'models'
 MODEL_PATH = None
 DETECT_FOLDER = 'detect'
 DETECT_PATH = None
 
 # 参数配置
-TEST_RATIO = 0.2
+TEST_RATIO = 0.1

@@ -44,16 +44,13 @@ class SampleHandler:
         # 初始化样本组路径
         if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
             self.sample_group = config.PROJECT_METADATA['sample_group']
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN)
-            test_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TEST) 
-            # 确保训练集和测试集路径同时存在
-            os.makedirs(test_path, exist_ok=True)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
         else:
             self.sample_group = None
             self.group_path = config.SAMPLE_PATH
         # 确保样本组路径存在
         os.makedirs(self.group_path, exist_ok=True)
-            
+
     def update_button_visibility(self):
         """
         根据当前样本组状态更新按钮显示
@@ -83,14 +80,11 @@ class SampleHandler:
         )
         # 如果用户点击了确定按钮且输入了名称
         if ok and text:
-            # 设置样本组名称
             # 创建样本组文件夹
-            train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN)
-            test_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TEST)
+            train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN_GOOD)
             if not os.path.exists(train_path):
-                # 创建训练集和测试集文件夹
+                # 创建训练集
                 os.makedirs(train_path)
-                os.makedirs(test_path)
                 # 更新数据
                 config.SAMPLE_GROUP = self.sample_group = text
                 self.group_path = train_path
@@ -116,7 +110,7 @@ class SampleHandler:
         if result == QDialog.Accepted and dialog.selected_group:
             # 更新数据
             config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
             update_metadata('sample_group', self.sample_group)
             # 更新按钮显示状态
             self.update_button_visibility()
@@ -472,7 +466,7 @@ class SampleHandler:
         初始化操作栏
         """
         self.ui.shrinkDoAndExcludeBgButton.clicked.connect(self.shrink_domain_exclude_background)
-        self.ui.autoSplitTestButton.clicked.connect(self.split_test_set)
+        self.ui.autoGenerateTestButton.clicked.connect(lambda: self.generate_test_set())
         self.ui.augmentButton.clicked.connect(self.augment)
         # 初始化augment中的选项组
         self.ui.randomOption.clicked.connect(self.random_option)
@@ -527,7 +521,8 @@ class SampleHandler:
 
     def augment(self):
         """
-        对选中项进行数据增强，并将增强后的图片保存
+        对选中项进行数据增强(正样本增强)，并将增强后的图片保存
+        正样本增强不会改变样本的本质特征，只增加样本的多样性
         """
         if not self.check_sample_group():
             return
@@ -543,13 +538,13 @@ class SampleHandler:
             # 根据指定的选项进行数据增强
             else:
                 if self.ui.rotateOption.isChecked():
-                    augmented_images.append((self.rotate_image(image)))
+                    augmented_images.append((self.augment_rotate_image(image)))
                 if self.ui.turnOverOption.isChecked():
-                    augmented_images.append((self.turn_over_image(image)))
+                    augmented_images.append((self.augment_flip_image(image)))
                 if self.ui.changeColorOption.isChecked():
-                    augmented_images.append((self.change_color(image)))
+                    augmented_images.append((self.augment_color(image)))
                 if self.ui.changeBrightnessOption.isChecked():
-                    augmented_images.append((self.change_brightness(image)))
+                    augmented_images.append((self.augment_brightness(image)))
 
             # 保存增强后的图像
             for augmented_image, suffix in augmented_images:
@@ -561,92 +556,388 @@ class SampleHandler:
 
     def random_augmentation(self, image):
         """
-        随机选择一种数据增强操作
+        随机选择一种正样本数据增强操作
         """
-        augmentations = [self.rotate_image, self.turn_over_image, self.change_brightness]
+        augmentations = [self.augment_rotate_image, self.augment_flip_image, self.augment_brightness, self.augment_color]
         augmentation = random.choice(augmentations)
         return augmentation(image)
 
-    def rotate_image(self, image):
+    def augment_rotate_image(self, image):
         """
-        随机旋转图像
+        随机旋转图像 - 正样本几何变换
+        保持物体特征不变，只改变视角
         """
         angle = random.choice([90, 180, 270])
         print(f"旋转角度: {angle}")
         if angle == 90:
-            return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+            return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE), "rotated90"
         elif angle == 180:
-            return cv2.rotate(image, cv2.ROTATE_180)
+            return cv2.rotate(image, cv2.ROTATE_180), "rotated180"
         elif angle == 270:
-            return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE), "rotated"
+            return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE), "rotated270"
 
-    def turn_over_image(self, image):
+    def augment_flip_image(self, image):
         """
-        随机翻转图像
+        随机翻转图像 - 正样本几何变换
+        保持物体特征不变，只改变视角
         """
         flip_code = random.choice([-1, 0, 1])
-        return cv2.flip(image, flip_code), "turned_over"
+        flip_name = "flip_both" if flip_code == -1 else ("flip_vertical" if flip_code == 0 else "flip_horizontal")
+        return cv2.flip(image, flip_code), flip_name
 
-    def change_brightness(self, image):
+    def augment_brightness(self, image):
         """
-        随机改变图像亮度
+        随机改变图像亮度 - 正样本光照变化
+        轻微调整亮度，模拟不同光照条件，但不会产生异常
+        范围控制在[-30, 30]，避免过度偏离正常样本
         """
-        value = random.randint(-50, 50)
-        print(f"亮度值: {value}")
+        value = random.randint(-30, 30)  # 保持较小的变化范围
+        print(f"正样本亮度调整值: {value}")
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         v = v.astype(np.int16)  # Convert to int16 to prevent overflow
         v = np.clip(v + value, 0, 255)
         v = v.astype(np.uint8)  # Convert back to uint8
         final_hsv = cv2.merge((h, s, v))
-        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), "brightness_changed"
+        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), "brightness_normal"
 
-    def change_color(self, image):
+    def augment_color(self, image):
         """
-        随机改变图像颜色
+        随机改变图像颜色 - 正样本色调变化
+        轻微调整色相，模拟不同色温，但不会产生异常
+        范围控制在[-20, 20]，避免过度偏离正常样本
         """
-        value = random.randint(-50, 50)  # Adjust the range as needed
+        value = random.randint(-20, 20)  # 保持较小的变化范围
+        print(f"正样本色调调整值: {value}")
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
         h = h.astype(np.int16)  # Convert to int16 to prevent overflow
         h = (h + value) % 180  # Hue values are in the range [0, 179]
         h = h.astype(np.uint8)  # Convert back to uint8
+        # 不额外增加饱和度
         final_hsv = cv2.merge((h, s, v))
-        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), "color_changed"
+        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), "color_normal"
 
-    def split_test_set(self, ):
+    def generate_test_set(self):
         """
-        将部分训练样本移动到测试集文件夹
+        准备MVTec格式的测试集：
+        1. 将部分训练样本复制到test/good文件夹
+        2. 使用特殊的数据增强技术生成伪缺陷样本放入test/defect_*文件夹
+        3. 同时生成对应的ground_truth掩码，放入ground_truth文件夹中
         
-        Args:
-            test_ratio: 测试集比例，默认为0.2（20%）
+        伪缺陷样本会明显偏离正常样本的特征，模拟实际缺陷
+        每种缺陷类型都有独立的子文件夹
         """
         if not self.check_sample_group():
             return
-        # 获取训练集和测试集路径
-        train_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN)
-        test_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TEST)
+            
+        # 获取训练集路径
+        train_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)
+        
+        # 创建MVTec格式的目录结构
+        test_good_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TEST_GOOD)
+        
+        # 定义所有缺陷类型及其对应的文件夹名
+        defect_types = {
+            'color_shift': 'test/defect_color_shift',  # 颜色偏移缺陷
+            'brightness': 'test/defect_brightness',    # 亮度异常缺陷
+            'noise': 'test/defect_noise',             # 噪点缺陷
+            'blur': 'test/defect_blur',               # 模糊缺陷
+            'distortion': 'test/defect_distortion'    # 扭曲变形缺陷
+        }
+        
+        # 为掩码创建ground_truth目录
+        ground_truth_base = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, "ground_truth")
+        ground_truth_paths = {}
+        for defect_type in defect_types.keys():
+            ground_truth_paths[defect_type] = join_path(ground_truth_base, 'defect_' + defect_type)
+        
+        
         # 测试集存在性检查
-        if os.path.exists(test_path) and len(os.listdir(test_path)) > 0:
-            show_message_box("警告", "已有测试集", QMessageBox.Warning)
-            return    
+        test_paths = [test_good_path] + [join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, path) 
+                                        for path in defect_types.values()]
+        test_paths.append(ground_truth_base)  # 添加ground_truth目录到检查列表
+        
+        if any(os.path.exists(path) and len(os.listdir(path)) > 0 for path in test_paths):
+            confirm = QMessageBox.question(
+                self.ui,
+                "确认覆盖",
+                "已存在测试集数据，是否覆盖？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if confirm == QMessageBox.No:
+                return
+            # 清空测试集文件夹
+            for path in test_paths:
+                if os.path.exists(path):
+                    for file in os.listdir(path):
+                        file_path = join_path(path, file)
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                        elif os.path.isdir(file_path):
+                            # 这里处理ground_truth下的子目录
+                            shutil.rmtree(file_path)
+                    
+        # 创建必要的目录
+        os.makedirs(test_good_path, exist_ok=True)
+        for defect_path in defect_types.values():
+            full_defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, defect_path)
+            os.makedirs(full_defect_path, exist_ok=True)
+        # 创建ground_truth目录
+        for gt_path in ground_truth_paths.values():
+            os.makedirs(gt_path, exist_ok=True)
+
         # 获取训练集中的所有图片
         train_images = [f for f in os.listdir(train_path) if os.path.isfile(join_path(train_path, f)) and is_image(f)]
+        
         # 如果训练集为空，显示错误消息并返回
         if not train_images:
             show_message_box("错误", "训练集中没有图片！", QMessageBox.Critical)
             return
+            
         # 计算需要移动到测试集的图片数量
         test_count = max(1, int(len(train_images) * config.TEST_RATIO))
-        # 随机选择图片移动到测试集
+        
+        # 随机选择图片复制到测试集
         test_images = random.sample(train_images, test_count)
-        # 移动图片到测试集
+        
+        # 复制图片到测试集good文件夹
         for image_name in test_images:
             src_path = join_path(train_path, image_name)
-            dst_path = join_path(test_path, image_name)
-            shutil.move(src_path, dst_path)  # 移动文件
-        # 显示成功消息
-        show_message_box("成功", f"已自动分割测试集，将{test_count}张图片移动到测试集。", QMessageBox.Information)  # 修改提示语
+            dst_path = join_path(test_good_path, image_name)
+            shutil.copy(src_path, dst_path)  # 复制而不是移动
+            
+        # 生成伪缺陷样本
+        # 选择部分训练图片作为生成伪缺陷样本的基础
+        defect_base_count = min(5, len(train_images))  # 最多使用5张基础图片
+        defect_base_images = random.sample(train_images, defect_base_count)
+        
+        # 记录每种缺陷类型生成的样本数量
+        defect_counts = {defect_type: 0 for defect_type in defect_types.keys()}
+        
+        for image_name in defect_base_images:
+            image_path = join_path(train_path, image_name)
+            image = cv2.imread(image_path)
+            if image is None:
+                continue
+                
+            # 1. 颜色偏移缺陷 - 使用带掩码的版本
+            defect_img, mask = self.defect_color_shift_with_mask(image)
+            defect_filename = f"defect_{defect_counts['color_shift']}.jpg"
+            defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, 
+                                  defect_types['color_shift'], defect_filename)
+            cv2.imwrite(defect_path, defect_img)
+            
+            # 保存对应的ground_truth掩码
+            mask_path = join_path(ground_truth_paths['color_shift'], 
+                                 f"defect_{defect_counts['color_shift']}.png")
+            cv2.imwrite(mask_path, mask)
+            defect_counts['color_shift'] += 1
+            
+            # 2. 亮度异常缺陷 - 使用带掩码的版本
+            defect_img, mask = self.defect_brightness_with_mask(image)
+            defect_filename = f"defect_{defect_counts['brightness']}.jpg"
+            defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
+                                  defect_types['brightness'], defect_filename)
+            cv2.imwrite(defect_path, defect_img)
+            
+            # 保存对应的ground_truth掩码
+            mask_path = join_path(ground_truth_paths['brightness'], 
+                                 f"defect_{defect_counts['brightness']}.png")
+            cv2.imwrite(mask_path, mask)
+            defect_counts['brightness'] += 1
+            
+            # 3. 噪点缺陷 - 使用带掩码的版本
+            defect_img, mask = self.defect_add_noise_with_mask(image)
+            defect_filename = f"defect_{defect_counts['noise']}.jpg"
+            defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
+                                  defect_types['noise'], defect_filename)
+            cv2.imwrite(defect_path, defect_img)
+            
+            # 保存对应的ground_truth掩码
+            mask_path = join_path(ground_truth_paths['noise'], 
+                                 f"defect_{defect_counts['noise']}.png")
+            cv2.imwrite(mask_path, mask)
+            defect_counts['noise'] += 1
+            
+            # 4. 模糊缺陷 - 使用带掩码的版本
+            defect_img, mask = self.defect_add_blur_with_mask(image)
+            defect_filename = f"defect_{defect_counts['blur']}.jpg"
+            defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
+                                  defect_types['blur'], defect_filename)
+            cv2.imwrite(defect_path, defect_img)
+            
+            # 保存对应的ground_truth掩码
+            mask_path = join_path(ground_truth_paths['blur'], 
+                                 f"defect_{defect_counts['blur']}.png")
+            cv2.imwrite(mask_path, mask)
+            defect_counts['blur'] += 1
+            
+            # 5. 扭曲变形缺陷 - 使用带掩码的版本
+            defect_img, mask = self.defect_add_distortion_with_mask(image)
+            defect_filename = f"defect_{defect_counts['distortion']}.jpg"
+            defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
+                                  defect_types['distortion'], defect_filename)
+            cv2.imwrite(defect_path, defect_img)
+            
+            # 保存对应的ground_truth掩码
+            mask_path = join_path(ground_truth_paths['distortion'], 
+                                 f"defect_{defect_counts['distortion']}.png")
+            cv2.imwrite(mask_path, mask)
+            defect_counts['distortion'] += 1
+            
+        # 显示成功消息，包含每种缺陷类型的数量
+        success_message = f"已准备测试集数据：\n- test/good: {len(test_images)}张正常图片"
+        for defect_type, count in defect_counts.items():
+            success_message += f"\n- {defect_types[defect_type]}: {count}张缺陷图片"
+        success_message += f"\n- ground_truth: 已生成所有缺陷的掩码"
+            
+        show_message_box(
+            "成功", 
+            success_message,
+            QMessageBox.Information
+        )
+        
+    def defect_add_distortion_with_mask(self, image):
+        """
+        伪缺陷：局部扭曲/变形，同时返回变形区域的掩码
+        添加明显的非线性变形，模拟凹陷、变形等结构缺陷
+        
+        返回:
+            (变形后的图像, 变形区域的掩码)
+        """
+        height, width = image.shape[:2]
+        
+        # 创建扭曲映射
+        map_x = np.zeros((height, width), dtype=np.float32)
+        map_y = np.zeros((height, width), dtype=np.float32)
+        
+        # 创建掩码，初始为黑色（无缺陷）
+        mask = np.zeros((height, width), dtype=np.uint8)
+        
+        # 随机选择一个区域进行扭曲
+        cx, cy = random.randint(width//4, 3*width//4), random.randint(height//4, 3*height//4)
+        radius = min(width, height) // 4
+        strength = 60  # 更大的扭曲强度
+        
+        # 生成扭曲映射
+        for y in range(height):
+            for x in range(width):
+                dx = x - cx
+                dy = y - cy
+                distance = np.sqrt(dx*dx + dy*dy)
+                
+                if distance < radius:
+                    # 在扭曲区域内生成掩码（255为白色，表示缺陷区域）
+                    mask[y, x] = 255
+                    
+                    factor = 1 - distance/radius
+                    angle = factor * strength * (np.pi/180)
+                    nx = x + dx * np.cos(angle) - dy * np.sin(angle) - dx
+                    ny = y + dx * np.sin(angle) + dy * np.cos(angle) - dy
+                    map_x[y, x] = nx
+                    map_y[y, x] = ny
+                else:
+                    map_x[y, x] = x
+                    map_y[y, x] = y
+        
+        # 应用扭曲
+        distorted = cv2.remap(image, map_x, map_y, cv2.INTER_LINEAR)
+        
+        return distorted, mask
+
+    def defect_color_shift_with_mask(self, image):
+        """
+        伪缺陷：强烈颜色偏移，同时返回掩码
+        显著改变图像颜色，模拟严重褪色、氧化等缺陷
+        
+        返回:
+            (颜色偏移后的图像, 颜色偏移区域的掩码)
+        """
+        value = random.randint(70, 100)  # 大幅度的颜色偏移
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        h = h.astype(np.int16)
+        h = (h + value) % 180
+        h = h.astype(np.uint8)
+        # 增加饱和度使缺陷更明显
+        s = np.clip(s.astype(np.int16) + random.randint(30, 70), 0, 255).astype(np.uint8)
+        final_hsv = cv2.merge((h, s, v))
+        
+        # 生成掩码 - 颜色偏移影响整个图像
+        height, width = image.shape[:2]
+        mask = np.ones((height, width), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
+        
+        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), mask
+        
+    def defect_brightness_with_mask(self, image):
+        """
+        伪缺陷：亮度异常，同时返回掩码
+        使图像异常亮或暗，模拟曝光不足、过度曝光或电气故障
+        
+        返回:
+            (亮度异常的图像, 亮度异常区域的掩码)
+        """
+        value = random.choice([random.randint(80, 120), random.randint(-120, -80)])  # 大幅度的亮度变化
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        v = v.astype(np.int16)
+        v = np.clip(v + value, 0, 255)
+        v = v.astype(np.uint8)
+        final_hsv = cv2.merge((h, s, v))
+        
+        # 生成掩码 - 亮度异常影响整个图像
+        height, width = image.shape[:2]
+        mask = np.ones((height, width), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
+        
+        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), mask
+        
+    def defect_add_noise_with_mask(self, image):
+        """
+        伪缺陷：添加噪点，同时返回掩码
+        模拟严重的噪点、颗粒缺陷或传感器故障
+        
+        返回:
+            (添加噪点后的图像, 噪点区域的掩码)
+        """
+        # 添加高斯噪声
+        row, col, ch = image.shape
+        mean = 0
+        sigma = random.randint(25, 50)  # 更高的噪声强度
+        gauss = np.random.normal(mean, sigma, (row, col, ch))
+        gauss = gauss.reshape(row, col, ch)
+        noisy = image + gauss
+        noisy = np.clip(noisy, 0, 255).astype(np.uint8)
+        
+        # 生成掩码 - 噪点影响整个图像
+        mask = np.ones((row, col), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
+        
+        return noisy, mask
+        
+    def defect_add_blur_with_mask(self, image):
+        """
+        伪缺陷：添加模糊，同时返回掩码
+        模拟失焦、运动模糊或光学系统问题
+        
+        返回:
+            (模糊后的图像, 模糊区域的掩码)
+        """
+        # 高斯模糊或中值模糊
+        blur_type = random.choice(["gaussian", "median"])
+        if blur_type == "gaussian":
+            kernel_size = random.choice([15, 21, 27])  # 更大的核意味着更模糊
+            blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
+        else:
+            kernel_size = random.choice([11, 15, 19])  # 更大的核意味着更模糊
+            blurred = cv2.medianBlur(image, kernel_size)
+        
+        # 生成掩码 - 模糊影响整个图像
+        height, width = image.shape[:2]
+        mask = np.ones((height, width), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
+        
+        return blurred, mask
+        
 
     def check_sample_group(self):
         """
@@ -879,7 +1170,7 @@ class UploadThread(QThread):
 class LoadImages:
     """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
     def __init__(self, ui):
-        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN)
+        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)
         self.ui = ui
     
     def load_with_progress(self):

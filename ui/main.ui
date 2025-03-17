@@ -761,9 +761,9 @@ QPushButton:pressed {
            </rect>
           </property>
           <property name="title">
-           <string>训练集设置</string>
+           <string>测试集设置</string>
           </property>
-          <widget class="QCheckBox" name="autoSplitTestCheckBox">
+          <widget class="QCheckBox" name="autoGenerateTestCheckBox">
            <property name="geometry">
             <rect>
              <x>20</x>
@@ -773,7 +773,7 @@ QPushButton:pressed {
             </rect>
            </property>
            <property name="text">
-            <string>自动生成训练集</string>
+            <string>自动生成测试集</string>
            </property>
            <property name="checkable">
             <bool>true</bool>
@@ -786,7 +786,7 @@ QPushButton:pressed {
            </property>
           </widget>
          </widget>
-         <widget class="QPushButton" name="autoSplitTestButton">
+         <widget class="QPushButton" name="autoGenerateTestButton">
           <property name="geometry">
            <rect>
             <x>160</x>
@@ -820,7 +820,7 @@ QPushButton:pressed {
          <zorder>augmentButton</zorder>
          <zorder>groupBox_4</zorder>
          <zorder>shrinkDoAndExcludeBgButton</zorder>
-         <zorder>autoSplitTestButton</zorder>
+         <zorder>autoGenerateTestButton</zorder>
         </widget>
        </item>
       </layout>
