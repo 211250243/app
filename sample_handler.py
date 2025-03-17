@@ -850,94 +850,610 @@ class SampleHandler:
     def defect_color_shift_with_mask(self, image):
         """
         伪缺陷：强烈颜色偏移，同时返回掩码
-        显著改变图像颜色，模拟严重褪色、氧化等缺陷
+        在图像的随机局部区域显著改变图像颜色，模拟局部褪色、氧化等缺陷
         
         返回:
             (颜色偏移后的图像, 颜色偏移区域的掩码)
         """
-        value = random.randint(70, 100)  # 大幅度的颜色偏移
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, s, v = cv2.split(hsv)
-        h = h.astype(np.int16)
-        h = (h + value) % 180
-        h = h.astype(np.uint8)
-        # 增加饱和度使缺陷更明显
-        s = np.clip(s.astype(np.int16) + random.randint(30, 70), 0, 255).astype(np.uint8)
-        final_hsv = cv2.merge((h, s, v))
-        
-        # 生成掩码 - 颜色偏移影响整个图像
         height, width = image.shape[:2]
-        mask = np.ones((height, width), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
         
-        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), mask
+        # 创建掩码，初始为黑色（无缺陷）
+        mask = np.zeros((height, width), dtype=np.uint8)
+        
+        # 随机选择一个区域进行颜色偏移
+        # 可以是圆形、椭圆形或多边形区域
+        shape_type = random.choice(["circle", "ellipse", "polygon"])
+        
+        # 复制原始图像，我们将在此基础上修改
+        result_image = image.copy()
+        
+        if shape_type == "circle":
+            # 圆形缺陷区域
+            center_x = random.randint(width // 4, 3 * width // 4)
+            center_y = random.randint(height // 4, 3 * height // 4)
+            radius = random.randint(min(height, width) // 10, min(height, width) // 5)
+            
+            # 转换图像到HSV空间以便修改颜色
+            hsv_image = cv2.cvtColor(result_image, cv2.COLOR_BGR2HSV)
+            
+            # 对图像的每个像素检查是否在圆内
+            for y in range(height):
+                for x in range(width):
+                    dist = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+                    if dist <= radius:
+                        # 在圆内区域修改颜色
+                        h, s, v = hsv_image[y, x]
+                        h = (h + random.randint(70, 100)) % 180  # 大幅度的颜色偏移
+                        s = min(255, s + random.randint(30, 70))  # 增加饱和度使缺陷更明显
+                        hsv_image[y, x] = [h, s, v]
+                        
+                        # 在掩码上标记缺陷区域（白色）
+                        mask[y, x] = 255
+            
+            # 将修改后的HSV图像转换回BGR
+            result_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+            
+        elif shape_type == "ellipse":
+            # 椭圆形缺陷区域
+            center_x = random.randint(width // 4, 3 * width // 4)
+            center_y = random.randint(height // 4, 3 * height // 4)
+            axis_x = random.randint(width // 10, width // 3)
+            axis_y = random.randint(height // 10, height // 3)
+            angle = random.randint(0, 180)
+            
+            # 转换图像到HSV空间以便修改颜色
+            hsv_image = cv2.cvtColor(result_image, cv2.COLOR_BGR2HSV)
+            
+            # 创建椭圆掩码
+            cv2.ellipse(mask, (center_x, center_y), (axis_x, axis_y), angle, 0, 360, 255, -1)
+            
+            # 对掩码中为白色的像素进行颜色偏移
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        h, s, v = hsv_image[y, x]
+                        h = (h + random.randint(70, 100)) % 180  # 大幅度的颜色偏移
+                        s = min(255, s + random.randint(30, 70))  # 增加饱和度使缺陷更明显
+                        hsv_image[y, x] = [h, s, v]
+            
+            # 将修改后的HSV图像转换回BGR
+            result_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+            
+        else:  # polygon
+            # 多边形缺陷区域
+            vertices = random.randint(3, 6)  # 随机选择3到6个顶点
+            points = []
+            
+            # 生成多边形的顶点
+            center_x = width // 2
+            center_y = height // 2
+            radius = min(width, height) // 4
+            
+            for i in range(vertices):
+                angle = 2 * np.pi * i / vertices
+                x = int(center_x + radius * np.cos(angle) * random.uniform(0.5, 1.0))
+                y = int(center_y + radius * np.sin(angle) * random.uniform(0.5, 1.0))
+                points.append((x, y))
+            
+            # 转换成numpy数组
+            points = np.array(points, np.int32)
+            points = points.reshape((-1, 1, 2))
+            
+            # 创建多边形掩码
+            cv2.fillPoly(mask, [points], 255)
+            
+            # 转换图像到HSV空间以便修改颜色
+            hsv_image = cv2.cvtColor(result_image, cv2.COLOR_BGR2HSV)
+            
+            # 对掩码中为白色的像素进行颜色偏移
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        h, s, v = hsv_image[y, x]
+                        h = (h + random.randint(70, 100)) % 180  # 大幅度的颜色偏移
+                        s = min(255, s + random.randint(30, 70))  # 增加饱和度使缺陷更明显
+                        hsv_image[y, x] = [h, s, v]
+            
+            # 将修改后的HSV图像转换回BGR
+            result_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+        
+        return result_image, mask
         
     def defect_brightness_with_mask(self, image):
         """
         伪缺陷：亮度异常，同时返回掩码
-        使图像异常亮或暗，模拟曝光不足、过度曝光或电气故障
+        在图像的随机局部区域改变亮度，模拟局部曝光不足、过度曝光或光源问题
         
         返回:
             (亮度异常的图像, 亮度异常区域的掩码)
         """
-        value = random.choice([random.randint(80, 120), random.randint(-120, -80)])  # 大幅度的亮度变化
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        h, s, v = cv2.split(hsv)
-        v = v.astype(np.int16)
-        v = np.clip(v + value, 0, 255)
-        v = v.astype(np.uint8)
-        final_hsv = cv2.merge((h, s, v))
-        
-        # 生成掩码 - 亮度异常影响整个图像
         height, width = image.shape[:2]
-        mask = np.ones((height, width), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
         
-        return cv2.cvtColor(final_hsv, cv2.COLOR_HSV2BGR), mask
+        # 创建掩码，初始为黑色（无缺陷）
+        mask = np.zeros((height, width), dtype=np.uint8)
+        
+        # 复制原始图像，我们将在此基础上修改
+        result_image = image.copy()
+        hsv_image = cv2.cvtColor(result_image, cv2.COLOR_BGR2HSV)
+        
+        # 随机确定亮度变化类型和值
+        is_dark = random.choice([True, False])
+        if is_dark:
+            # 暗区域
+            value_change = random.randint(-120, -80)
+        else:
+            # 亮区域
+            value_change = random.randint(80, 120)
+            
+        # 随机选择缺陷形状
+        shape_type = random.choice(["gradient", "rectangle", "irregular"])
+        
+        if shape_type == "gradient":
+            # 渐变式亮度变化 - 从一侧到另一侧
+            direction = random.choice(["horizontal", "vertical", "diagonal"])
+            
+            if direction == "horizontal":
+                # 水平方向的亮度渐变
+                start_x = random.randint(0, width // 2)
+                end_x = random.randint(start_x + width // 4, width)
+                
+                for y in range(height):
+                    for x in range(width):
+                        if start_x <= x <= end_x:
+                            # 计算渐变系数，在起点处为0，终点处为1
+                            ratio = min(1.0, max(0.0, (x - start_x) / (end_x - start_x)))
+                            
+                            # 应用亮度变化，渐变程度随着x的增加而增强
+                            h, s, v = hsv_image[y, x]
+                            v = np.clip(int(v) + int(value_change * ratio), 0, 255)
+                            hsv_image[y, x] = [h, s, v]
+                            
+                            # 根据渐变程度确定掩码的值
+                            mask[y, x] = int(255 * ratio)
+            
+            elif direction == "vertical":
+                # 垂直方向的亮度渐变
+                start_y = random.randint(0, height // 2)
+                end_y = random.randint(start_y + height // 4, height)
+                
+                for y in range(height):
+                    if start_y <= y <= end_y:
+                        ratio = min(1.0, max(0.0, (y - start_y) / (end_y - start_y)))
+                        for x in range(width):
+                            h, s, v = hsv_image[y, x]
+                            v = np.clip(int(v) + int(value_change * ratio), 0, 255)
+                            hsv_image[y, x] = [h, s, v]
+                            mask[y, x] = int(255 * ratio)
+            
+            else:  # diagonal
+                # 对角线方向的亮度渐变
+                for y in range(height):
+                    for x in range(width):
+                        # 计算到图像中心的距离比例
+                        dy = y - height // 2
+                        dx = x - width // 2
+                        distance = np.sqrt(dx*dx + dy*dy)
+                        max_distance = np.sqrt((width//2)**2 + (height//2)**2)
+                        ratio = min(1.0, distance / max_distance)
+                        
+                        # 应用亮度变化
+                        h, s, v = hsv_image[y, x]
+                        v = np.clip(int(v) + int(value_change * ratio), 0, 255)
+                        hsv_image[y, x] = [h, s, v]
+                        
+                        # 设置掩码值
+                        mask[y, x] = int(255 * ratio)
+        
+        elif shape_type == "rectangle":
+            # 矩形区域亮度变化
+            rect_width = random.randint(width // 5, width // 2)
+            rect_height = random.randint(height // 5, height // 2)
+            rect_x = random.randint(0, width - rect_width)
+            rect_y = random.randint(0, height - rect_height)
+            
+            # 创建矩形掩码
+            cv2.rectangle(mask, (rect_x, rect_y), (rect_x + rect_width, rect_y + rect_height), 255, -1)
+            
+            # 对掩码中为白色的像素应用亮度变化
+            for y in range(rect_y, rect_y + rect_height):
+                for x in range(rect_x, rect_x + rect_width):
+                    h, s, v = hsv_image[y, x]
+                    v = np.clip(int(v) + value_change, 0, 255)
+                    hsv_image[y, x] = [h, s, v]
+        
+        else:  # irregular
+            # 不规则形状的亮度变化 - 使用多个重叠的圆形
+            num_circles = random.randint(3, 6)
+            
+            # 随机确定中心点
+            center_x = random.randint(width // 4, 3 * width // 4)
+            center_y = random.randint(height // 4, 3 * height // 4)
+            
+            # 创建多个重叠的圆形区域
+            for _ in range(num_circles):
+                circle_x = center_x + random.randint(-width//8, width//8)
+                circle_y = center_y + random.randint(-height//8, height//8)
+                radius = random.randint(min(width, height) // 15, min(width, height) // 8)
+                
+                # 添加到掩码
+                cv2.circle(mask, (circle_x, circle_y), radius, 255, -1)
+            
+            # 对掩码中为白色的像素应用亮度变化
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        h, s, v = hsv_image[y, x]
+                        v = np.clip(int(v) + value_change, 0, 255)
+                        hsv_image[y, x] = [h, s, v]
+        
+        # 将修改后的HSV图像转换回BGR
+        result_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2BGR)
+        
+        return result_image, mask
         
     def defect_add_noise_with_mask(self, image):
         """
         伪缺陷：添加噪点，同时返回掩码
-        模拟严重的噪点、颗粒缺陷或传感器故障
+        在图像的随机局部区域添加噪点，模拟灰尘、颗粒、传感器损坏等局部缺陷
         
         返回:
             (添加噪点后的图像, 噪点区域的掩码)
         """
-        # 添加高斯噪声
-        row, col, ch = image.shape
-        mean = 0
-        sigma = random.randint(25, 50)  # 更高的噪声强度
-        gauss = np.random.normal(mean, sigma, (row, col, ch))
-        gauss = gauss.reshape(row, col, ch)
-        noisy = image + gauss
-        noisy = np.clip(noisy, 0, 255).astype(np.uint8)
+        height, width = image.shape[:2]
         
-        # 生成掩码 - 噪点影响整个图像
-        mask = np.ones((row, col), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
+        # 创建掩码，初始为黑色（无缺陷）
+        mask = np.zeros((height, width), dtype=np.uint8)
         
-        return noisy, mask
+        # 复制原始图像，我们将在此基础上修改
+        result_image = image.copy()
+        
+        # 随机选择缺陷形状和位置
+        noise_type = random.choice(["spot", "streak", "scattered"])
+        
+        if noise_type == "spot":
+            # 圆形或椭圆形噪点区域
+            center_x = random.randint(width // 4, 3 * width // 4)
+            center_y = random.randint(height // 4, 3 * height // 4)
+            
+            if random.choice([True, False]):  # 圆形
+                radius = random.randint(min(width, height) // 10, min(width, height) // 5)
+                cv2.circle(mask, (center_x, center_y), radius, 255, -1)
+            else:  # 椭圆形
+                axis_x = random.randint(width // 10, width // 4)
+                axis_y = random.randint(height // 10, height // 4)
+                angle = random.randint(0, 180)
+                cv2.ellipse(mask, (center_x, center_y), (axis_x, axis_y), angle, 0, 360, 255, -1)
+            
+            # 生成高强度的噪声
+            sigma = random.randint(30, 60)  # 更高的噪声强度
+            noise = np.zeros_like(result_image, dtype=np.float32)
+            
+            # 对掩码中为白色的像素添加噪声
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        # 为每个像素单独生成噪声值
+                        pixel_noise = np.random.normal(0, sigma, 3)
+                        result_image[y, x] = np.clip(result_image[y, x] + pixel_noise, 0, 255).astype(np.uint8)
+            
+        elif noise_type == "streak":
+            # 条纹状噪点 - 可以是水平、垂直或对角线
+            direction = random.choice(["horizontal", "vertical", "diagonal"])
+            line_width = random.randint(max(1, min(width, height) // 30), min(width, height) // 15)
+            
+            if direction == "horizontal":
+                # 水平条纹
+                y_pos = random.randint(height // 4, 3 * height // 4)
+                streak_height = random.randint(line_width, 2 * line_width)
+                
+                # 创建条纹掩码
+                for y in range(y_pos, min(height, y_pos + streak_height)):
+                    mask[y, :] = 255
+                
+                # 对掩码区域添加随机噪声
+                sigma = random.randint(30, 50)
+                for y in range(y_pos, min(height, y_pos + streak_height)):
+                    noise_line = np.random.normal(0, sigma, (width, 3))
+                    result_image[y, :] = np.clip(result_image[y, :] + noise_line, 0, 255).astype(np.uint8)
+            
+            elif direction == "vertical":
+                # 垂直条纹
+                x_pos = random.randint(width // 4, 3 * width // 4)
+                streak_width = random.randint(line_width, 2 * line_width)
+                
+                # 创建条纹掩码
+                for x in range(x_pos, min(width, x_pos + streak_width)):
+                    mask[:, x] = 255
+                
+                # 对掩码区域添加随机噪声
+                sigma = random.randint(30, 50)
+                for x in range(x_pos, min(width, x_pos + streak_width)):
+                    noise_line = np.random.normal(0, sigma, (height, 3))
+                    result_image[:, x] = np.clip(result_image[:, x] + noise_line, 0, 255).astype(np.uint8)
+            
+            else:  # diagonal
+                # 对角线条纹 - 使用线段
+                start_x = random.randint(0, width // 4)
+                start_y = random.randint(0, height // 4)
+                end_x = random.randint(3 * width // 4, width)
+                end_y = random.randint(3 * height // 4, height)
+                
+                # 创建对角线掩码 - 使用粗线条
+                cv2.line(mask, (start_x, start_y), (end_x, end_y), 255, line_width * 2)
+                
+                # 对掩码区域添加随机噪声
+                sigma = random.randint(30, 50)
+                for y in range(height):
+                    for x in range(width):
+                        if mask[y, x] == 255:
+                            pixel_noise = np.random.normal(0, sigma, 3)
+                            result_image[y, x] = np.clip(result_image[y, x] + pixel_noise, 0, 255).astype(np.uint8)
+        
+        else:  # scattered
+            # 散布的多个小噪点区域
+            num_spots = random.randint(5, 15)
+            spots_radius = random.randint(3, 10)
+            
+            # 随机位置生成多个小噪点
+            for _ in range(num_spots):
+                spot_x = random.randint(0, width - 1)
+                spot_y = random.randint(0, height - 1)
+                cv2.circle(mask, (spot_x, spot_y), spots_radius, 255, -1)
+            
+            # 对掩码区域添加高强度噪声
+            sigma = random.randint(40, 70)  # 更高的噪声强度，使小噪点更明显
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        pixel_noise = np.random.normal(0, sigma, 3)
+                        result_image[y, x] = np.clip(result_image[y, x] + pixel_noise, 0, 255).astype(np.uint8)
+        
+        return result_image, mask
         
     def defect_add_blur_with_mask(self, image):
         """
         伪缺陷：添加模糊，同时返回掩码
-        模拟失焦、运动模糊或光学系统问题
+        在图像的随机局部区域添加模糊效果，模拟局部失焦、运动模糊、液体污渍等缺陷
         
         返回:
             (模糊后的图像, 模糊区域的掩码)
         """
-        # 高斯模糊或中值模糊
-        blur_type = random.choice(["gaussian", "median"])
-        if blur_type == "gaussian":
-            kernel_size = random.choice([15, 21, 27])  # 更大的核意味着更模糊
-            blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
-        else:
-            kernel_size = random.choice([11, 15, 19])  # 更大的核意味着更模糊
-            blurred = cv2.medianBlur(image, kernel_size)
-        
-        # 生成掩码 - 模糊影响整个图像
         height, width = image.shape[:2]
-        mask = np.ones((height, width), dtype=np.uint8) * 255  # 白色掩码，表示整个图像都有缺陷
         
-        return blurred, mask
+        # 创建掩码，初始为黑色（无缺陷）
+        mask = np.zeros((height, width), dtype=np.uint8)
         
+        # 复制原始图像，我们将在此基础上修改
+        result_image = image.copy()
+        
+        # 随机选择模糊类型
+        blur_effect = random.choice(["gaussian", "motion", "median", "partial"])
+        
+        if blur_effect == "gaussian":
+            # 高斯模糊 - 圆形或椭圆形区域
+            center_x = random.randint(width // 4, 3 * width // 4)
+            center_y = random.randint(height // 4, 3 * height // 4)
+            
+            if random.choice([True, False]):  # 圆形
+                radius = random.randint(min(width, height) // 8, min(width, height) // 4)
+                cv2.circle(mask, (center_x, center_y), radius, 255, -1)
+            else:  # 椭圆形
+                axis_x = random.randint(width // 8, width // 3)
+                axis_y = random.randint(height // 8, height // 3)
+                angle = random.randint(0, 180)
+                cv2.ellipse(mask, (center_x, center_y), (axis_x, axis_y), angle, 0, 360, 255, -1)
+            
+            # 创建局部高斯模糊的临时图像
+            kernel_size = random.choice([9, 15, 21])  # 较大的核意味着更模糊
+            blurred = cv2.GaussianBlur(result_image, (kernel_size, kernel_size), 0)
+            
+            # 根据掩码融合原始图像和模糊图像
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        result_image[y, x] = blurred[y, x]
+        
+        elif blur_effect == "motion":
+            # 运动模糊 - 沿特定方向的拖尾效果
+            direction = random.choice(["horizontal", "vertical", "diagonal"])
+            kernel_size = random.randint(15, 25)  # 运动模糊的长度
+            
+            if direction == "horizontal":
+                # 水平方向的运动模糊
+                kernel = np.zeros((kernel_size, kernel_size))
+                kernel[kernel_size // 2, :] = 1.0 / kernel_size
+                motion_blur = cv2.filter2D(result_image, -1, kernel)
+                
+                # 创建水平区域的掩码
+                rect_height = random.randint(height // 5, height // 2)
+                y_pos = random.randint(0, height - rect_height)
+                cv2.rectangle(mask, (0, y_pos), (width, y_pos + rect_height), 255, -1)
+            
+            elif direction == "vertical":
+                # 垂直方向的运动模糊
+                kernel = np.zeros((kernel_size, kernel_size))
+                kernel[:, kernel_size // 2] = 1.0 / kernel_size
+                motion_blur = cv2.filter2D(result_image, -1, kernel)
+                
+                # 创建垂直区域的掩码
+                rect_width = random.randint(width // 5, width // 2)
+                x_pos = random.randint(0, width - rect_width)
+                cv2.rectangle(mask, (x_pos, 0), (x_pos + rect_width, height), 255, -1)
+            
+            else:  # diagonal
+                # 对角线方向的运动模糊
+                angle = random.randint(30, 150)  # 运动模糊的角度
+                rad_angle = np.deg2rad(angle)
+                
+                kernel = np.zeros((kernel_size, kernel_size))
+                center = kernel_size // 2
+                
+                # 创建对角线模糊核
+                for i in range(kernel_size):
+                    offset = i - center
+                    x = int(center + offset * np.cos(rad_angle))
+                    y = int(center + offset * np.sin(rad_angle))
+                    if 0 <= x < kernel_size and 0 <= y < kernel_size:
+                        kernel[y, x] = 1.0 / kernel_size
+                
+                motion_blur = cv2.filter2D(result_image, -1, kernel)
+                
+                # 创建对角线区域的掩码 - 使用多边形
+                poly_width = min(width, height) // 2
+                start_x = random.randint(0, width // 4)
+                start_y = random.randint(0, height // 4)
+                
+                if random.choice([True, False]):  # 左上到右下
+                    points = np.array([
+                        [start_x, start_y],
+                        [start_x + poly_width, start_y],
+                        [start_x + poly_width + poly_width // 2, start_y + poly_width // 2],
+                        [start_x + poly_width, start_y + poly_width],
+                        [start_x, start_y + poly_width]
+                    ], np.int32)
+                else:  # 右上到左下
+                    start_x = random.randint(width // 2, 3 * width // 4)
+                    points = np.array([
+                        [start_x, start_y],
+                        [start_x + poly_width, start_y],
+                        [start_x + poly_width - poly_width // 2, start_y + poly_width // 2],
+                        [start_x, start_y + poly_width],
+                        [start_x - poly_width // 2, start_y + poly_width // 2]
+                    ], np.int32)
+                
+                points = points.reshape((-1, 1, 2))
+                cv2.fillPoly(mask, [points], 255)
+            
+            # 根据掩码融合原始图像和运动模糊图像
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        result_image[y, x] = motion_blur[y, x]
+        
+        elif blur_effect == "median":
+            # 中值模糊 - 适合模拟液体或污渍造成的模糊
+            # 不规则形状区域
+            center_x = random.randint(width // 4, 3 * width // 4)
+            center_y = random.randint(height // 4, 3 * height // 4)
+            
+            # 创建不规则形状掩码 - 使用多个重叠的圆形
+            num_circles = random.randint(3, 7)
+            base_radius = min(width, height) // 10
+            
+            for _ in range(num_circles):
+                circle_x = center_x + random.randint(-width//10, width//10)
+                circle_y = center_y + random.randint(-height//10, height//10)
+                radius = random.randint(base_radius // 2, base_radius)
+                cv2.circle(mask, (circle_x, circle_y), radius, 255, -1)
+            
+            # 应用中值模糊
+            kernel_size = random.choice([7, 11, 15])  # 较大的核意味着更模糊
+            median_blur = cv2.medianBlur(result_image, kernel_size)
+            
+            # 根据掩码融合原始图像和中值模糊图像
+            for y in range(height):
+                for x in range(width):
+                    if mask[y, x] == 255:
+                        result_image[y, x] = median_blur[y, x]
+        
+        else:  # partial - 渐变模糊效果，从清晰到模糊
+            # 渐变模糊 - 模拟部分区域逐渐失焦
+            direction = random.choice(["left-to-right", "top-to-bottom", "radial"])
+            
+            if direction == "left-to-right":
+                # 水平方向渐变模糊
+                start_x = random.randint(0, width // 3)
+                end_x = random.randint(2 * width // 3, width)
+                
+                # 创建一系列不同强度的模糊图像
+                blurred_images = []
+                max_kernel = 25
+                steps = 5
+                
+                for i in range(steps):
+                    kernel_size = 1 + 2 * (i * max_kernel // steps)  # 确保是奇数
+                    if kernel_size > 1:
+                        blur = cv2.GaussianBlur(result_image, (kernel_size, kernel_size), 0)
+                        blurred_images.append(blur)
+                    else:
+                        blurred_images.append(result_image.copy())
+                
+                # 根据x位置融合不同程度的模糊图像
+                for y in range(height):
+                    for x in range(width):
+                        if start_x <= x <= end_x:
+                            # 计算模糊程度（0到steps-1之间）
+                            ratio = (x - start_x) / (end_x - start_x)
+                            blur_idx = min(steps - 1, int(ratio * steps))
+                            result_image[y, x] = blurred_images[blur_idx][y, x]
+                            
+                            # 设置掩码 - 渐变
+                            mask[y, x] = min(255, int(ratio * 255))
+            
+            elif direction == "top-to-bottom":
+                # 垂直方向渐变模糊
+                start_y = random.randint(0, height // 3)
+                end_y = random.randint(2 * height // 3, height)
+                
+                # 创建一系列不同强度的模糊图像
+                blurred_images = []
+                max_kernel = 25
+                steps = 5
+                
+                for i in range(steps):
+                    kernel_size = 1 + 2 * (i * max_kernel // steps)  # 确保是奇数
+                    if kernel_size > 1:
+                        blur = cv2.GaussianBlur(result_image, (kernel_size, kernel_size), 0)
+                        blurred_images.append(blur)
+                    else:
+                        blurred_images.append(result_image.copy())
+                
+                # 根据y位置融合不同程度的模糊图像
+                for y in range(height):
+                    if start_y <= y <= end_y:
+                        # 计算模糊程度（0到steps-1之间）
+                        ratio = (y - start_y) / (end_y - start_y)
+                        blur_idx = min(steps - 1, int(ratio * steps))
+                        result_image[y, :] = blurred_images[blur_idx][y, :]
+                        
+                        # 设置掩码 - 渐变
+                        mask[y, :] = min(255, int(ratio * 255))
+            
+            else:  # radial
+                # 径向渐变模糊 - 从中心向外扩散
+                center_x = random.randint(width // 3, 2 * width // 3)
+                center_y = random.randint(height // 3, 2 * height // 3)
+                max_radius = min(min(width, height) // 2, 
+                                max(abs(center_x - 0), abs(center_x - width), 
+                                    abs(center_y - 0), abs(center_y - height)))
+                
+                # 创建一系列不同强度的模糊图像
+                blurred_images = []
+                max_kernel = 25
+                steps = 5
+                
+                for i in range(steps):
+                    kernel_size = 1 + 2 * (i * max_kernel // steps)  # 确保是奇数
+                    if kernel_size > 1:
+                        blur = cv2.GaussianBlur(result_image, (kernel_size, kernel_size), 0)
+                        blurred_images.append(blur)
+                    else:
+                        blurred_images.append(result_image.copy())
+                
+                # 根据到中心的距离融合不同程度的模糊图像
+                for y in range(height):
+                    for x in range(width):
+                        distance = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+                        if distance <= max_radius:
+                            # 计算模糊程度（0到steps-1之间）
+                            ratio = min(1.0, distance / max_radius)
+                            blur_idx = min(steps - 1, int(ratio * steps))
+                            result_image[y, x] = blurred_images[blur_idx][y, x]
+                            
+                            # 设置掩码 - 渐变
+                            mask[y, x] = min(255, int(ratio * 255))
+        
+        return result_image, mask
 
     def check_sample_group(self):
         """
