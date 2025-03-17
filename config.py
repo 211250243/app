@@ -21,6 +21,7 @@ PROJECT_METADATA_PATH = None
 SAMPLE_FOLDER = 'sample_groups'
 SAMPLE_GROUP = None
 SAMPLE_PATH = None
+SAMPLE_LABEL = 'train/good'
 MODEL_FOLDER = 'models'
 MODEL_PATH = None
 DETECT_FOLDER = 'detect'

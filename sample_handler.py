@@ -44,7 +44,7 @@ class SampleHandler:
         # 初始化样本组路径
         if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
             self.sample_group = config.PROJECT_METADATA['sample_group']
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL)
         else:
             self.sample_group = None
             self.group_path = config.SAMPLE_PATH
@@ -83,7 +83,7 @@ class SampleHandler:
         if ok and text:
             # 设置样本组名称
             # 创建样本组文件夹
-            group_path = join_path(config.SAMPLE_PATH, text)
+            group_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL)
             if not os.path.exists(group_path):
                 os.makedirs(group_path)
                 # 更新数据
@@ -111,7 +111,7 @@ class SampleHandler:
         if result == QDialog.Accepted and dialog.selected_group:
             # 更新数据
             config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL)
             update_metadata('sample_group', self.sample_group)
             # 更新按钮显示状态
             self.update_button_visibility()
@@ -823,7 +823,7 @@ class UploadThread(QThread):
 class LoadImages:
     """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
     def __init__(self, ui):
-        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP)
+        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL)
         self.ui = ui
     
     def load_with_progress(self):
