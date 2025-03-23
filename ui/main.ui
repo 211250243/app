@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <property name="iconSize">
      <size>
@@ -61,8 +61,11 @@
         <x>540</x>
         <y>60</y>
         <width>20</width>
-        <height>521</height>
+        <height>488</height>
        </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: rgba(200, 200, 200, 150);</string>
       </property>
       <property name="orientation">
        <enum>Qt::Orientation::Vertical</enum>
@@ -77,6 +80,25 @@
         <height>491</height>
        </rect>
       </property>
+      <property name="styleSheet">
+       <string notr="true">QGroupBox {
+    background-color: rgba(255, 255, 255, 150);
+    border: 1px solid rgba(200, 200, 200, 150);
+    border-radius: 10px;
+    margin-top: 12px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1e3a8a;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 0px 10px;
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 200), stop:1 rgba(255, 255, 255, 80));
+    border-radius: 5px;
+}</string>
+      </property>
       <property name="title">
        <string>流程一</string>
       </property>
@@ -84,29 +106,37 @@
        <property name="geometry">
         <rect>
          <x>20</x>
-         <y>30</y>
-         <width>331</width>
-         <height>201</height>
+         <y>60</y>
+         <width>471</width>
+         <height>171</height>
         </rect>
        </property>
+       <property name="styleSheet">
+        <string notr="true">font-family: &quot;Microsoft YaHei UI&quot;;
+font-size: 12pt;
+color: #333333;
+background-color: rgba(240, 247, 255, 120);
+border-radius: 8px;
+padding: 15px;
+line-height: 1.5;</string>
+       </property>
        <property name="text">
-        <string>如果需要训练模型，请按以下步骤操作：
-
-
-                     1. 采集样本并进行预处理。
-
-                     2. 创建新模型并进行训练。
-
-                     3. 训练完成后进入检测阶段。</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;如果需要训练模型，请按以下步骤操作：&lt;/span&gt;&lt;/p&gt;&lt;p&gt;1. 采集样本并进行预处理。&lt;/p&gt;&lt;p&gt;2. 创建新模型并进行训练。&lt;/p&gt;&lt;p&gt;3. 训练完成后进入检测阶段。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="textFormat">
+        <enum>Qt::TextFormat::RichText</enum>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
        </property>
       </widget>
       <widget class="QLabel" name="narrow2">
        <property name="geometry">
         <rect>
-         <x>240</x>
+         <x>237</x>
          <y>300</y>
-         <width>25</width>
-         <height>18</height>
+         <width>30</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="font">
@@ -115,8 +145,14 @@
          <bold>true</bold>
         </font>
        </property>
+       <property name="styleSheet">
+        <string notr="true">color: #aaaaaa;</string>
+       </property>
        <property name="text">
-        <string>-&gt;</string>
+        <string>→</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
        <property name="color" stdset="0">
         <string>gray</string>
@@ -125,10 +161,10 @@
       <widget class="QLabel" name="narrow1">
        <property name="geometry">
         <rect>
-         <x>70</x>
+         <x>65</x>
          <y>300</y>
-         <width>25</width>
-         <height>18</height>
+         <width>30</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="font">
@@ -137,17 +173,23 @@
          <bold>true</bold>
         </font>
        </property>
+       <property name="styleSheet">
+        <string notr="true">color: #3498db;</string>
+       </property>
        <property name="text">
-        <string>-&gt;</string>
+        <string>→</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
       <widget class="QLabel" name="narrow3">
        <property name="geometry">
         <rect>
-         <x>360</x>
+         <x>355</x>
          <y>300</y>
-         <width>25</width>
-         <height>18</height>
+         <width>30</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="font">
@@ -156,8 +198,14 @@
          <bold>true</bold>
         </font>
        </property>
+       <property name="styleSheet">
+        <string notr="true">color: #aaaaaa;</string>
+       </property>
        <property name="text">
-        <string>-&gt;</string>
+        <string>→</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
        <property name="color" stdset="0">
         <string>gray</string>
@@ -176,14 +224,28 @@
         </rect>
        </property>
        <property name="styleSheet">
-        <string notr="true"/>
+        <string notr="true">QPushButton {
+    background-color: rgba(240, 240, 240, 200);
+    border: 1px solid rgba(200, 200, 200, 150);
+    border-radius: 10px;
+}
+
+QPushButton:disabled {
+    background-color: rgba(240, 240, 240, 100);
+    border: 1px solid rgba(200, 200, 200, 100);
+}
+
+QPushButton:hover {
+    background-color: rgba(220, 240, 255, 200);
+    border: 1px solid rgba(100, 170, 255, 150);
+}</string>
        </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset>
-         <normaloff>icon/detect.svg</normaloff>icon/detect.svg</iconset>
+         <normaloff>ui/icon/detect.svg</normaloff>ui/icon/detect.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -202,14 +264,28 @@
         </rect>
        </property>
        <property name="styleSheet">
-        <string notr="true"/>
+        <string notr="true">QPushButton {
+    background-color: rgba(240, 250, 255, 200);
+    border: 1px solid rgba(100, 150, 255, 150);
+    border-radius: 10px;
+}
+
+QPushButton:hover {
+    background-color: rgba(220, 240, 255, 230);
+    border: 1px solid rgba(100, 170, 255, 200);
+}
+
+QPushButton:pressed {
+    background-color: rgba(200, 230, 255, 250);
+    border: 1px solid rgba(70, 130, 255, 200);
+}</string>
        </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset>
-         <normaloff>icon/sample_combined.svg</normaloff>icon/sample_combined.svg</iconset>
+         <normaloff>ui/icon/sample_combined.svg</normaloff>ui/icon/sample_combined.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -221,20 +297,26 @@
       <widget class="QLabel" name="spot1">
        <property name="geometry">
         <rect>
-         <x>40</x>
-         <y>300</y>
-         <width>15</width>
-         <height>15</height>
+         <x>38</x>
+         <y>298</y>
+         <width>30</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="font">
         <font>
-         <pointsize>30</pointsize>
+         <pointsize>20</pointsize>
          <bold>true</bold>
         </font>
        </property>
+       <property name="styleSheet">
+        <string notr="true">color: #3498db;</string>
+       </property>
        <property name="text">
-        <string>·</string>
+        <string>●</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
       <widget class="QPushButton" name="modelButton">
@@ -249,12 +331,29 @@
          <height>80</height>
         </rect>
        </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: rgba(240, 240, 240, 200);
+    border: 1px solid rgba(200, 200, 200, 150);
+    border-radius: 10px;
+}
+
+QPushButton:disabled {
+    background-color: rgba(240, 240, 240, 100);
+    border: 1px solid rgba(200, 200, 200, 100);
+}
+
+QPushButton:hover {
+    background-color: rgba(220, 240, 255, 200);
+    border: 1px solid rgba(100, 170, 255, 150);
+}</string>
+       </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset>
-         <normaloff>icon/model.svg</normaloff>icon/model.svg</iconset>
+         <normaloff>ui/icon/model.svg</normaloff>ui/icon/model.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -266,14 +365,107 @@
       <widget class="QPushButton" name="startNextButton">
        <property name="geometry">
         <rect>
-         <x>370</x>
-         <y>440</y>
-         <width>86</width>
-         <height>26</height>
+         <x>340</x>
+         <y>420</y>
+         <width>110</width>
+         <height>35</height>
         </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 10pt;
+}
+
+QPushButton:hover {
+    background-color: #40a9ff;
+}
+
+QPushButton:pressed {
+    background-color: #096dd9;
+}</string>
        </property>
        <property name="text">
         <string>下一步</string>
+       </property>
+       <property name="icon">
+        <iconset>
+         <normaloff>ui/icon/next.svg</normaloff>ui/icon/next.svg</iconset>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>16</width>
+         <height>16</height>
+        </size>
+       </property>
+      </widget>
+      <widget class="QLabel" name="sampleLabel">
+       <property name="geometry">
+        <rect>
+         <x>100</x>
+         <y>350</y>
+         <width>135</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-family: &quot;Microsoft YaHei UI&quot;;
+font-size: 10pt;
+color: #3498db;
+font-weight: bold;</string>
+       </property>
+       <property name="text">
+        <string>样本采集</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="modelLabel">
+       <property name="geometry">
+        <rect>
+         <x>270</x>
+         <y>350</y>
+         <width>80</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-family: &quot;Microsoft YaHei UI&quot;;
+font-size: 10pt;
+color: #aaaaaa;</string>
+       </property>
+       <property name="text">
+        <string>模型训练</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
+       </property>
+      </widget>
+      <widget class="QLabel" name="detectLabel">
+       <property name="geometry">
+        <rect>
+         <x>390</x>
+         <y>350</y>
+         <width>80</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-family: &quot;Microsoft YaHei UI&quot;;
+font-size: 10pt;
+color: #aaaaaa;</string>
+       </property>
+       <property name="text">
+        <string>缺陷检测</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
      </widget>
@@ -282,9 +474,28 @@
        <rect>
         <x>570</x>
         <y>50</y>
-        <width>411</width>
+        <width>421</width>
         <height>491</height>
        </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QGroupBox {
+    background-color: rgba(255, 255, 255, 150);
+    border: 1px solid rgba(200, 200, 200, 150);
+    border-radius: 10px;
+    margin-top: 12px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1e3a8a;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 0px 10px;
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 200), stop:1 rgba(255, 255, 255, 80));
+    border-radius: 5px;
+}</string>
       </property>
       <property name="title">
        <string>流程二</string>
@@ -292,19 +503,29 @@
       <widget class="QLabel" name="quickLabel">
        <property name="geometry">
         <rect>
-         <x>110</x>
-         <y>30</y>
-         <width>271</width>
-         <height>161</height>
+         <x>20</x>
+         <y>60</y>
+         <width>371</width>
+         <height>171</height>
         </rect>
        </property>
+       <property name="styleSheet">
+        <string notr="true">font-family: &quot;Microsoft YaHei UI&quot;;
+font-size: 12pt;
+color: #333333;
+background-color: rgba(240, 247, 255, 120);
+border-radius: 8px;
+padding: 15px;
+line-height: 1.5;</string>
+       </property>
        <property name="text">
-        <string>如果已有模型，可以直接进行检测：
-
-
-                 1. 选择配置文件，加载模型。
-
-                 2. 进行图像检测，查看结果。</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;如果已有模型，可以直接进行检测：&lt;/span&gt;&lt;/p&gt;&lt;p&gt;1. 选择配置文件，加载模型。&lt;/p&gt;&lt;p&gt;2. 进行图像检测，查看结果。&lt;/p&gt;&lt;p/&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="textFormat">
+        <enum>Qt::TextFormat::RichText</enum>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
        </property>
       </widget>
       <widget class="QPushButton" name="quickDetectButton">
@@ -313,21 +534,35 @@
        </property>
        <property name="geometry">
         <rect>
-         <x>170</x>
-         <y>250</y>
-         <width>135</width>
+         <x>150</x>
+         <y>270</y>
+         <width>150</width>
          <height>80</height>
         </rect>
        </property>
        <property name="styleSheet">
-        <string notr="true"/>
+        <string notr="true">QPushButton {
+    background-color: rgba(240, 250, 255, 200);
+    border: 1px solid rgba(100, 150, 255, 150);
+    border-radius: 10px;
+}
+
+QPushButton:hover {
+    background-color: rgba(220, 240, 255, 230);
+    border: 1px solid rgba(100, 170, 255, 200);
+}
+
+QPushButton:pressed {
+    background-color: rgba(200, 230, 255, 250);
+    border: 1px solid rgba(70, 130, 255, 200);
+}</string>
        </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset>
-         <normaloff>icon/detect_combined.svg</normaloff>icon/detect_combined.svg</iconset>
+         <normaloff>ui/icon/detect_combined.svg</normaloff>ui/icon/detect_combined.svg</iconset>
        </property>
        <property name="iconSize">
         <size>
@@ -339,29 +574,35 @@
       <widget class="QLabel" name="spot2">
        <property name="geometry">
         <rect>
-         <x>100</x>
-         <y>280</y>
-         <width>15</width>
-         <height>15</height>
+         <x>88</x>
+         <y>298</y>
+         <width>30</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="font">
         <font>
-         <pointsize>30</pointsize>
+         <pointsize>20</pointsize>
          <bold>true</bold>
         </font>
        </property>
+       <property name="styleSheet">
+        <string notr="true">color: #3498db;</string>
+       </property>
        <property name="text">
-        <string>·</string>
+        <string>●</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
       <widget class="QLabel" name="narrow4">
        <property name="geometry">
         <rect>
-         <x>130</x>
-         <y>280</y>
-         <width>25</width>
-         <height>18</height>
+         <x>115</x>
+         <y>300</y>
+         <width>30</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="font">
@@ -370,24 +611,101 @@
          <bold>true</bold>
         </font>
        </property>
+       <property name="styleSheet">
+        <string notr="true">color: #3498db;</string>
+       </property>
        <property name="text">
-        <string>-&gt;</string>
+        <string>→</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
        </property>
       </widget>
       <widget class="QPushButton" name="quickNextButton">
        <property name="geometry">
         <rect>
-         <x>270</x>
-         <y>410</y>
-         <width>86</width>
-         <height>26</height>
+         <x>250</x>
+         <y>420</y>
+         <width>110</width>
+         <height>35</height>
         </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 10pt;
+}
+
+QPushButton:hover {
+    background-color: #40a9ff;
+}
+
+QPushButton:pressed {
+    background-color: #096dd9;
+}</string>
        </property>
        <property name="text">
         <string>下一步</string>
        </property>
+       <property name="icon">
+        <iconset>
+         <normaloff>ui/icon/next.svg</normaloff>ui/icon/next.svg</iconset>
+       </property>
+       <property name="iconSize">
+        <size>
+         <width>16</width>
+         <height>16</height>
+        </size>
+       </property>
+      </widget>
+      <widget class="QLabel" name="quickDetectLabel">
+       <property name="geometry">
+        <rect>
+         <x>150</x>
+         <y>350</y>
+         <width>150</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">font-family: &quot;Microsoft YaHei UI&quot;;
+font-size: 10pt;
+color: #3498db;
+font-weight: bold;</string>
+       </property>
+       <property name="text">
+        <string>缺陷检测</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignmentFlag::AlignCenter</set>
+       </property>
       </widget>
      </widget>
+     <widget class="QLabel" name="mainBackgroundLabel">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>1021</width>
+        <height>650</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #f6f8fa, stop:1 #e0e4e8);</string>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+     <zorder>mainBackgroundLabel</zorder>
+     <zorder>line</zorder>
+     <zorder>groupBox</zorder>
+     <zorder>groupBox_2</zorder>
     </widget>
     <widget class="QWidget" name="sampleWidget">
      <attribute name="title">
