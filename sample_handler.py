@@ -4,10 +4,12 @@ import shutil
 import random
 import numpy as np
 from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer, QCoreApplication
-from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon
+from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon, QFont
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
-    QFileDialog, QAbstractItemView, QMessageBox, QDialog, QPushButton, QInputDialog, QLineEdit, QListWidget
+    QFileDialog, QAbstractItemView, QMessageBox, QDialog, QPushButton, QInputDialog, QLineEdit, QListWidget, \
+    QFrame
+from PySide6.QtUiTools import QUiLoader
 
 import config
 from server import Server
@@ -73,16 +75,13 @@ class SampleHandler:
         """
         新建样本组，弹出对话框让用户输入样本组名称
         """
-        # 弹出输入对话框
-        text, ok = QInputDialog.getText(
-            self.ui, 
-            "新建样本组", 
-            "请输入样本组名称：", 
-            QLineEdit.Normal, 
-            ""
-        )
+        # 弹出自定义美化的对话框
+        dialog = NewSampleGroupDialog(self.ui)
+        result = dialog.exec()
+        text = dialog.get_input_text()
+        
         # 如果用户点击了确定按钮且输入了名称
-        if ok and text:
+        if result == QDialog.Accepted and text:
             # 创建样本组文件夹
             train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN_GOOD)
             if not os.path.exists(train_path):
@@ -129,12 +128,10 @@ class SampleHandler:
         # 创建并显示样本组选择对话框
         dialog = SampleGroupDialog(self.ui)
         dialog.setWindowTitle("删除样本组")
-        # 修改对话框标签文本
-        for child in dialog.findChildren(QLabel):
-            if "请选择" in child.text():
-                child.setText("请选择要删除的样本组：")
-                break
+        # 修改对话框标题标签文本
+        dialog.ui.titleLabel.setText("请选择要删除的样本组：")
         result = dialog.exec()
+        
         # 如果用户点击了确定按钮并选择了样本组
         if result == QDialog.Accepted and dialog.selected_group:
             # 获取选中的样本组名称
@@ -1873,68 +1870,38 @@ class LoadImages:
 
 class SampleGroupDialog(QDialog):
     """
-    样本组选择对话框
+    样本组选择对话框 - 使用UI文件加载
     """
     def __init__(self, parent=None):
         super().__init__(parent)
         self.selected_group = None
-        self.init_ui()
+        # 加载UI文件
+        self.ui = QUiLoader().load(r'ui\import_sample_group.ui')
+        
+        # 设置主窗口属性
+        self.setWindowTitle(self.ui.windowTitle())
+        self.setMinimumSize(self.ui.width(), self.ui.height())
+        
+        # 创建主布局
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.ui)
+        
+        # 连接信号
+        self.ui.refreshButton.clicked.connect(self.load_sample_groups)
+        self.ui.okButton.clicked.connect(self.accept)
+        self.ui.cancelButton.clicked.connect(self.reject)
+        self.ui.listWidget.itemDoubleClicked.connect(self.accept)
+        
+        # 加载样本组
         self.load_sample_groups()
-
-    def init_ui(self):
-        """
-        初始化UI
-        """
-        # 设置对话框标题和大小
-        self.setWindowTitle("选择样本组")
-        self.resize(400, 300)
-        
-        # 创建布局
-        layout = QVBoxLayout(self)
-        
-        # 添加标签
-        label = QLabel("请选择要导入的样本组：")
-        label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
-        layout.addWidget(label)
-        
-        # 添加列表控件
-        self.list_widget = QListWidget()
-        self.list_widget.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.list_widget.itemDoubleClicked.connect(self.accept)
-        layout.addWidget(self.list_widget)
-        
-        # 添加按钮布局
-        button_layout = QHBoxLayout()
-        
-        # 添加刷新按钮
-        refresh_button = QPushButton("刷新")
-        refresh_button.clicked.connect(self.load_sample_groups)
-        button_layout.addWidget(refresh_button)
-        
-        # 添加空白区域
-        button_layout.addStretch()
-        
-        # 添加确定和取消按钮
-        ok_button = QPushButton("确定")
-        ok_button.clicked.connect(self.accept)
-        cancel_button = QPushButton("取消")
-        cancel_button.clicked.connect(self.reject)
-        
-        button_layout.addWidget(ok_button)
-        button_layout.addWidget(cancel_button)
-        
-        # 将按钮布局添加到主布局
-        layout.addLayout(button_layout)
-        
-        # 设置对话框布局
-        self.setLayout(layout)
 
     def load_sample_groups(self):
         """
         加载样本组列表
         """
         # 清空列表
-        self.list_widget.clear()
+        self.ui.listWidget.clear()
         # 获取样本文件夹路径
         sample_folder = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
         # 获取样本文件夹下的所有子文件夹
@@ -1949,7 +1916,7 @@ class SampleGroupDialog(QDialog):
         if not sample_groups:
             empty_item = QListWidgetItem("没有找到样本组")
             empty_item.setFlags(Qt.NoItemFlags)  # 禁用选择
-            self.list_widget.addItem(empty_item)
+            self.ui.listWidget.addItem(empty_item)
             return
         # 添加样本组到列表
         for group_name, has_images in sample_groups:
@@ -1959,13 +1926,13 @@ class SampleGroupDialog(QDialog):
                 item.setIcon(QIcon("icon/image.svg"))  # 假设有图片图标
             else:
                 item.setIcon(QIcon("icon/folder.svg"))  # 假设有文件夹图标
-            self.list_widget.addItem(item)
+            self.ui.listWidget.addItem(item)
     
     def get_selected_group(self):
         """
         获取选中的样本组
         """
-        selected_items = self.list_widget.selectedItems()
+        selected_items = self.ui.listWidget.selectedItems()
         if selected_items:
             return selected_items[0].text()
         return None
@@ -1979,3 +1946,33 @@ class SampleGroupDialog(QDialog):
             super().accept()
         else:
             show_message_box("提示", "请选择一个样本组", QMessageBox.Information, self)
+
+
+class NewSampleGroupDialog(QDialog):
+    """
+    自定义美化的新建样本组对话框 - 使用UI文件加载
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # 加载UI文件
+        self.ui = QUiLoader().load(r'ui\new_sample_group.ui')
+        
+        # 设置主窗口属性和窗口标题
+        self.setWindowTitle(self.ui.windowTitle())
+        self.setFixedSize(self.ui.width(), self.ui.height())
+        
+        # 创建主布局
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.ui)
+        
+        # 连接信号
+        self.ui.confirmButton.clicked.connect(self.accept)
+        self.ui.cancelButton.clicked.connect(self.reject)
+        
+        # 设置焦点到输入框
+        self.ui.inputField.setFocus()
+        
+    def get_input_text(self):
+        """获取输入的文本"""
+        return self.ui.inputField.text().strip()
