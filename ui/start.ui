@@ -6,9 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>714</width>
-    <height>564</height>
+    <width>800</width>
+    <height>600</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>800</width>
+    <height>600</height>
+   </size>
   </property>
   <property name="font">
    <font>
@@ -16,57 +22,260 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>VisioCraft - 智能视觉缺陷检测</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QMainWindow {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #f6f8fa, stop:1 #e0e4e8);
+}
+
+QPushButton {
+    background-color: #ffffff;
+    border: 2px solid #e0e0e0;
+    border-radius: 15px;
+    padding: 10px;
+}
+
+QPushButton:hover {
+    background-color: #f0f7ff;
+    border: 2px solid #2473bd;
+}
+
+QPushButton:pressed {
+    background-color: #e0e0e0;
+    border: 2px solid #006ad1;
+}
+
+QLabel {
+    color: #333333;
+}
+
+QLabel#welcome {
+    color: #1e3a8a;
+}
+
+QLabel#versionLabel {
+    color: #666666;
+}
+
+QLabel#copyrightLabel {
+    color: #777777;
+}
+
+QLabel#descriptionLabel {
+    color: #555555;
+    background-color: rgba(255, 255, 255, 120);
+    border-radius: 10px;
+    padding: 10px;
+}
+
+QListWidget {
+    background-color: rgba(255, 255, 255, 120);
+    border-radius: 10px;
+    padding: 1px;
+    border: 1px solid rgba(224, 224, 224, 150);
+}
+
+QListWidget::item {
+    padding: 1px 6px;
+    border-bottom: 1px solid rgba(224, 224, 224, 150);
+}
+
+QListWidget::item:hover {
+    background-color: rgba(230, 240, 255, 180);
+}
+
+QListWidget::item:selected {
+    background-color: rgba(240, 247, 255, 150);
+    color: #333333;
+}
+</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QLabel" name="welcome">
     <property name="geometry">
      <rect>
-      <x>200</x>
+      <x>150</x>
       <y>60</y>
-      <width>301</width>
-      <height>31</height>
+      <width>500</width>
+      <height>60</height>
      </rect>
     </property>
     <property name="font">
      <font>
-      <pointsize>25</pointsize>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>28</pointsize>
       <bold>true</bold>
      </font>
     </property>
     <property name="text">
-     <string>欢迎使用VisioCraft</string>
+     <string>欢迎使用 VisioCraft</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
-   <widget class="QLabel" name="tip">
+   <widget class="QLabel" name="versionLabel">
     <property name="geometry">
      <rect>
-      <x>270</x>
-      <y>130</y>
-      <width>161</width>
-      <height>51</height>
+      <x>360</x>
+      <y>120</y>
+      <width>80</width>
+      <height>20</height>
      </rect>
     </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
     <property name="text">
-     <string>     从头创建新项目。
-从磁盘中打开现有项目。</string>
+     <string>V 1.0.0</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="descriptionLabel">
+    <property name="geometry">
+     <rect>
+      <x>200</x>
+      <y>160</y>
+      <width>400</width>
+      <height>50</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>11</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>智能视觉缺陷检测平台 - 让视觉检测更简单</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="recentLabel">
+    <property name="geometry">
+     <rect>
+      <x>280</x>
+      <y>336</y>
+      <width>250</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>10</pointsize>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgba(51, 51, 51, 180);</string>
+    </property>
+    <property name="text">
+     <string>最近项目</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="recentList">
+    <property name="geometry">
+     <rect>
+      <x>280</x>
+      <y>360</y>
+      <width>250</width>
+      <height>81</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgba(255, 255, 255, 120);
+border-radius: 10px;
+padding: 5px;
+border: 1px solid rgba(224, 224, 224, 150);</string>
+    </property>
+    <property name="verticalScrollBarPolicy">
+     <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
+    </property>
+    <property name="horizontalScrollBarPolicy">
+     <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
+    </property>
+    <property name="editTriggers">
+     <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+    </property>
+    <property name="alternatingRowColors">
+     <bool>false</bool>
+    </property>
+    <property name="selectionMode">
+     <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+    </property>
+    <property name="iconSize">
+     <size>
+      <width>16</width>
+      <height>16</height>
+     </size>
+    </property>
+    <property name="textElideMode">
+     <enum>Qt::TextElideMode::ElideMiddle</enum>
+    </property>
+    <property name="movement">
+     <enum>QListView::Movement::Static</enum>
+    </property>
+    <property name="flow">
+     <enum>QListView::Flow::TopToBottom</enum>
+    </property>
+    <property name="isWrapping" stdset="0">
+     <bool>false</bool>
+    </property>
+    <property name="resizeMode">
+     <enum>QListView::ResizeMode::Fixed</enum>
+    </property>
+    <property name="spacing">
+     <number>2</number>
+    </property>
+    <property name="uniformItemSizes">
+     <bool>false</bool>
+    </property>
+    <property name="batchSize">
+     <number>3</number>
+    </property>
+    <property name="selectionRectVisible">
+     <bool>false</bool>
+    </property>
+    <property name="sortingEnabled">
+     <bool>false</bool>
     </property>
    </widget>
    <widget class="QPushButton" name="openButton">
     <property name="geometry">
      <rect>
-      <x>380</x>
-      <y>220</y>
+      <x>435</x>
+      <y>230</y>
       <width>100</width>
       <height>100</height>
      </rect>
+    </property>
+    <property name="toolTip">
+     <string>从磁盘中打开现有项目</string>
     </property>
     <property name="text">
      <string/>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>B:/Development/GraduationDesign/app/ui/icon/open.svg</normaloff>B:/Development/GraduationDesign/app/ui/icon/open.svg</iconset>
+      <normaloff>ui/icon/open.svg</normaloff>ui/icon/open.svg</iconset>
     </property>
     <property name="iconSize">
      <size>
@@ -78,18 +287,21 @@
    <widget class="QPushButton" name="newButton">
     <property name="geometry">
      <rect>
-      <x>210</x>
-      <y>220</y>
+      <x>275</x>
+      <y>230</y>
       <width>100</width>
       <height>100</height>
      </rect>
+    </property>
+    <property name="toolTip">
+     <string>创建新的项目</string>
     </property>
     <property name="text">
      <string/>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>B:/Development/GraduationDesign/app/ui/icon/new.svg</normaloff>B:/Development/GraduationDesign/app/ui/icon/new.svg</iconset>
+      <normaloff>ui/icon/new.svg</normaloff>ui/icon/new.svg</iconset>
     </property>
     <property name="iconSize">
      <size>
@@ -98,30 +310,110 @@
      </size>
     </property>
    </widget>
-   <widget class="QLabel" name="newButtonLabel">
+   <widget class="QLabel" name="copyrightLabel">
     <property name="geometry">
      <rect>
-      <x>240</x>
-      <y>330</y>
-      <width>31</width>
-      <height>18</height>
+      <x>220</x>
+      <y>540</y>
+      <width>360</width>
+      <height>20</height>
      </rect>
     </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>9</pointsize>
+     </font>
+    </property>
     <property name="text">
-     <string>新建</string>
+     <string>© 2023 VisioCraft 智能视觉缺陷检测平台</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
-   <widget class="QLabel" name="label_2">
+   <widget class="QLabel" name="featureLabel1">
     <property name="geometry">
      <rect>
-      <x>420</x>
-      <y>330</y>
-      <width>31</width>
-      <height>18</height>
+      <x>150</x>
+      <y>460</y>
+      <width>150</width>
+      <height>60</height>
      </rect>
     </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgba(255, 255, 255, 180);
+border-radius: 10px;
+padding: 5px;</string>
+    </property>
     <property name="text">
-     <string>打开</string>
+     <string>✓ 简单易用的界面
+✓ 智能缺陷检测</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="featureLabel2">
+    <property name="geometry">
+     <rect>
+      <x>325</x>
+      <y>460</y>
+      <width>150</width>
+      <height>60</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgba(255, 255, 255, 180);
+border-radius: 10px;
+padding: 5px;</string>
+    </property>
+    <property name="text">
+     <string>✓ 强大数据增强
+✓ 批量处理能力</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="featureLabel3">
+    <property name="geometry">
+     <rect>
+      <x>500</x>
+      <y>460</y>
+      <width>150</width>
+      <height>60</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Microsoft YaHei UI</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgba(255, 255, 255, 180);
+border-radius: 10px;
+padding: 5px;</string>
+    </property>
+    <property name="text">
+     <string>✓ 高精度检测结果
+✓ 实时可视化</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
   </widget>

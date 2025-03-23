@@ -1,8 +1,10 @@
 import json
 import os
 from pathlib import Path  # 用于处理文件路径
-from PySide6.QtCore import QDateTime, Signal, Qt
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, QLabel
+from PySide6.QtCore import QDateTime, Signal, Qt, QSize, QEvent
+from PySide6.QtGui import QKeySequence, QShortcut, QDragEnterEvent, QDropEvent, QIcon
+from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, 
+                              QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget)
 from PySide6.QtUiTools import QUiLoader
 
 import config
@@ -24,8 +26,18 @@ class NewProjectDialog(QDialog):
         self.ui.newButton.clicked.connect(self.create_new_project)
         self.ui.pathButton.clicked.connect(self.select_path)
         self.ui.cancelButton.clicked.connect(self.cancel)
+        
+        # 添加快捷键
+        self.shortcut_create = QShortcut(QKeySequence(Qt.Key_Return), self.ui)
+        self.shortcut_create.activated.connect(self.create_new_project)
+        
+        self.shortcut_cancel = QShortcut(QKeySequence(Qt.Key_Escape), self.ui)
+        self.shortcut_cancel.activated.connect(self.cancel)
 
         self.path = ""  # 用于保存项目的路径
+        
+        # 设置焦点到名称输入框
+        self.ui.nameEdit.setFocus()
 
     def create_new_project(self):
         """
@@ -33,8 +45,11 @@ class NewProjectDialog(QDialog):
         """
         # 检查项目名称是否合法
         project_name = self.ui.nameEdit.text()
+        if not project_name:
+            show_message_box("错误", "项目名称不能为空！", QMessageBox.Critical)
+            return
         if not project_name.isidentifier():  # 判断是否是合法的标识符
-            show_message_box("错误", "项目名称不合法！", QMessageBox.Critical)
+            show_message_box("错误", "项目名称不合法！只能包含字母、数字和下划线，且不能以数字开头", QMessageBox.Critical)
             return
 
         # 检查路径是否存在
@@ -65,12 +80,42 @@ class NewProjectDialog(QDialog):
         with open(metadata_file_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
 
-        show_message_box("成功", f"项目已保存到 {metadata_file_path}", QMessageBox.Information)
+        # 添加到最近项目列表
+        self.add_to_recent_projects(project_folder)
 
         # 发射信号，将项目路径传递给父窗口
         self.project_info.emit(str(project_folder))
         # 关闭新建项目窗口
         self.ui.accept()
+
+    def add_to_recent_projects(self, project_path):
+        """将项目添加到最近项目列表"""
+        recent_file = join_path(os.path.expanduser("~"), ".visioCraft", "recent_projects.json")
+        os.makedirs(os.path.dirname(recent_file), exist_ok=True)
+        
+        recent_projects = []
+        if os.path.exists(recent_file):
+            try:
+                with open(recent_file, "r", encoding="utf-8") as f:
+                    recent_projects = json.load(f)
+            except:
+                recent_projects = []
+        
+        # 确保列表格式正确
+        if not isinstance(recent_projects, list):
+            recent_projects = []
+            
+        # 将当前项目添加到列表开头
+        if project_path in recent_projects:
+            recent_projects.remove(project_path)
+        recent_projects.insert(0, project_path)
+        
+        # 限制最近项目数量
+        recent_projects = recent_projects[:10]
+        
+        # 保存更新后的列表
+        with open(recent_file, "w", encoding="utf-8") as f:
+            json.dump(recent_projects, f, ensure_ascii=False)
 
     def select_path(self):
         """
@@ -94,15 +139,122 @@ class StartWindow(QMainWindow):
         super().__init__()
 
         # 创建UI对象并设置界面
-        self.ui = QUiLoader().load(r'ui\start.ui')
+        self.ui = QUiLoader().load(r'ui/start.ui')
+        
+        # 初始化界面
+        self.init_ui()
+        
+        # 拖放设置（拖动文件夹到窗口）
+        self.ui.setAcceptDrops(True) # 允许接收拖放事件
+        self.ui.installEventFilter(self) # 安装事件过滤器
 
+        # 创建悬浮计时器
+        self.floating_timer = FloatingTimer(self.ui)
+        self.floating_timer.show()
+        
+        # 加载最近项目列表
+        self.load_recent_projects()
+        
+    def init_ui(self):
+        """初始化界面和事件连接"""
         # 设置按钮点击事件
         self.ui.newButton.clicked.connect(self.create_new_archive)
         self.ui.openButton.clicked.connect(self.open_existing_archive)
         
-        # 创建悬浮计时器
-        self.floating_timer = FloatingTimer(self.ui)
-        self.floating_timer.show()
+        # 设置最近项目列表双击事件
+        self.ui.recentList.itemDoubleClicked.connect(self.on_recent_item_clicked)
+        
+        # 添加快捷键
+        self.shortcut_new = QShortcut(QKeySequence("Ctrl+N"), self.ui)
+        self.shortcut_new.activated.connect(self.create_new_archive)
+        
+        self.shortcut_open = QShortcut(QKeySequence("Ctrl+O"), self.ui)
+        self.shortcut_open.activated.connect(self.open_existing_archive)
+        
+        # 更新按钮提示
+        self.ui.newButton.setToolTip("创建新的项目 (Ctrl+N)")
+        self.ui.openButton.setToolTip("从磁盘中打开现有项目 (Ctrl+O)")
+    
+    def load_recent_projects(self):
+        """加载最近项目列表到UI中"""
+        self.ui.recentList.clear()
+        
+        recent_file = join_path(os.path.expanduser("~"), ".visioCraft", "recent_projects.json")
+        if not os.path.exists(recent_file):
+            self.ui.recentLabel.setVisible(False)
+            self.ui.recentList.setVisible(False)
+            return
+            
+        try:
+            with open(recent_file, "r", encoding="utf-8") as f:
+                recent_projects = json.load(f)
+                
+            if not recent_projects:
+                self.ui.recentLabel.setVisible(False)
+                self.ui.recentList.setVisible(False)
+                return
+                
+            self.ui.recentLabel.setVisible(True)
+            self.ui.recentList.setVisible(True)
+            
+            for project_path in recent_projects:
+                metadata_path = join_path(project_path, "metadata.json")
+                project_name = os.path.basename(project_path)
+                
+                if os.path.exists(metadata_path):
+                    try:
+                        with open(metadata_path, "r", encoding="utf-8") as f:
+                            metadata = json.load(f)
+                        project_name = metadata.get("project_name", project_name)
+                    except:
+                        pass
+                
+                item = QListWidgetItem(project_name)
+                item.setData(Qt.UserRole, project_path)
+                self.ui.recentList.addItem(item)
+                
+        except Exception as e:
+            print(f"加载最近项目失败: {str(e)}")
+            self.ui.recentLabel.setVisible(False)
+            self.ui.recentList.setVisible(False)
+    
+    def on_recent_item_clicked(self, item):
+        """当最近项目被点击时"""
+        project_path = item.data(Qt.UserRole)
+        self.open_existing_archive(project_path)
+        
+    def eventFilter(self, obj, event):
+        """事件过滤器，处理拖放事件"""
+        if obj == self.ui:
+            if event.type() == QEvent.DragEnter:
+                self.dragEnterEvent(event)
+                return True
+            elif event.type() == QEvent.Drop:
+                self.dropEvent(event)
+                return True
+        return super().eventFilter(obj, event)
+        
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        """当拖动进入窗口时的处理"""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            
+    def dropEvent(self, event: QDropEvent):
+        """当放下拖动项时的处理"""
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if urls:
+                folder_path = urls[0].toLocalFile()
+                if os.path.isdir(folder_path):
+                    self.check_and_open_project(folder_path)
+    
+    def check_and_open_project(self, folder_path):
+        """检查并打开项目文件夹"""
+        metadata_path = join_path(folder_path, config.PROJECT_METADATA_FILE)
+        if os.path.exists(metadata_path):
+            self.open_existing_archive(folder_path)
+        else:
+            show_message_box("错误", "选择的文件夹不是有效的项目文件夹，没有找到 metadata.json 文件", QMessageBox.Critical)
 
     def create_new_archive(self):
         """
@@ -144,12 +296,45 @@ class StartWindow(QMainWindow):
                     with open(metadata_path, "r", encoding="utf-8") as f:
                         config.PROJECT_METADATA = json.load(f)
                         print("项目信息：", config.PROJECT_METADATA)
+                    
+                    # 添加到最近项目列表
+                    self.add_to_recent_projects(folder)
+                    
                     # 显示读取的项目信息
                     self.open_main_window()
                 except Exception as e:
                     show_message_box("错误", f"读取项目元数据失败: {str(e)}", QMessageBox.Critical)
             else:
                 show_message_box("错误", "选择的文件夹没有找到 metadata.json 文件", QMessageBox.Critical)
+    
+    def add_to_recent_projects(self, project_path):
+        """将项目添加到最近项目列表"""
+        recent_file = join_path(os.path.expanduser("~"), ".visioCraft", "recent_projects.json")
+        os.makedirs(os.path.dirname(recent_file), exist_ok=True)
+        
+        recent_projects = []
+        if os.path.exists(recent_file):
+            try:
+                with open(recent_file, "r", encoding="utf-8") as f:
+                    recent_projects = json.load(f)
+            except:
+                recent_projects = []
+        
+        # 确保列表格式正确
+        if not isinstance(recent_projects, list):
+            recent_projects = []
+            
+        # 将当前项目添加到列表开头
+        if project_path in recent_projects:
+            recent_projects.remove(project_path)
+        recent_projects.insert(0, project_path)
+        
+        # 限制最近项目数量
+        recent_projects = recent_projects[:10]
+        
+        # 保存更新后的列表
+        with open(recent_file, "w", encoding="utf-8") as f:
+            json.dump(recent_projects, f, ensure_ascii=False)
 
     def open_main_window(self):
         """

@@ -43,7 +43,7 @@ class SampleHandler:
         self.ui.deleteSampleGroupButton.clicked.connect(self.delete_sample_group)
         # 初始化样本组路径
         if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
-            self.sample_group = config.PROJECT_METADATA['sample_group']
+            config.SAMPLE_GROUP = self.sample_group = config.PROJECT_METADATA['sample_group']
             self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
         else:
             self.sample_group = None
@@ -112,10 +112,10 @@ class SampleHandler:
             config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
             self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
             update_metadata('sample_group', self.sample_group)
-            # 更新按钮显示状态
-            self.update_button_visibility()
             # 加载样本组中的图片
             LoadImages(self.ui).load_with_progress()
+            # 更新按钮显示状态
+            self.update_button_visibility()
             # 显示成功消息
             show_message_box("成功", f"已导入样本组：{self.sample_group}", QMessageBox.Information, self.ui)
 
@@ -1690,6 +1690,7 @@ class LoadImages:
         self.ui = ui
     
     def load_with_progress(self):
+        # QCoreApplication.processEvents() # 强制处理所有之前的UI更新事件（现已移至ProgressDialog）
         """使用进度条加载图片"""
         # 创建进度对话框
         progress_dialog = ProgressDialog(self.ui, {
@@ -1698,7 +1699,7 @@ class LoadImages:
         })
         # 显示对话框并开始加载
         progress_dialog.show()
-        QCoreApplication.processEvents() # 确保进度条显示！！！
+        # QCoreApplication.processEvents() # 确保进度条显示！！！（现已移至ProgressDialog）
 
         # 重新获取图片列表
         self.ui.imageList.clear()
@@ -1754,7 +1755,7 @@ class LoadImages:
         loading = LoadingAnimation(self.ui)
         loading.set_text("正在加载图片...")
         loading.show()
-        QCoreApplication.processEvents()  # 确保动画显示！！！
+        # QCoreApplication.processEvents()  # 确保动画显示！！！（现已移至LoadingAnimation）
 
         # 重新获取图片列表
         self.ui.imageList.clear()

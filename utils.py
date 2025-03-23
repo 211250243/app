@@ -1,7 +1,7 @@
 import json
 import os
 
-from PySide6.QtCore import Signal, Qt, QTimer, QDateTime, QPoint, QSize
+from PySide6.QtCore import QCoreApplication, Qt, QTimer, QDateTime, QPoint, QSize
 from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
 from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QProgressBar, QLabel, QWidget, QApplication, QProgressDialog
 
@@ -9,18 +9,51 @@ import config
 
 
 
-
 class ProgressDialog(QProgressDialog):
     """
     基于QProgressDialog的进度展示框
     """
-    def __init__(self, parent=None, msg="请稍等..."):
+    def __init__(self, parent=None, msg={"title": "处理中", "text": "请稍等..."}):
         super().__init__(parent)
         self.setWindowTitle(msg["title"])
         self.setLabelText(msg["text"])
         self.setRange(0, 100)
         self.setCancelButton(None)
         self.setModal(True)
+        self.setMinimumDuration(0)  # 立即显示，不等待
+        self.setMinimumSize(300, 100)
+        
+        # 应用样式
+        self.setStyleSheet("""
+            QProgressDialog {
+                background-color: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            QLabel {
+                color: #333;
+                font-size: 11pt;
+                font-family: 'Microsoft YaHei UI';
+                margin-bottom: 5px;
+            }
+            QProgressBar {
+                border: 1px solid #bbb;
+                border-radius: 3px;
+                background-color: #f0f0f0;
+                text-align: center;
+                min-height: 12px;
+            }
+            QProgressBar::chunk {
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
+                                              stop:0 #4da6ff, stop:1 #1e88e5);
+                border-radius: 3px;
+            }
+        """)
+    
+    def showEvent(self, event):
+        """当进度对话框显示时确保UI更新"""
+        super().showEvent(event)
+        QCoreApplication.processEvents()  # 立即处理所有挂起的UI事件
 
 # class ProgressDialog(QDialog):
 #     """
@@ -274,6 +307,7 @@ class LoadingAnimation(QWidget):
         # 开始播放动画
         self.movie.start()
         super().showEvent(event)
+        QCoreApplication.processEvents() # 立即处理所有挂起的UI事件
         
     def resizeEvent(self, event):
         """调整大小时确保背景覆盖整个区域"""
