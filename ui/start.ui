@@ -72,13 +72,14 @@ QLabel#descriptionLabel {
 QListWidget {
     background-color: rgba(255, 255, 255, 120);
     border-radius: 10px;
-    padding: 1px;
+    padding: 3px;
     border: 1px solid rgba(224, 224, 224, 150);
+    outline: none;
+    show-decoration-selected: 0;
 }
 
 QListWidget::item {
-    padding: 1px 6px;
-    border-bottom: 1px solid rgba(224, 224, 224, 150);
+    border-radius: 5px;
 }
 
 QListWidget::item:hover {
@@ -88,6 +89,41 @@ QListWidget::item:hover {
 QListWidget::item:selected {
     background-color: rgba(240, 247, 255, 150);
     color: #333333;
+    border: none;
+    outline: none;
+}
+
+QListWidget:focus {
+    outline: none;
+}
+
+/* 滚动条样式 */
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: rgba(210, 210, 210, 150);
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: rgba(100, 100, 100, 200);
+}
+
+QScrollBar::handle:vertical:pressed {
+    background-color: rgba(80, 80, 80, 250);
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: transparent;
 }
 </string>
   </property>
@@ -191,7 +227,7 @@ QListWidget::item:selected {
       <x>280</x>
       <y>360</y>
       <width>250</width>
-      <height>81</height>
+      <height>61</height>
      </rect>
     </property>
     <property name="font">
@@ -201,10 +237,42 @@ QListWidget::item:selected {
      </font>
     </property>
     <property name="styleSheet">
-     <string notr="true">background-color: rgba(255, 255, 255, 120);
+     <string notr="true">background-color: rgba(255, 255, 255, 80);
 border-radius: 10px;
 padding: 5px;
-border: 1px solid rgba(224, 224, 224, 150);</string>
+border: 1px solid rgba(224, 224, 224, 100);
+outline: none;
+
+/* 滚动条样式 */
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: rgba(100, 100, 100, 150);
+    min-height: 30px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: rgba(100, 100, 100, 200);
+}
+
+QScrollBar::handle:vertical:pressed {
+    background-color: rgba(80, 80, 80, 250);
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: transparent;
+}</string>
     </property>
     <property name="verticalScrollBarPolicy">
      <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>

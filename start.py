@@ -4,7 +4,7 @@ from pathlib import Path  # 用于处理文件路径
 from PySide6.QtCore import QDateTime, Signal, Qt, QSize, QEvent
 from PySide6.QtGui import QKeySequence, QShortcut, QDragEnterEvent, QDropEvent, QIcon
 from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, 
-                              QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget)
+                              QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget, QHBoxLayout)
 from PySide6.QtUiTools import QUiLoader
 
 import config
@@ -178,40 +178,52 @@ class StartWindow(QMainWindow):
     def load_recent_projects(self):
         """加载最近项目列表到UI中"""
         self.ui.recentList.clear()
-        
         recent_file = join_path(os.path.expanduser("~"), ".visioCraft", "recent_projects.json")
         if not os.path.exists(recent_file):
             self.ui.recentLabel.setVisible(False)
             self.ui.recentList.setVisible(False)
             return
-            
         try:
             with open(recent_file, "r", encoding="utf-8") as f:
                 recent_projects = json.load(f)
-                
+            # 如果最近项目列表为空，隐藏最近项目区域
             if not recent_projects:
                 self.ui.recentLabel.setVisible(False)
                 self.ui.recentList.setVisible(False)
                 return
-                
-            self.ui.recentLabel.setVisible(True)
-            self.ui.recentList.setVisible(True)
-            
+            # 遍历最近项目列表
             for project_path in recent_projects:
                 metadata_path = join_path(project_path, "metadata.json")
                 project_name = os.path.basename(project_path)
-                
+                create_time = ""
                 if os.path.exists(metadata_path):
                     try:
                         with open(metadata_path, "r", encoding="utf-8") as f:
                             metadata = json.load(f)
                         project_name = metadata.get("project_name", project_name)
+                        create_time = metadata.get("create_time", "")
                     except:
                         pass
+                # 创建一个自定义的 widget 来显示项目名称和创建时间
+                item_widget = QWidget()
+                layout = QHBoxLayout(item_widget)
+                layout.setContentsMargins(16, 0, 16, 0) # 依次为左、上、右、下                
+                name_label = QLabel(project_name)
+                name_label.setStyleSheet("color: rgba(51, 51, 51, 180);")
+                name_label.setAlignment(Qt.AlignVCenter) # 垂直居中
+                layout.addWidget(name_label)
                 
-                item = QListWidgetItem(project_name)
+                time_label = QLabel(create_time)
+                time_label.setStyleSheet("color: rgba(128, 128, 128, 150); font-size: 9pt;")
+                time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                layout.addWidget(time_label)
+                
+                item = QListWidgetItem()
+                item.setSizeHint(QSize(item_widget.sizeHint().width(), 22))
                 item.setData(Qt.UserRole, project_path)
+                
                 self.ui.recentList.addItem(item)
+                self.ui.recentList.setItemWidget(item, item_widget)
                 
         except Exception as e:
             print(f"加载最近项目失败: {str(e)}")
@@ -221,8 +233,37 @@ class StartWindow(QMainWindow):
     def on_recent_item_clicked(self, item):
         """当最近项目被点击时"""
         project_path = item.data(Qt.UserRole)
+        if not os.path.exists(project_path):
+            # 从界面列表中移除
+            row = self.ui.recentList.row(item)
+            self.ui.recentList.takeItem(row)
+            # 从本地存储中移除
+            self.remove_from_recent_projects(project_path)
+            # 如果列表为空，隐藏最近项目区域
+            if self.ui.recentList.count() == 0:
+                self.ui.recentLabel.setVisible(False)
+                self.ui.recentList.setVisible(False)
+            # 显示提示信息
+            show_message_box("提示", "该项目已被移除或路径不存在，已从最近项目列表中删除", QMessageBox.Information)
+            return
+            
         self.open_existing_archive(project_path)
-        
+
+    def remove_from_recent_projects(self, project_path):
+        """从最近项目列表中移除指定项目"""
+        recent_file = join_path(os.path.expanduser("~"), ".visioCraft", "recent_projects.json")
+        if os.path.exists(recent_file):
+            try:
+                with open(recent_file, "r", encoding="utf-8") as f:
+                    recent_projects = json.load(f)
+                if project_path in recent_projects:
+                    recent_projects.remove(project_path)
+                    # 保存更新后的列表
+                    with open(recent_file, "w", encoding="utf-8") as f:
+                        json.dump(recent_projects, f, ensure_ascii=False)
+            except Exception as e:
+                print(f"移除最近项目失败: {str(e)}")
+
     def eventFilter(self, obj, event):
         """事件过滤器，处理拖放事件"""
         if obj == self.ui:
@@ -288,6 +329,11 @@ class StartWindow(QMainWindow):
         if not folder:
             folder = QFileDialog.getExistingDirectory(self, "选择项目文件夹")
         if folder:
+            # 检查项目文件夹是否存在
+            if not os.path.exists(folder):
+                show_message_box("错误", "项目文件夹不存在", QMessageBox.Critical)
+                return
+                
             # 检查文件夹中是否存在 metadata.json
             metadata_path = config.PROJECT_METADATA_PATH = join_path(folder, config.PROJECT_METADATA_FILE)
             if os.path.exists(metadata_path):
