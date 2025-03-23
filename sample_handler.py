@@ -31,8 +31,6 @@ class SampleHandler:
         self.init_image_list()
         self.init_detail_frame()
         self.init_operate_column()
-        # 更新按钮显示状态
-        self.update_button_visibility()
 
     def init_sample_group(self):
         """
@@ -58,11 +56,16 @@ class SampleHandler:
         # 样本操作按钮区域仅当有当前样本组时显示
         has_sample_group = self.sample_group is not None
         self.ui.sampleOperationFrame.setVisible(has_sample_group)
-        
         # 更新当前样本组标签
         if has_sample_group:
             self.ui.currentGroupLabel.setText(f"当前样本组：{self.sample_group}")
             self.ui.currentGroupLabel.setVisible(True)
+            # 恢复默认按钮显示状态
+            self.updateButtonState(True)
+            # 重置默认裁剪框按钮状态
+            self.restoreButtonState()
+            # 清除detailFrame图像
+            self.clear_detail_frame()
         else:
             self.ui.currentGroupLabel.setVisible(False)
 
@@ -212,10 +215,23 @@ class SampleHandler:
             checkbox = item.checkbox  # Retrieve the checkbox from the item's data
             if checkbox:
                 checkbox.setVisible(True)
+        # 更改按钮显示状态
+        self.updateButtonState(False)
+
+    def updateButtonState(self, state: bool):
+        """
+        修改按钮显示状态，True为默认状态
+        """
+        self.ui.selectButton.setVisible(state)
+        self.ui.importButton.setVisible(state)
+        self.ui.addButton.setVisible(state)
+        self.ui.deleteButton.setVisible(not state)
+        self.ui.selectAllButton.setVisible(not state)
+        self.ui.completeButton.setVisible(not state)
 
     def select_disabled(self):
         """
-        取消所有图片的选中状态
+        取消所有图片的选中状态, 并恢复按钮显示状态
         """
         self.ui.imageList.clearSelection()  # Clear any selected items
         self.ui.imageList.setSelectionMode(QAbstractItemView.SingleSelection)  # Enable single-selection mode
@@ -224,6 +240,8 @@ class SampleHandler:
             checkbox = item.checkbox  # Retrieve the checkbox from the item's data
             if checkbox:
                 checkbox.setVisible(False)
+        # 恢复按钮显示状态
+        self.updateButtonState(True)
 
     def select_all_images(self):
         """
@@ -249,6 +267,8 @@ class SampleHandler:
             # self.ui.imageList.takeItem(self.ui.imageList.row(item))  # 从列表中移除项
         LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
         self.clear_detail_frame()  # 清除detailFrame
+        # 删除完图片后，重置选择模式为禁用状态
+        self.select_disabled()
 
     def import_dir(self):
         """
@@ -305,13 +325,17 @@ class SampleHandler:
         
         # 绑定按钮事件
         self.ui.cropButton.clicked.connect(self.show_crop_rect)
-        self.ui.finishButton.clicked.connect(self.finish_crop)
+        self.ui.acceptButton.clicked.connect(self.accept_crop)
+        self.ui.rejectButton.clicked.connect(self.reject_crop)
+        self.ui.cancelButton.clicked.connect(self.cancel_crop)
         self.ui.saveButton.clicked.connect(self.save_image)
         self.ui.scaleUpButton.clicked.connect(self.scale_up)
         self.ui.scaleDownButton.clicked.connect(self.scale_down)
         self.ui.rotateLeftButton.clicked.connect(self.rotate_left)
         self.ui.rotateRightButton.clicked.connect(self.rotate_right)
-
+        # 初始化裁剪框默认按钮状态
+        self.restoreButtonState()
+        
         # 初始化变量
         self.ui.pixmap = None
         self.ui.crop_rect = None
@@ -332,6 +356,8 @@ class SampleHandler:
         """
         清除图像信息
         """
+        if not hasattr(self.ui, 'scene'):
+            return  # 如果场景尚未初始化，直接返回
         if self.ui.image_item: # 如果存在图片项
             self.ui.scene.removeItem(self.ui.image_item)
             self.ui.image_item = None
@@ -377,17 +403,28 @@ class SampleHandler:
         # 设置裁剪区域大小
         self.ui.view.setSceneRect(self.ui.pixmap.rect())
         self.ui.view.fitInView(self.ui.image_item, Qt.KeepAspectRatio)  # Ensure the view fits the image
+        
+        # 重置裁剪框默认按钮状态
+        self.restoreButtonState()
 
     def show_crop_rect(self):
         """
         显示裁剪框
         """
+        # 移除已有的裁剪框（如果存在）
         if self.ui.crop_rect:
-            self.ui.crop_rect.setVisible(True)
-        else:
-            self.ui.crop_rect = ResizableRectItem(self, self.ui.image_item.pos().x(), self.ui.image_item.pos().y(),
-                                               self.ui.image_item.pixmap().width(), self.ui.image_item.pixmap().height())
-            self.ui.scene.addItem(self.ui.crop_rect)
+            self.ui.scene.removeItem(self.ui.crop_rect)
+            self.ui.crop_rect = None
+            
+        # 创建新的裁剪框，确保它总是基于当前图像尺寸
+        self.ui.crop_rect = ResizableRectItem(self, self.ui.image_item.pos().x(), self.ui.image_item.pos().y(),
+                                           self.ui.image_item.pixmap().width(), self.ui.image_item.pixmap().height())
+        self.ui.scene.addItem(self.ui.crop_rect)
+        
+        # 隐藏裁剪按钮，显示接受和拒绝按钮
+        self.ui.cropButton.setVisible(False)
+        self.ui.acceptButton.setVisible(True)
+        self.ui.rejectButton.setVisible(True)
 
     def crop_image(self):
         """
@@ -408,9 +445,9 @@ class SampleHandler:
             # 添加裁剪后的图像
             self.ui.scene.addItem(self.ui.cropped_item)
 
-    def finish_crop(self):
+    def accept_crop(self):
         """
-        完成裁剪
+        接受裁剪
         """
         if self.ui.crop_rect:
             # 获取裁剪区域
@@ -419,19 +456,70 @@ class SampleHandler:
             # 将裁剪后的图像显示在界面上，并设置位置
             self.ui.image_item.setPixmap(cropped_pixmap)
             self.ui.image_item.setPos(rect.topLeft())
-            # 隐藏裁剪框
-            self.ui.crop_rect.setVisible(False)
+            # 清除裁剪框
+            self.ui.scene.removeItem(self.ui.crop_rect)
+            self.ui.crop_rect = None
+            # 修改按钮状态
+            self.ui.acceptButton.setVisible(False)
+            self.ui.rejectButton.setVisible(False)
+            self.ui.cancelButton.setVisible(True)
+            self.ui.saveButton.setVisible(True)
+
+    def reject_crop(self):
+        """
+        点击裁剪后取消操作
+        """
+        # 移除裁剪框
+        if self.ui.crop_rect:
+            self.ui.scene.removeItem(self.ui.crop_rect)
+            self.ui.crop_rect = None  # 完全清除裁剪框引用
+        # 移除模糊效果和裁剪预览
+        if self.ui.image_item and self.ui.image_item.graphicsEffect():
+            self.ui.image_item.setGraphicsEffect(None)
+        if self.ui.cropped_item:
+            self.ui.scene.removeItem(self.ui.cropped_item)
+            self.ui.cropped_item = None
+        # 恢复裁剪框默认按钮状态
+        self.restoreButtonState()
+
+    def cancel_crop(self):
+        """
+        点击接受后取消操作，需要恢复原始图片
+        """
+        self.reject_crop()
+        if self.ui.image_item and self.image_path:
+            # 重新加载原始图片并恢复位置
+            self.ui.pixmap = QPixmap(self.image_path)
+            self.ui.image_item.setPixmap(self.ui.pixmap)
+            self.ui.image_item.setPos(0, 0)  # 重置位置到原点
+            self.ui.image_item.setScale(1.0)  # 重置缩放比例
+            self.ui.image_item.setRotation(0)  # 重置旋转角度
+            # 重置视图尺寸
+            self.ui.view.setSceneRect(self.ui.pixmap.rect())
+            self.ui.view.fitInView(self.ui.image_item, Qt.KeepAspectRatio)
 
     def save_image(self):
         """
         保存裁剪后的图像
         """
-        # 先判断crop_rect是否可见，如果可见，说明还未完成裁剪
-        if self.ui.crop_rect.isVisible():
-            self.finish_crop()
+        # 保存图像
         if self.ui.image_item and self.image_path:
             self.ui.image_item.pixmap().save(self.image_path) # 保存图像
             self.refresh_image_item(self.image_path) # 刷新这个选中项的图片
+            # 显示保存成功提示
+            show_message_box("保存成功", "图片已成功保存", QMessageBox.Information, self.ui)
+        # 恢复裁剪框默认按钮状态
+        self.restoreButtonState()
+
+    def restoreButtonState(self):
+        """
+        恢复裁剪框默认按钮状态
+        """
+        self.ui.cropButton.setVisible(True)
+        self.ui.acceptButton.setVisible(False)
+        self.ui.rejectButton.setVisible(False)
+        self.ui.cancelButton.setVisible(False)
+        self.ui.saveButton.setVisible(False)
 
     def refresh_image_item(self, image_path=None):
         """
@@ -1560,9 +1648,13 @@ class ResizableRectItem(QGraphicsRectItem):
             super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        """
+        鼠标释放事件：结束缩放或移动操作
+        """
         self.resizing = False
         super().mouseReleaseEvent(event)
-        self.parent.crop_image()  # 调用父窗口的裁剪方法
+        # 鼠标释放后，如果已经创建了裁剪框，则执行裁剪（预览）
+        self.parent.crop_image()
 
     def is_on_resize_handle(self, pos):
         """

@@ -96,7 +96,8 @@ if __name__ == "__main__":
         "project_name": "test",
         "project_path": "B:\\Development\\GraduationDesign\\app\\test",
         "description": "",
-        "create_time": "2024-12-20 19:47:57"
+        "create_time": "2024-12-20 19:47:57",
+        "sample_group": "1"
     }
 
     config.PROJECT_METADATA_PATH = join_path(config.PROJECT_METADATA['project_path'], config.PROJECT_METADATA_FILE)
