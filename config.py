@@ -6,6 +6,9 @@ SERVER_PASSWORD = 'NAec19216800.'
 SERVER_SAMPLE_PATH = 'data/sample_groups'
 SERVER_DOWNLOAD_PATH = 'patchcore/evaluated_results/2025_1_9'
 
+HOSTNAME = '10.160.22.114'
+PORT = 20060
+
 # 项目配置
 """
 PROJECT_METADATA = {

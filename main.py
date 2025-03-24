@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QTimer
 import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
-from sample_handler import SampleHandler, UploadThread
+from sample_handler import SampleHandler
 from utils import FloatingTimer, join_path
 
 
@@ -54,12 +54,7 @@ class MainWindow(QMainWindow):
     def switch_to_page_1(self):
         self.ui.tabWidget.setCurrentIndex(1)
     def switch_to_page_2(self):
-        # 上传样本到服务器
-        self.ui.upload_result = False  # 上传结果
-        UploadThread(self.ui).execute()
-        # 上传成功后切换到下一页
-        if self.ui.upload_result:
-            self.ui.tabWidget.setCurrentIndex(2)
+        self.ui.tabWidget.setCurrentIndex(2)
     def switch_to_page_3(self):
         self.ui.tabWidget.setCurrentIndex(3)
     # def on_tab_changed(self, index):

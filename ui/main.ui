@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>1</number>
     </property>
     <property name="iconSize">
      <size>
@@ -1576,6 +1576,36 @@ QPushButton:pressed {
        </property>
        <property name="text">
         <string>删除样本组</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="uploadSampleGroupButton">
+       <property name="geometry">
+        <rect>
+         <x>385</x>
+         <y>5</y>
+         <width>90</width>
+         <height>28</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1890ff;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #bae7ff;
+    border: 1px solid #69c0ff;
+}
+QPushButton:pressed {
+    background-color: #91d5ff;
+}</string>
+       </property>
+       <property name="text">
+        <string>上传样本组</string>
        </property>
       </widget>
      </widget>

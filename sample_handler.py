@@ -3,18 +3,17 @@ import os
 import shutil
 import random
 import numpy as np
-from PySide6.QtCore import Qt, QRectF, QPointF, QThread, QEventLoop, QTimer, QCoreApplication
+from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon, QFont
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
-    QFileDialog, QAbstractItemView, QMessageBox, QDialog, QPushButton, QInputDialog, QLineEdit, QListWidget, \
-    QFrame
+    QFileDialog, QAbstractItemView, QMessageBox, QDialog
 from PySide6.QtUiTools import QUiLoader
 
 import config
-from server import Server
+from http_server import Server
+import http_server
 from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box, update_metadata
-from PySide6.QtCore import Signal
 
 
 
@@ -41,6 +40,7 @@ class SampleHandler:
         self.ui.newSampleGroupButton.clicked.connect(self.new_sample_group)
         self.ui.importSampleGroupButton.clicked.connect(self.import_sample_group)
         self.ui.deleteSampleGroupButton.clicked.connect(self.delete_sample_group)
+        self.ui.uploadSampleGroupButton.clicked.connect(self.upload_sample_group)
         # 初始化样本组路径
         if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
             config.SAMPLE_GROUP = self.sample_group = config.PROJECT_METADATA['sample_group']
@@ -165,6 +165,37 @@ class SampleHandler:
                 except Exception as e:
                     # 如果删除失败，显示错误消息
                     show_message_box("错误", f"删除样本组失败：{str(e)}", QMessageBox.Critical, self.ui)
+
+    def upload_sample_group(self):
+        """
+        上传样本组到服务器
+        """
+        # 创建进度条
+        progressDialog = ProgressDialog(self.ui, {
+            "title": "上传样本",
+            "text": "正在上传样本组..."
+        })
+        progressDialog.show()
+        # 获取当前样本组中的所有图片文件
+        files = [f for f in os.listdir(self.group_path) if is_image(f)]
+        total_files = len(files)
+        if total_files == 0:
+            show_message_box("警告", "样本组为空，请导入样本", QMessageBox.Warning)
+            return
+        # 更新进度条文本
+        progressDialog.setLabelText(f"正在上传 {total_files} 个文件...")
+        # 遍历并上传每个文件
+        for index, file_name in enumerate(files):
+            file_path = join_path(self.group_path, file_name)
+            # 上传文件，若失败则停止
+            try:
+                http_server.upload_sample(file_path)
+            except Exception as e:
+                show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
+                return
+            # 更新进度条
+            progress = int((index + 1) / total_files * 100)
+            progressDialog.setValue(progress)
 
 
 
@@ -1662,114 +1693,41 @@ class ResizableRectItem(QGraphicsRectItem):
         return handle_rect.contains(pos)
 
 
-class UploadThread(QThread):
+class UploadSampleGroup:
     """
-    上传样本到服务器的线程
+    上传样本组到服务器的线程
     """
-    upload_finished = Signal(bool)  # 上传完成时发出的信号
-
     def __init__(self, ui):
         super().__init__()
-        self.local_sample_path = config.SAMPLE_PATH
-        self.remote_sample_path = config.SERVER_SAMPLE_PATH
-        self.ui = ui
-        self.e = "未知错误"  # 用于存储异常信息
-        self.total_files = 0  # 总文件数
-        self.uploaded_files = 0  # 已上传文件数
-
-        msg = {
-            "title": "上传样本",
-            "text": "正在上传样本组..."
-        }
-        self.progressDialog = ProgressDialog(self.ui, msg)
-        self.upload_finished.connect(self.on_upload_finished)
-
-    def on_upload_finished(self, success):
-        self.progressDialog.close()  # 关闭进度条
-        self.ui.upload_result = success  # 保存上传结果
-        if success:
-            print("----------------Upload success----------------")
-        else:
-            print("----------------Upload failed----------------")
-            show_message_box("上传失败", f"失败原因：{str(self.e)}", QMessageBox.Critical, self.ui)
-
-    def execute(self):
-        self.progressDialog.show()  # 显示进度条
-        self.start()  # 启动线程
-        # Use QEventLoop to wait for the thread to finish
-        print("----------------Upload started----------------")
-        loop = QEventLoop()
-        self.upload_finished.connect(loop.quit)
-        loop.exec()
-
-    def count_files(self, directory):
-        """统计目录中的所有图片文件数量"""
-        count = 0
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                if is_image(file):
-                    count += 1
-        return count
-
-    def upload_directory_with_progress(self, server, local_path, remote_path):
-        """递归上传整个目录，并更新进度条"""
-        # 确保远程目录存在
-        try:
-            server.sftp_client.mkdir(remote_path)
-        except IOError:
-            pass  # 目录已存在则跳过
-        # 遍历本地目录
-        for item in os.listdir(local_path):
-            local_item_path = join_path(local_path, item)
-            remote_item_path = join_path(remote_path, item)
-            
-            if os.path.isdir(local_item_path):
-                # 如果是目录，递归上传
-                try:
-                    server.sftp_client.mkdir(remote_item_path)
-                except IOError:
-                    pass  # 目录已存在则跳过
-                self.upload_directory_with_progress(server, local_item_path, remote_item_path)
-            elif os.path.isfile(local_item_path) and is_image(item):
-                # 如果是图片文件，上传
-                try:
-                    server.upload_file(local_item_path, remote_item_path)
-                    self.uploaded_files += 1
-                    # 更新进度条
-                    progress = int(self.uploaded_files / self.total_files * 100)
-                    self.progressDialog.setValue(progress)
-                except Exception as e:
-                    self.e = str(e) or "文件上传失败"
-                    raise  # 继续抛出异常
+        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)    
 
     def run(self):
-        # 连接服务器
-        server = Server()
-        try:
-            server.connect_to_server()
-        except Exception as e:
-            self.e = str(e) or "服务器连接失败"
-            self.upload_finished.emit(False)
+        # 创建进度条
+        progressDialog = ProgressDialog(self.ui, {
+            "title": "上传样本",
+            "text": "正在上传样本组..."
+        })
+        progressDialog.show()
+        # 获取当前样本组中的所有图片文件
+        files = [f for f in os.listdir(self.group_path) if is_image(f)]
+        total_files = len(files)
+        if total_files == 0:
+            show_message_box("警告", "样本组为空，请导入样本", QMessageBox.Warning)
             return
-        try:
-            # 统计所有需要上传的文件数量
-            self.total_files = self.count_files(self.local_sample_path)
-            if self.total_files == 0:
-                self.e = "没有找到可上传的图片文件"
-                self.upload_finished.emit(False)
+        # 更新进度条文本
+        progressDialog.setLabelText(f"正在上传 {total_files} 个文件...")
+        # 遍历并上传每个文件
+        for index, file_name in enumerate(files):
+            file_path = join_path(self.group_path, file_name)
+            # 上传文件，若失败则停止
+            try:
+                http_server.upload_sample(file_path)
+            except Exception as e:
+                show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
                 return
-            # 更新进度条文本
-            self.progressDialog.setLabelText(f"正在上传 {self.total_files} 个文件...")
-            # 上传整个样本组文件夹
-            self.uploaded_files = 0
-            self.upload_directory_with_progress(server, self.local_sample_path, self.remote_sample_path)
-            # 上传成功
-            self.upload_finished.emit(True)
-        except Exception as e:
-            self.e = str(e) or "上传过程中出错"
-            self.upload_finished.emit(False)
-        finally:
-            server.close_connection()
+            # 更新进度条
+            progress = int((index + 1) / total_files * 100)
+            progressDialog.setValue(progress)
 
 
 class LoadImages:
@@ -1806,37 +1764,6 @@ class LoadImages:
             # 更新进度
             progress = int((index + 1) / total_images * 100)
             progress_dialog.setValue(progress)
-
-    # def load_with_progress(self):
-    #     """使用进度条加载图片"""
-    #     # 创建进度对话框
-    #     self.progress_dialog = ProgressDialog(self.ui, {
-    #         "title": "加载图片",
-    #         "text": "正在加载图片..."
-    #     })
-    #
-    #     # 显示对话框并开始加载
-    #     self.progress_dialog.show()
-    #     QTimer.singleShot(100, self.run)  # Run the image loading process after a short delay
-    #     self.progress_dialog.exec()  # 阻塞当前代码的执行，直到对话框关闭
-    #
-    # def run (self):
-    #     # 重新获取图片列表
-    #     self.ui.imageList.clear()
-    #     images = [f for f in os.listdir(self.sample_path) if is_image(f)]
-    #     total_images = len(images)
-    #     # 处理空图片列表情况
-    #     if total_images == 0:
-    #         self.progress_dialog.setValue(100)
-    #         return
-    #     # 加载图片
-    #     for index, image in enumerate(images):
-    #         # 添加图片到列表
-    #         image_path = join_path(self.sample_path, image)
-    #         self._add_to_list(image_path, image, index)
-    #         # 更新进度
-    #         progress = int((index + 1) / total_images * 100)
-    #         self.progress_dialog.setValue(progress)
 
     def load_with_animation(self):
         """使用加载动画加载图片"""
