@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <property name="iconSize">
      <size>
@@ -1827,6 +1827,100 @@ QPushButton:pressed {
      <zorder>sampleNextButton</zorder>
     </widget>
     <widget class="QWidget" name="modelWidget">
+     <property name="styleSheet">
+      <string notr="true">QWidget#modelWidget {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #f8f9fa, stop:1 #e9ecef);
+}
+QGroupBox {
+    background-color: white;
+    border: 1px solid #e0e3e9;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 12pt;
+    font-weight: bold;
+    color: #1e3a8a;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 20px;
+    padding: 0px 10px;
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 200), stop:1 rgba(255, 255, 255, 80));
+    border-radius: 5px;
+}
+QPushButton {
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    background-color: #f0f0f0;
+    border: 1px solid #d9d9d9;
+    color: #595959;
+}
+QPushButton:hover {
+    background-color: #e6f7ff;
+    border-color: #40a9ff;
+    color: #40a9ff;
+}
+QPushButton:pressed {
+    background-color: #bae7ff;
+    border-color: #1890ff;
+}
+QPushButton#modelNextButton, QPushButton#trainButton {
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    font-weight: bold;
+}
+QPushButton#modelNextButton:hover, QPushButton#trainButton:hover {
+    background-color: #40a9ff;
+    color: white;
+}
+QPushButton#modelNextButton:pressed, QPushButton#trainButton:pressed {
+    background-color: #096dd9;
+}
+QLineEdit {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    padding: 4px 8px;
+    background-color: white;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 13px;
+}
+QLineEdit:disabled {
+    background-color: #f5f5f5;
+    border-color: #e8e8e8;
+    color: #999999;
+}
+QComboBox {
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    padding: 4px 8px;
+    background-color: white;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 13px;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+QComboBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #666666;
+    margin-top: 2px;
+}
+QComboBox::down-arrow:hover {
+    border-top: 5px solid #333333;
+}
+QLabel {
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 13px;
+    color: #333333;
+}</string>
+     </property>
      <attribute name="title">
       <string>模型训练</string>
      </attribute>
@@ -1841,6 +1935,10 @@ QPushButton:pressed {
       </property>
       <property name="text">
        <string>下一步</string>
+      </property>
+      <property name="icon">
+       <iconset>
+        <normaloff>ui/icon/next.svg</normaloff>ui/icon/next.svg</iconset>
       </property>
      </widget>
      <widget class="QGroupBox" name="groupBox_5">
@@ -1858,14 +1956,14 @@ QPushButton:pressed {
       <widget class="QPushButton" name="importModelButton">
        <property name="geometry">
         <rect>
-         <x>110</x>
+         <x>270</x>
          <y>60</y>
-         <width>51</width>
-         <height>26</height>
+         <width>90</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="text">
-        <string>导入</string>
+        <string>导入模型</string>
        </property>
       </widget>
       <widget class="QLineEdit" name="curModelEdit">
@@ -1875,9 +1973,9 @@ QPushButton:pressed {
        <property name="geometry">
         <rect>
          <x>120</x>
-         <y>100</y>
+         <y>120</y>
          <width>241</width>
-         <height>23</height>
+         <height>30</height>
         </rect>
        </property>
       </widget>
@@ -1886,21 +1984,21 @@ QPushButton:pressed {
         <rect>
          <x>40</x>
          <y>60</y>
-         <width>61</width>
-         <height>26</height>
+         <width>90</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="text">
-        <string>新建</string>
+        <string>新建模型</string>
        </property>
       </widget>
       <widget class="QLabel" name="label_2">
        <property name="geometry">
         <rect>
          <x>42</x>
-         <y>100</y>
+         <y>120</y>
          <width>81</width>
-         <height>20</height>
+         <height>30</height>
         </rect>
        </property>
        <property name="text">
@@ -1925,12 +2023,12 @@ QPushButton:pressed {
         <rect>
          <x>30</x>
          <y>40</y>
-         <width>86</width>
-         <height>26</height>
+         <width>91</width>
+         <height>30</height>
         </rect>
        </property>
        <property name="text">
-        <string>扩充</string>
+        <string>扩充样本</string>
        </property>
       </widget>
      </widget>
@@ -2046,13 +2144,8 @@ QPushButton:pressed {
           <x>40</x>
           <y>30</y>
           <width>81</width>
-          <height>18</height>
+          <height>26</height>
          </rect>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>10</pointsize>
-         </font>
         </property>
         <property name="text">
          <string>backbone：</string>
@@ -2067,7 +2160,7 @@ QPushButton:pressed {
           <x>140</x>
           <y>30</y>
           <width>201</width>
-          <height>18</height>
+          <height>26</height>
          </rect>
         </property>
        </widget>
@@ -2077,13 +2170,8 @@ QPushButton:pressed {
           <x>40</x>
           <y>60</y>
           <width>81</width>
-          <height>18</height>
+          <height>26</height>
          </rect>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>10</pointsize>
-         </font>
         </property>
         <property name="text">
          <string>patchsize：</string>
@@ -2098,7 +2186,7 @@ QPushButton:pressed {
           <x>140</x>
           <y>60</y>
           <width>201</width>
-          <height>18</height>
+          <height>26</height>
          </rect>
         </property>
        </widget>
@@ -2108,13 +2196,8 @@ QPushButton:pressed {
           <x>40</x>
           <y>90</y>
           <width>81</width>
-          <height>18</height>
+          <height>26</height>
          </rect>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>10</pointsize>
-         </font>
         </property>
         <property name="text">
          <string>batch_size：</string>
@@ -2129,7 +2212,7 @@ QPushButton:pressed {
           <x>140</x>
           <y>90</y>
           <width>201</width>
-          <height>18</height>
+          <height>26</height>
          </rect>
         </property>
        </widget>
@@ -2152,7 +2235,7 @@ QPushButton:pressed {
           <x>60</x>
           <y>150</y>
           <width>86</width>
-          <height>26</height>
+          <height>30</height>
          </rect>
         </property>
         <property name="text">
@@ -2165,7 +2248,7 @@ QPushButton:pressed {
           <x>240</x>
           <y>150</y>
           <width>86</width>
-          <height>26</height>
+          <height>30</height>
          </rect>
         </property>
         <property name="text">
@@ -2179,21 +2262,25 @@ QPushButton:pressed {
        <rect>
         <x>250</x>
         <y>570</y>
-        <width>75</width>
-        <height>24</height>
+        <width>100</width>
+        <height>30</height>
        </rect>
       </property>
       <property name="text">
-       <string>训练</string>
+       <string>开始训练</string>
+      </property>
+      <property name="icon">
+       <iconset>
+        <normaloff>ui/icon/train.svg</normaloff>ui/icon/train.svg</iconset>
       </property>
      </widget>
      <widget class="QPushButton" name="viewParamsButton">
       <property name="geometry">
        <rect>
-        <x>350</x>
+        <x>360</x>
         <y>570</y>
-        <width>75</width>
-        <height>24</height>
+        <width>110</width>
+        <height>30</height>
        </rect>
       </property>
       <property name="text">
