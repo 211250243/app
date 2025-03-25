@@ -1,3 +1,109 @@
+## 模型操作
+
+1. add_model(model) // 添加模型
+2. delete_model(model_id) // 删除模型
+3. list_model() // 获取模型列表
+4. train_info(model_id) // 获取模型已训练的图像列表(由此可知训练进度)
+5. infer_info(model_id) // 获取模型已推理的图像列表(由此可知推理进度)
+6. train_process(model_id) // 获取模型训练实时信息
+7. infer_process(model_id) // 获取模型推理实时信息
+8. train_model(model_id, group_id) // 训练模型
+9. finish_model(model_id) // 结束训练
+10. infer_model(model_id, group_id) // 推理模型
+
+```python
+# 增删查模型
+@app.post("/add_model")
+def add_model(model: Model_Info, db: Session = Depends(get_db)):
+    db_model = Model_Info_DB(
+        name=model.name,
+        input_h=model.input_h,
+        input_w=model.input_w,
+        end_acc = model.end_acc,
+        layers = model.layers,
+        patchsize = model.patchsize,
+        embed_dimension=model.embed_dimension,
+    )
+    db.add(db_model)
+    db.commit()
+    db.refresh(db_model)
+    return db_model.id
+@app.delete("/delete_model/{model_id}")
+def delete_model(model_id: int, db: Session = Depends(get_db)):
+    db.query(Model_Trian_Info_DB).filter(Model_Trian_Info_DB.model_id==model_id).delete()
+    remove_model_in_cache(model_id)
+    model_dir = os.path.join(data_path,f"model-{model_id}")
+    if os.path.exists(model_dir):
+        shutil.rmtree(model_dir)
+    db.commit()
+    return {"message": "Model deleted successfully"}
+@app.get("/list_model")
+def list_model(db: Session = Depends(get_db)):
+    model_list = db.query(Model_Info_DB).all()
+    return model_list
+
+# 获取训练、推理信息
+@app.post("/train_info/{model_id}")
+def train_info(model_id: int, db: Session = Depends(get_db)):
+    x = db.query(Model_Trian_Info_DB).filter(Model_Trian_Info_DB.model_id == model_id).all()
+    res={}
+    for value in x:
+        res[value.img_filename]=''
+    res = list(res.keys())
+    return res
+@app.post("/infer_info/{model_id}")
+def infer_info(model_id: int, db: Session = Depends(get_db)):
+    x = db.query(Model_Infer_Info_DB).filter(Model_Infer_Info_DB.model_id == model_id).all()
+    return x
+@app.post('/train_process/{model_id}')
+def train_process(model_id: int , db: Session = Depends(get_db)):
+    model_info = db.query(Model_Info_DB).filter(Model_Info_DB.id == model_id).first()
+    model = get_model_from_cache(model_info)
+    return model.plot_data
+@app.post('/infer_process/{model_id}')
+def infer_process(model_id: int, db: Session = Depends(get_db)):
+    model_info = db.query(Model_Info_DB).filter(Model_Info_DB.id == model_id).first()
+    model = get_model_from_cache(model_info)
+    result = 0
+    if(model.to_infer_num>0):
+        result = model.have_infer_num / model.to_infer_num
+    return {"inferPercentage":result}
+
+# 训练、推理
+@app.post('/train_model/{model_id}')
+def train_model(model_id: int, background_tasks: BackgroundTasks, group_id : int = None, db: Session = Depends(get_db)):
+    # 查询模型信息
+    model_info = db.query(Model_Info_DB).filter(Model_Info_DB.id == model_id).first()
+    # 更新模型状态为“正在训练”
+    model_info.status = 1
+    db.commit()
+    db.refresh(model_info)
+    # 将训练任务作为后台任务进行处理
+    background_tasks.add_task(train_model_async, model_info, group_id)
+    # 返回一个响应，表示任务已提交
+    return {"message": "Model training started", "model_id": model_id}
+@app.post('/finish_model/{model_id}')
+def finish_model(model_id: int , db: Session = Depends(get_db)):
+    model_info = db.query(Model_Info_DB).filter(Model_Info_DB.id == model_id).first()
+    model = get_model_from_cache(model_info)
+    if model.finish_signal ==False:
+        model.finish_signal =True
+    return {}
+@app.post("/infer_model/{model_id}")
+async def infer_model(model_id: int, background_tasks: BackgroundTasks, group_id:int= None,db: Session = Depends(get_db)):
+    model_info = db.query(Model_Info_DB).filter(Model_Info_DB.id == model_id).first()
+    # 恢复到原状态
+    pre_status =model_info.status
+    # 更新模型状态为“正在推理”
+    model_info.status = 3
+    db.commit()
+    db.refresh(model_info)
+    background_tasks.add_task(infer_model_async, model_info, group_id, pre_status)
+    return {}
+```
+
+## 样本组操作
+
 1. upload_sample(file, group_id) // 上传样本
 2. download_sample(filename) // 下载样本
 3. get_sample_list(group_id) // 获取一个组的样本名列表

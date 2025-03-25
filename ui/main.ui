@@ -852,6 +852,23 @@ QListWidget::item:hover {
          <property name="frameShadow">
           <enum>QFrame::Shadow::Raised</enum>
          </property>
+         <widget class="QGraphicsView" name="sampleView">
+          <property name="geometry">
+           <rect>
+            <x>5</x>
+            <y>5</y>
+            <width>467</width>
+            <height>400</height>
+           </rect>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QGraphicsView {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: #fafafa;
+}</string>
+          </property>
+         </widget>
          <widget class="QPushButton" name="cropButton">
           <property name="geometry">
            <rect>
@@ -891,8 +908,8 @@ QPushButton:pressed {
          <widget class="QPushButton" name="acceptButton">
           <property name="geometry">
            <rect>
-            <x>380</x>
-            <y>410</y>
+            <x>330</x>
+            <y>430</y>
             <width>86</width>
             <height>32</height>
            </rect>
@@ -925,8 +942,8 @@ QPushButton:pressed {
          <widget class="QPushButton" name="saveButton">
           <property name="geometry">
            <rect>
-            <x>380</x>
-            <y>410</y>
+            <x>330</x>
+            <y>430</y>
             <width>86</width>
             <height>32</height>
            </rect>
@@ -1072,48 +1089,11 @@ QPushButton:pressed {
            <string>↻</string>
           </property>
          </widget>
-         <widget class="QPushButton" name="cancelButton">
-          <property name="enabled">
-           <bool>true</bool>
-          </property>
-          <property name="geometry">
-           <rect>
-            <x>30</x>
-            <y>410</y>
-            <width>86</width>
-            <height>32</height>
-           </rect>
-          </property>
-          <property name="styleSheet">
-           <string notr="true">QPushButton {
-    background-color: #f5f5f5;
-    border: 1px solid #d9d9d9;
-    border-radius: 4px;
-    padding: 6px 12px;
-    font-size: 13px;
-    color: #555;
-}
-QPushButton:hover {
-    background-color: #fafafa;
-    border: 1px solid #d9d9d9;
-}
-QPushButton:pressed {
-    background-color: #e8e8e8;
-}</string>
-          </property>
-          <property name="text">
-           <string>取消</string>
-          </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/cancel.svg</normaloff>ui/icon/cancel.svg</iconset>
-          </property>
-         </widget>
          <widget class="QPushButton" name="rejectButton">
           <property name="geometry">
            <rect>
-            <x>30</x>
-            <y>410</y>
+            <x>60</x>
+            <y>430</y>
             <width>86</width>
             <height>32</height>
            </rect>
@@ -1137,6 +1117,40 @@ QPushButton:pressed {
           </property>
           <property name="text">
            <string>拒绝</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>ui/icon/reject.svg</normaloff>ui/icon/reject.svg</iconset>
+          </property>
+         </widget>
+         <widget class="QPushButton" name="cancelButton">
+          <property name="geometry">
+           <rect>
+            <x>60</x>
+            <y>430</y>
+            <width>86</width>
+            <height>32</height>
+           </rect>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+    background-color: #ff4d4f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #ff7875;
+}
+QPushButton:pressed {
+    background-color: #cf1322;
+}</string>
+          </property>
+          <property name="text">
+           <string>取消</string>
           </property>
           <property name="icon">
            <iconset>

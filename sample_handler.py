@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidg
 from PySide6.QtUiTools import QUiLoader
 
 import config
-from http_server import Server
+from http_server import HttpServer
 import http_server
 from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box, update_metadata
 
@@ -189,7 +189,7 @@ class SampleHandler:
             file_path = join_path(self.group_path, file_name)
             # 上传文件，若失败则停止
             try:
-                http_server.upload_sample(file_path)
+                HttpServer().upload_sample(file_path, 1)
             except Exception as e:
                 show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
                 return
@@ -336,20 +336,13 @@ class SampleHandler:
 
 
 
-    # def on_ui_ready(self):
-    #     print(self.ui.detailFrame.size())
-    #     self.ui.view.setSceneRect(0, 0, 1000, 400)
     def init_detail_frame(self):
         """
         初始化图像预览区
         """
-        # 创建场景和视图
+        # 创建场景，使用已有的视图
         self.ui.scene = QGraphicsScene(self.ui.detailFrame)
-        self.ui.view = QGraphicsView(self.ui.scene, self.ui.detailFrame)
-        # 设置视图自适应 detailFrame 的大小
-        self.ui.view.setGeometry(0, 0, 494, 400)
-        # self.ui.view.setSceneRect(0, 0, 494, 400)
-        # QTimer.singleShot(0, self.on_ui_ready)
+        self.ui.sampleView.setScene(self.ui.scene)
         
         # 绑定按钮事件
         self.ui.cropButton.clicked.connect(self.show_crop_rect)
@@ -369,16 +362,6 @@ class SampleHandler:
         self.ui.crop_rect = None
         self.ui.cropped_item = None
         self.ui.image_item = None
-
-    # def test(self, image_path):
-    #     # 显示详细信息
-    #     self.image_path = image_path  # Store the image path
-    #     # 创建图片项
-    #     self.ui.pixmap = QPixmap(image_path)
-    #     self.ui.image_item = QGraphicsPixmapItem(self.ui.pixmap)
-    #     self.ui.scene.addItem(self.ui.image_item)
-    #     # 设置裁剪区域
-    #     self.ui.view.setSceneRect(self.ui.pixmap.rect())
 
     def clear_detail_frame(self):
         """
@@ -429,8 +412,8 @@ class SampleHandler:
         self.ui.scene.addItem(self.ui.image_item)
         print(f"图片路径: {image_path}\n尺寸: {self.ui.pixmap.width()}x{self.ui.pixmap.height()}px")
         # 设置裁剪区域大小
-        self.ui.view.setSceneRect(self.ui.pixmap.rect())
-        self.ui.view.fitInView(self.ui.image_item, Qt.KeepAspectRatio)  # Ensure the view fits the image
+        self.ui.sampleView.setSceneRect(self.ui.pixmap.rect())
+        self.ui.sampleView.fitInView(self.ui.image_item, Qt.KeepAspectRatio)  # Ensure the view fits the image
         
         # 重置裁剪框默认按钮状态
         self.restoreButtonState()
@@ -523,8 +506,8 @@ class SampleHandler:
             self.ui.image_item.setScale(1.0)  # 重置缩放比例
             self.ui.image_item.setRotation(0)  # 重置旋转角度
             # 重置视图尺寸
-            self.ui.view.setSceneRect(self.ui.pixmap.rect())
-            self.ui.view.fitInView(self.ui.image_item, Qt.KeepAspectRatio)
+            self.ui.sampleView.setSceneRect(self.ui.pixmap.rect())
+            self.ui.sampleView.fitInView(self.ui.image_item, Qt.KeepAspectRatio)
 
     def save_image(self):
         """
@@ -534,6 +517,7 @@ class SampleHandler:
         if self.ui.image_item and self.image_path:
             self.ui.image_item.pixmap().save(self.image_path) # 保存图像
             self.refresh_image_item(self.image_path) # 刷新这个选中项的图片
+            self.refresh_detail_frame() # 刷新详细图像
             # 显示保存成功提示
             show_message_box("保存成功", "图片已成功保存", QMessageBox.Information, self.ui)
         # 恢复裁剪框默认按钮状态
@@ -1645,6 +1629,10 @@ class ResizableRectItem(QGraphicsRectItem):
         self.resizing = False # 是否正在缩放
         self.resize_handle_size = 10 # 缩放手柄的大小
         self.cursor = Qt.ArrowCursor # 鼠标样式
+        # 保存原始图片边界
+        self.image_rect = QRectF(args[0], args[1], args[2], args[3])
+        # 设置最小尺寸
+        self.min_size = 20
 
     def hoverMoveEvent(self, event):
         """
@@ -1670,10 +1658,42 @@ class ResizableRectItem(QGraphicsRectItem):
         # 如果正在缩放，调整裁剪框的大小; 否则，调用父窗口的鼠标移动事件
         if self.resizing:
             rect = self.rect()
-            rect.setBottomRight(event.pos())
+            new_pos = event.pos()
+            current_pos = self.pos()
+            # 计算边界的最大可拖动范围
+            max_bottom = self.image_rect.height() - current_pos.y()
+            max_right = self.image_rect.width() - current_pos.x()
+            # 确保缩放不超出原始图片范围
+            if new_pos.x() > max_right:
+                new_pos.setX(max_right)
+            if new_pos.y() > max_bottom:
+                new_pos.setY(max_bottom)
+            # 防止裁剪框反向和过小
+            if new_pos.x() < self.min_size:
+                new_pos.setX(self.min_size)
+            if new_pos.y() < self.min_size:
+                new_pos.setY(self.min_size)
+            # 设置新的裁剪框大小
+            rect.setBottomRight(new_pos)
             self.setRect(rect)
         else:
+            # 调用父类的事件处理
             super().mouseMoveEvent(event)
+            # 获取移动后的位置和矩形
+            current_pos = self.pos()
+            current_rect = self.rect()
+            # 检查是否超出图片边界
+            if current_pos.x() < 0:
+                current_pos.setX(0)
+            if current_pos.y() < 0:
+                current_pos.setY(0)
+            # 检查右边界和底边界
+            if current_pos.x() + current_rect.width() > self.image_rect.width():
+                current_pos.setX(self.image_rect.width() - current_rect.width())
+            if current_pos.y() + current_rect.height() > self.image_rect.height():
+                current_pos.setY(self.image_rect.height() - current_rect.height())
+            # 应用修正后的位置
+            self.setPos(current_pos)
 
     def mouseReleaseEvent(self, event):
         """

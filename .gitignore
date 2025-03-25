@@ -1,3 +1,5 @@
-test/*
-__pycache__
-patchcore_inspection
+test/
+__pycache__/
+.idea/
+.venv/
+patchcore_inspection/
