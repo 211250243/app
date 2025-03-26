@@ -11,8 +11,8 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidg
 from PySide6.QtUiTools import QUiLoader
 
 import config
-from http_server import HttpServer
-import http_server
+from http_server import HttpServer, UploadSampleGroup_HTTP
+from ssh_server import SSHServer, UploadSampleGroup_SSH
 from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box, update_metadata
 
 
@@ -32,7 +32,7 @@ class SampleHandler:
         self.init_image_list()
         self.init_detail_frame()
         self.init_operate_column()
-
+    
     def init_sample_group(self):
         """
         初始化样本组
@@ -41,16 +41,42 @@ class SampleHandler:
         self.ui.importSampleGroupButton.clicked.connect(self.import_sample_group)
         self.ui.deleteSampleGroupButton.clicked.connect(self.delete_sample_group)
         self.ui.uploadSampleGroupButton.clicked.connect(self.upload_sample_group)
-        # 初始化样本组路径
-        if 'sample_group' in config.PROJECT_METADATA and config.PROJECT_METADATA['sample_group']:
-            config.SAMPLE_GROUP = self.sample_group = config.PROJECT_METADATA['sample_group']
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
-        else:
-            self.sample_group = None
-            self.group_path = config.SAMPLE_PATH
-        # 确保样本组路径存在
-        os.makedirs(self.group_path, exist_ok=True)
-
+        # 获取样本组并初始化路径
+        sample_group = config.PROJECT_METADATA.get('sample_group')
+        group_path = config.SAMPLE_PATH  # 默认路径
+        os.makedirs(group_path, exist_ok=True) # 确保路径存在
+        if sample_group:
+            # 尝试构建样本组路径
+            tmp_path = join_path(group_path, sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            if os.path.exists(tmp_path):
+                group_path = tmp_path
+            else:
+                # 路径无效时清除样本组配置
+                sample_group = None
+                update_metadata('sample_group', None)
+        # 同步配置和实例变量
+        config.SAMPLE_GROUP = self.sample_group = sample_group
+        self.group_path = group_path
+    
+    def check_before_operate(self, type = 1):
+        """
+        type: 1 检查是否存在样本组、导入样本、选择样本图片
+        type: 2 检查是否选择样本组、导入样本
+        """
+        # 检查是否存在样本组
+        if not self.sample_group:
+            show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical, self.ui)
+            return False
+        # 检查是否导入样本
+        if not os.listdir(self.group_path):
+            show_message_box("提示", "请先导入样本！", QMessageBox.Information, self.ui)
+            return False
+        # 检查是否选择样本图片
+        if type == 1 and not self.ui.image_item:
+            show_message_box("提示", "请先选择一个样本图片", QMessageBox.Information, self.ui)
+            return False
+        return True
+        
     def update_button_visibility(self):
         """
         根据当前样本组状态更新按钮显示
@@ -85,6 +111,12 @@ class SampleHandler:
             # 创建样本组文件夹
             train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN_GOOD)
             if not os.path.exists(train_path):
+                # 对接 http_server: 创建样本组
+                try:
+                    group_id = HttpServer().add_group(text)
+                    print(f"http_server创建样本组成功 ID={group_id}")
+                except Exception as e:
+                    print(f"http_server创建样本组失败: {str(e)}")
                 # 创建训练集
                 os.makedirs(train_path)
                 # 更新数据
@@ -114,6 +146,29 @@ class SampleHandler:
             config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
             self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
             update_metadata('sample_group', self.sample_group)
+            # 对接 http_server: 如果样本组为空，则从服务器下载样本
+            os.makedirs(self.group_path, exist_ok=True) # 确保本地文件夹存在
+            if not os.listdir(self.group_path):
+                try:
+                    # 连接服务器
+                    http_server = HttpServer()
+                    group_id = http_server.get_group_id(config.SAMPLE_GROUP)
+                    samples = http_server.get_sample_list(group_id)
+                    # 创建进度对话框
+                    progress_dialog = ProgressDialog(self.ui, {
+                        "title": "下载样本",
+                        "text": f"正在下载 {len(samples)} 个样本文件..."
+                    })
+                    progress_dialog.show()
+                    # 下载每个样本并更新进度
+                    for index, sample in enumerate(samples):
+                        http_server.save_downloaded_sample(sample, self.group_path)
+                        print(f"http_server下载样本成功: {sample}")
+                        # 更新进度
+                        progress = int((index + 1) / len(samples) * 100)
+                        progress_dialog.setValue(progress)
+                except Exception as e:
+                    print(f"从http_server加载图片失败: {str(e)}")
             # 加载样本组中的图片
             LoadImages(self.ui).load_with_progress()
             # 更新按钮显示状态
@@ -149,8 +204,15 @@ class SampleHandler:
                 # 获取样本组路径
                 group_path = join_path(config.SAMPLE_PATH, sample_group)
                 try:
-                    # 删除样本组文件夹及其内容
-                    shutil.rmtree(group_path)
+                    # 删除样本组文件夹及其内容, 如果不存在则不删除
+                    shutil.rmtree(group_path, ignore_errors=True)
+                    # 对接 http_server: 删除样本组
+                    try:
+                        group_id = HttpServer().get_group_id(sample_group)
+                        HttpServer().delete_group(group_id)
+                        print(f"http_server删除样本组成功 ID={group_id}")
+                    except Exception as e:
+                        print(f"http_server删除样本组失败: {str(e)}")
                     # 如果删除的是当前样本组，清空当前样本组
                     if self.sample_group == sample_group:
                         config.SAMPLE_GROUP = self.sample_group = None
@@ -170,33 +232,10 @@ class SampleHandler:
         """
         上传样本组到服务器
         """
-        # 创建进度条
-        progressDialog = ProgressDialog(self.ui, {
-            "title": "上传样本",
-            "text": "正在上传样本组..."
-        })
-        progressDialog.show()
-        # 获取当前样本组中的所有图片文件
-        files = [f for f in os.listdir(self.group_path) if is_image(f)]
-        total_files = len(files)
-        if total_files == 0:
-            show_message_box("警告", "样本组为空，请导入样本", QMessageBox.Warning)
-            return
-        # 更新进度条文本
-        progressDialog.setLabelText(f"正在上传 {total_files} 个文件...")
-        # 遍历并上传每个文件
-        for index, file_name in enumerate(files):
-            file_path = join_path(self.group_path, file_name)
-            # 上传文件，若失败则停止
-            try:
-                HttpServer().upload_sample(file_path, 1)
-            except Exception as e:
-                show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
-                return
-            # 更新进度条
-            progress = int((index + 1) / total_files * 100)
-            progressDialog.setValue(progress)
-
+        # UploadSampleGroup(self.ui).run()
+        # UploadSampleGroup_ssh(self.ui).run()
+        # UploadSampleGroup_HTTP(self.ui).run()
+        UploadSampleGroup_SSH(self.ui).run()
 
 
     def init_image_list(self):
@@ -417,11 +456,15 @@ class SampleHandler:
         
         # 重置裁剪框默认按钮状态
         self.restoreButtonState()
-
+            
     def show_crop_rect(self):
         """
         显示裁剪框
         """
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
+            return
+
         # 移除已有的裁剪框（如果存在）
         if self.ui.crop_rect:
             self.ui.scene.removeItem(self.ui.crop_rect)
@@ -544,18 +587,30 @@ class SampleHandler:
         selected_items.image_label.setPixmap(auto_pixmap)
 
     def scale_up(self):
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
+            return
         if self.ui.image_item:
             self.ui.image_item.setScale(self.ui.image_item.scale() * 1.1)
 
     def scale_down(self):
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
+            return
         if self.ui.image_item:
             self.ui.image_item.setScale(self.ui.image_item.scale() * 0.9)
 
     def rotate_left(self):
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
+            return
         if self.ui.image_item:
             self.ui.image_item.setRotation(self.ui.image_item.rotation() - 10)
 
     def rotate_right(self):
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
+            return
         if self.ui.image_item:
             self.ui.image_item.setRotation(self.ui.image_item.rotation() + 10)
 
@@ -585,7 +640,8 @@ class SampleHandler:
         """
         缩小域并排除背景
         """
-        if not self.check_sample_group():
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
             return
         # 获取选中的项并遍历处理
         selected_items = self.ui.imageList.selectedItems()
@@ -624,7 +680,8 @@ class SampleHandler:
         对选中项进行数据增强(正样本增强)，并将增强后的图片保存
         正样本增强不会改变样本的本质特征，只增加样本的多样性
         """
-        if not self.check_sample_group():
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate():
             return
         selected_items = self.ui.imageList.selectedItems()
         for item in selected_items:
@@ -728,7 +785,8 @@ class SampleHandler:
         伪缺陷样本会明显偏离正常样本的特征，模拟实际缺陷
         每种缺陷类型都有独立的子文件夹
         """
-        if not self.check_sample_group():
+        # 检查是否存在样本组和图片项
+        if not self.check_before_operate(2):
             return
             
         # 获取训练集路径
@@ -816,13 +874,25 @@ class SampleHandler:
         # 记录每种缺陷类型生成的样本数量
         defect_counts = {defect_type: 0 for defect_type in defect_types.keys()}
         
-        for image_name in defect_base_images:
+        # 创建进度条
+        progressDialog = ProgressDialog(self.ui, {
+            "title": "生成伪缺陷样本",
+            "text": "准备生成伪缺陷样本..."
+        })
+        progressDialog.show()
+        
+        # 计算总任务数：每张基础图片要生成5种缺陷
+        total_tasks = defect_base_count * len(defect_types)
+        current_task = 0
+        
+        for image_index, image_name in enumerate(defect_base_images):
             image_path = join_path(train_path, image_name)
             image = cv2.imread(image_path)
             if image is None:
                 continue
                 
             # 1. 颜色偏移缺陷 - 使用带掩码的版本
+            progressDialog.setLabelText(f"处理基础图片 {image_index+1}/{defect_base_count}：生成颜色偏移缺陷")
             defect_img, mask = self.defect_color_shift_with_mask(image)
             defect_filename = f"defect_{defect_counts['color_shift']}.jpg"
             defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, 
@@ -834,8 +904,11 @@ class SampleHandler:
                                  f"defect_{defect_counts['color_shift']}.png")
             cv2.imwrite(mask_path, mask)
             defect_counts['color_shift'] += 1
+            current_task += 1
+            progressDialog.setValue(int(current_task / total_tasks * 100))
             
             # 2. 亮度异常缺陷 - 使用带掩码的版本
+            progressDialog.setLabelText(f"处理基础图片 {image_index+1}/{defect_base_count}：生成亮度异常缺陷")
             defect_img, mask = self.defect_brightness_with_mask(image)
             defect_filename = f"defect_{defect_counts['brightness']}.jpg"
             defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
@@ -847,8 +920,11 @@ class SampleHandler:
                                  f"defect_{defect_counts['brightness']}.png")
             cv2.imwrite(mask_path, mask)
             defect_counts['brightness'] += 1
+            current_task += 1
+            progressDialog.setValue(int(current_task / total_tasks * 100))
             
             # 3. 噪点缺陷 - 使用带掩码的版本
+            progressDialog.setLabelText(f"处理基础图片 {image_index+1}/{defect_base_count}：生成噪点缺陷")
             defect_img, mask = self.defect_add_noise_with_mask(image)
             defect_filename = f"defect_{defect_counts['noise']}.jpg"
             defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
@@ -860,8 +936,11 @@ class SampleHandler:
                                  f"defect_{defect_counts['noise']}.png")
             cv2.imwrite(mask_path, mask)
             defect_counts['noise'] += 1
+            current_task += 1
+            progressDialog.setValue(int(current_task / total_tasks * 100))
             
             # 4. 模糊缺陷 - 使用带掩码的版本
+            progressDialog.setLabelText(f"处理基础图片 {image_index+1}/{defect_base_count}：生成模糊缺陷")
             defect_img, mask = self.defect_add_blur_with_mask(image)
             defect_filename = f"defect_{defect_counts['blur']}.jpg"
             defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
@@ -873,8 +952,11 @@ class SampleHandler:
                                  f"defect_{defect_counts['blur']}.png")
             cv2.imwrite(mask_path, mask)
             defect_counts['blur'] += 1
+            current_task += 1
+            progressDialog.setValue(int(current_task / total_tasks * 100))
             
             # 5. 扭曲变形缺陷 - 使用带掩码的版本
+            progressDialog.setLabelText(f"处理基础图片 {image_index+1}/{defect_base_count}：生成扭曲变形缺陷")
             defect_img, mask = self.defect_add_distortion_with_mask(image)
             defect_filename = f"defect_{defect_counts['distortion']}.jpg"
             defect_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP,
@@ -886,12 +968,18 @@ class SampleHandler:
                                  f"defect_{defect_counts['distortion']}.png")
             cv2.imwrite(mask_path, mask)
             defect_counts['distortion'] += 1
+            current_task += 1
+            progressDialog.setValue(int(current_task / total_tasks * 100))
             
+        # 最后更新进度条为完成状态
+        progressDialog.setLabelText("伪缺陷样本生成完成")
+        progressDialog.setValue(100)
+        
         # 显示成功消息，包含每种缺陷类型的数量
-        success_message = f"已准备测试集数据：\n- test/good: {len(test_images)}张正常图片"
+        success_message = f"已准备测试集数据：\ntest/good: {len(test_images)}张正常图片"
         for defect_type, count in defect_counts.items():
-            success_message += f"\n- {defect_types[defect_type]}: {count}张缺陷图片"
-        success_message += f"\n- ground_truth: 已生成所有缺陷的掩码"
+            success_message += f"\n{defect_types[defect_type]}: {count}张缺陷图片"
+        success_message += f"\nground_truth: 已生成所有缺陷的掩码"
             
         show_message_box(
             "成功", 
@@ -1555,14 +1643,6 @@ class SampleHandler:
         
         return result_image, mask
 
-    def check_sample_group(self):
-        """
-        检查是否选择样本组
-        """
-        if not config.SAMPLE_GROUP:
-            show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical)
-            return False
-        return True
 
 
 class CustomListWidgetItem(QListWidgetItem):
@@ -1713,42 +1793,6 @@ class ResizableRectItem(QGraphicsRectItem):
         return handle_rect.contains(pos)
 
 
-class UploadSampleGroup:
-    """
-    上传样本组到服务器的线程
-    """
-    def __init__(self, ui):
-        super().__init__()
-        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)    
-
-    def run(self):
-        # 创建进度条
-        progressDialog = ProgressDialog(self.ui, {
-            "title": "上传样本",
-            "text": "正在上传样本组..."
-        })
-        progressDialog.show()
-        # 获取当前样本组中的所有图片文件
-        files = [f for f in os.listdir(self.group_path) if is_image(f)]
-        total_files = len(files)
-        if total_files == 0:
-            show_message_box("警告", "样本组为空，请导入样本", QMessageBox.Warning)
-            return
-        # 更新进度条文本
-        progressDialog.setLabelText(f"正在上传 {total_files} 个文件...")
-        # 遍历并上传每个文件
-        for index, file_name in enumerate(files):
-            file_path = join_path(self.group_path, file_name)
-            # 上传文件，若失败则停止
-            try:
-                http_server.upload_sample(file_path)
-            except Exception as e:
-                show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
-                return
-            # 更新进度条
-            progress = int((index + 1) / total_files * 100)
-            progressDialog.setValue(progress)
-
 
 class LoadImages:
     """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
@@ -1824,22 +1868,18 @@ class SampleGroupDialog(QDialog):
         self.selected_group = None
         # 加载UI文件
         self.ui = QUiLoader().load(r'ui\import_sample_group.ui')
-        
         # 设置主窗口属性
         self.setWindowTitle(self.ui.windowTitle())
         self.setMinimumSize(self.ui.width(), self.ui.height())
-        
         # 创建主布局
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(self.ui)
-        
         # 连接信号
         self.ui.refreshButton.clicked.connect(self.load_sample_groups)
         self.ui.okButton.clicked.connect(self.accept)
         self.ui.cancelButton.clicked.connect(self.reject)
         self.ui.listWidget.itemDoubleClicked.connect(self.accept)
-        
         # 加载样本组
         self.load_sample_groups()
 
@@ -1854,11 +1894,22 @@ class SampleGroupDialog(QDialog):
         # 获取样本文件夹下的所有子文件夹
         sample_groups = []
         for item in os.listdir(sample_folder):
-            item_path = os.path.join(sample_folder, item)
+            item_path = join_path(sample_folder, item)
             if os.path.isdir(item_path):
-                # 检查文件夹中是否有图片文件
-                has_images = any(is_image(f) for f in os.listdir(item_path) if os.path.isfile(os.path.join(item_path, f)))
+                # 检查good文件夹中是否有图片文件
+                has_images = any(is_image(f) for f in os.listdir(join_path(item_path, config.SAMPLE_LABEL_TRAIN_GOOD)))
                 sample_groups.append((item, has_images))
+        # 对接 http_server: 如果样本组列表为空，则从服务器获取样本组列表
+        if not sample_groups:
+            try:
+                group_list = HttpServer().get_group_list()
+                print(f"http_server获取样本组列表成功: {group_list}")
+                if group_list:
+                    for group in group_list:
+                        group_name = group.get("group_name")
+                        sample_groups.append((group_name, True))
+            except Exception as e:
+                print(f"从http_server获取样本组失败: {str(e)}")
         # 如果没有样本组，显示提示
         if not sample_groups:
             empty_item = QListWidgetItem("没有找到样本组")
@@ -1868,11 +1919,8 @@ class SampleGroupDialog(QDialog):
         # 添加样本组到列表
         for group_name, has_images in sample_groups:
             item = QListWidgetItem(group_name)
-            # 如果文件夹中有图片，设置图标
-            if has_images:
-                item.setIcon(QIcon("icon/image.svg"))  # 假设有图片图标
-            else:
-                item.setIcon(QIcon("icon/folder.svg"))  # 假设有文件夹图标
+            # 根据文件夹中有无图片，设置图标
+            item.setIcon(QIcon("ui/icon/non-empty_folder.svg" if has_images else "ui/icon/empty_folder.svg"))
             self.ui.listWidget.addItem(item)
     
     def get_selected_group(self):
@@ -1923,3 +1971,5 @@ class NewSampleGroupDialog(QDialog):
     def get_input_text(self):
         """获取输入的文本"""
         return self.ui.inputField.text().strip()
+    
+

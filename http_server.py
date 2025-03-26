@@ -3,8 +3,8 @@ import time
 import requests
 import config
 from typing import Optional
-
-from utils import join_path
+from PySide6.QtWidgets import QMessageBox
+from utils import ProgressDialog, is_image, join_path, show_message_box
 
 
 class HttpServer:        
@@ -75,7 +75,7 @@ class HttpServer:
                 'patchsize': 补丁大小,
                 'name': 模型名称,
                 'layers': 层数列表,
-                'status': 状态，0是新建的 1是已经训练中 2是训练结束 3是推理中，训练结束回到1，推理结束回到原状态
+                'status': 状态，0是新建的 1是已经训练中 2是训练结束 3是推理中，推理结束回到原状态
             }]
         """
         url = f"http://{config.HOSTNAME}:{config.PORT}/list_model"
@@ -92,13 +92,13 @@ class HttpServer:
     
     def train_info(self, model_id):
         """
-        获取模型已训练的图像列表，由此可知训练进度
+        获取模型训练完成后的图像列表
         
         Args:
             model_id: 模型ID
             
         Returns:
-            已训练的图像列表
+            已训练的图像列表 ['image1.jpg', 'image2.jpg', ...]
         """
         url = f"http://{config.HOSTNAME}:{config.PORT}/train_info/{model_id}"
         try:
@@ -114,13 +114,20 @@ class HttpServer:
     
     def infer_info(self, model_id):
         """
-        获取模型已推理的图像列表，由此可知推理进度
+        获取模型推理完成后的图像列表（相当于infer_process的最终状态）
         
         Args:
             model_id: 模型ID
             
-        Returns:
-            已推理的图像列表
+        Returns: 
+            已推理的图像列表：[{
+                'img_result_filename': 推理结果文件名,
+                'id': 所属的样本组ID,
+                'bm_score': 边界框得分,
+                'score': 得分,
+                'model_id': 模型ID,
+                'img_filename': 图像文件名
+            }]
         """
         url = f"http://{config.HOSTNAME}:{config.PORT}/infer_info/{model_id}"
         try:
@@ -173,7 +180,11 @@ class HttpServer:
             
         Returns:
             推理信息：{
-                'inferPercentage': 推理进度
+                'inferPercentage': 推理进度,
+                'have_infer_img_list': [{
+                    'name': 图像文件名,
+                    'score': 得分
+                }]
             }
         """
         url = f"http://{config.HOSTNAME}:{config.PORT}/infer_process/{model_id}"
@@ -344,14 +355,11 @@ class HttpServer:
             保存文件的完整路径
         """
         content = self.download_sample(filename)
-        full_path = os.path.join(save_path, filename)
-        
-        # 确保目录存在
+        full_path = join_path(save_path, filename)
+        # 确保目录存在，写入
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        
         with open(full_path, 'wb') as f:
             f.write(content)
-        
         return full_path
 
     def add_group(self, group_name):
@@ -400,7 +408,10 @@ class HttpServer:
         获取所有组的列表
         
         Returns:
-            组列表
+            组列表：[{
+                "id": 组ID,
+                "group_name": 组名
+            }]
         """
         url = f"http://{config.HOSTNAME}:{config.PORT}/get_group_list"
         try:
@@ -413,6 +424,20 @@ class HttpServer:
         except Exception as e:
             print(f"获取组列表失败: {str(e)}")
             raise
+
+    def get_group_id(self, group_name):
+        """
+        根据组名获取组ID
+        """
+        group_list = self.get_group_list()
+        for group in group_list:
+            if group.get("group_name") == group_name:
+                print(f"组名匹配成功: {group_name} -> {group.get('id')}")
+                return group.get("id")
+        print(f"http_server无该样本组: {group_list}")
+        return None
+            
+
         
 def test_sample_api():
     """
@@ -495,7 +520,7 @@ def test_model_api():
     # 0. 准备样本
     test_dir = "B:/Development/GraduationDesign/app/test"
     image_dir = join_path(test_dir, "img")
-    test_images = os.listdir(image_dir)[:10]
+    test_images = os.listdir(image_dir)[:2]
     # 添加组
     group_name = f"测试组-{int(time.time())}"
     group_id = server.add_group(group_name)
@@ -549,80 +574,78 @@ def test_model_api():
     print(f"\n3. 测试开始训练模型 (模型ID: {model_id}, 组ID: {group_id})")
     try:
         train_result = server.train_model(model_id, group_id)
-        print(f"开始训练: {train_result}")
+        print(f"----- 开始训练: {train_result} -----")
     except Exception as e:
         print(f"开始训练失败: {str(e)}")
-        result = server.delete_model(model_id)
-        print(f"删除模型结果: {result}")
 
     # 4/5. 获取训练进度，以及训练实时信息
     print(f"\n4/5. 测试获取训练进度，以及训练实时信息 (模型ID: {model_id})")
     # 循环查询训练进度
     while True:
         try:
+            # 等待5秒后再次查询
+            time.sleep(5)
             train_info = server.train_info(model_id) # 已训练的图像列表，通过其数量除以测试图片总数，得到训练进度
+            print(f"已训练的图像列表: {train_info}")
             train_process = server.train_process(model_id)
             print(f"训练实时信息: {train_process}")
             # 如果训练完成，退出循环
-            if len(train_info) == len(test_images):
-                print("训练已完成，已训练的图像列表: {train_info}")
+            list_model = server.list_model()
+            for model in list_model:
+                if model.get("id") == model_id:
+                    break
+            if model.get("status") == 2:
+                print(f"\n----- 模型训练结束 (模型ID: {model_id})-----")
                 break
-            # 等待5秒后再次查询
-            time.sleep(5)
         except Exception as e:
             print(f"获取训练信息失败: {str(e)}")
             break
 
-    # 6. 确认模型训练完成，否则结束训练
-    try:
-        train_info = server.list_model()
-        for model in train_info:
-            print(f"模型列表: {model}")
-            if model.get("id") == model_id:
-                if model.get("status") != 2:
-                    print(f"\n6. 测试结束模型训练 (模型ID: {model_id})")
-                    try:
-                        finish_result = server.finish_model(model_id)
-                        print(f"结束训练: {finish_result}")
-                    except Exception as e:
-                        print(f"结束训练失败: {str(e)}")
-                    break
-    except Exception as e:
-        print(f"获取模型列表失败: {str(e)}")
+    # 6. 结束训练
+    # try:
+    #     finish_result = server.finish_model(model_id)
+    #     print(f"结束训练: {finish_result}")
+    # except Exception as e:
+    #     print(f"结束训练失败: {str(e)}")
 
     # 7. 开始模型推理
     print(f"\n7. 测试开始模型推理 (模型ID: {model_id}, 组ID: {group_id})")
     try:
         infer_result = server.infer_model(model_id, group_id)
-        print(f"开始推理: {infer_result}")
+        print(f"----- 开始推理: {infer_result} -----")
     except Exception as e:
         print(f"开始推理失败: {str(e)}")
-        result = server.delete_model(model_id)
-        print(f"删除模型结果: {result}")
 
     # 8/9. 获取推理进度，以及推理实时信息
     print(f"\n8/9. 测试获取推理进度，以及推理实时信息 (模型ID: {model_id})")
     # 循环查询推理进度
     while True:
         try:
+            # 等待1秒后再次查询
+            time.sleep(1)
             infer_info = server.infer_info(model_id)
+            print(f"已推理的图像列表: {infer_info}")
             infer_process = server.infer_process(model_id)
             print(f"推理信息: {infer_process}")
             # 如果推理完成，退出循环
-            if len(infer_info) == len(test_images):
-                print("推理已完成")
+            list_model = server.list_model()
+            for model in list_model:
+                if model.get("id") == model_id:
+                    break
+            if model.get("status") == 2:
+                print(f"\n----- 模型推理结束 (模型ID: {model_id})-----")
                 break
-            # 等待5秒后再次查询
-            time.sleep(5)
         except Exception as e:
             print(f"获取推理信息失败: {str(e)}")
             break
 
-    # 10. 删除模型
+    # 10. 删除模型和组
     print(f"\n10. 测试删除模型 (模型ID: {model_id})")
     try:
         result = server.delete_model(model_id)
         print(f"删除模型结果: {result}")
+        result = server.delete_group(group_id)
+        print(f"删除组结果: {result}")
     except Exception as e:
         print(f"删除模型失败: {str(e)}")
 
@@ -644,17 +667,66 @@ def test_model_api():
     print("\n======= 测试完成 =======")
 
 
+class UploadSampleGroup_HTTP:
+    """
+    上传样本组到服务器的线程
+    """
+    def __init__(self, ui):
+        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD) 
+        self.ui = ui
+
+    def run(self):
+        # 创建进度条
+        progressDialog = ProgressDialog(self.ui, {
+            "title": "上传样本",
+            "text": "正在上传样本组..."
+        })
+        progressDialog.show()
+        # 获取当前样本组中的所有图片文件
+        files = [f for f in os.listdir(self.group_path) if is_image(f)]
+        total_files = len(files)
+        if total_files == 0:
+            show_message_box("警告", "样本组为空，请导入样本", QMessageBox.Warning)
+            return
+        # 更新进度条文本
+        progressDialog.setLabelText(f"正在上传 {total_files} 个文件...")
+        # 遍历并上传每个文件
+        for index, file_name in enumerate(files):
+            file_path = join_path(self.group_path, file_name)
+            # 上传文件，若失败则停止
+            try:
+                group_id = HttpServer().get_group_id(config.SAMPLE_GROUP)
+                HttpServer().upload_sample(file_path, group_id)
+            except Exception as e:
+                show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
+                return
+            # 更新进度条
+            progress = int((index + 1) / total_files * 100)
+            progressDialog.setValue(progress)
+            
+
 if __name__ == "__main__":
     # test_sample_api()
-    test_model_api()
+    # test_model_api()
 
-    # server = HttpServer()
+    server = HttpServer()
+    # print(server.list_model())
     # group_name = f"测试组-{int(time.time())}"
     # group_id = server.add_group(group_name)
     # print(f"创建组成功: 名称={group_name}, ID={group_id}")
-    # # 2. 获取组列表
-    # groups = server.get_group_list()
-    # print(f"组列表: {groups}")
 
-    # samples = server.get_sample_list(1)
-    # print(f"样本列表: {samples}")
+    # 2. 获取组列表
+    groups = server.get_group_list()
+    print(f"组列表: {groups}")
+
+    samples = server.get_sample_list(1)
+    print(f"样本列表: {samples}")
+    
+    # # 下载样本组
+    # download_dir = "B:/Development/GraduationDesign/app/test/downloads"
+    # for sample in samples:
+    #     server.save_downloaded_sample(sample, download_dir)
+
+    # # 删除样本组
+    # for group in groups:
+    #     server.delete_group(group.get("id"))

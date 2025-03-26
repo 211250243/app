@@ -3,7 +3,7 @@ import os
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QDateTime, QPoint, QSize
 from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
-from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QProgressBar, QLabel, QWidget, QApplication, QProgressDialog
+from PySide6.QtWidgets import QMessageBox, QVBoxLayout, QLabel, QWidget, QApplication, QProgressDialog, QPushButton
 
 import config
 
@@ -80,18 +80,119 @@ class ProgressDialog(QProgressDialog):
 #         print(f"设置进度值：{value}")
 #         self.progress_bar.setValue(value)
 
-def show_message_box(title: str, message: str, icon_type: QMessageBox.Icon, parent=None):
+def show_message_box(title: str, message: str, icon_type: QMessageBox.Icon, parent=None, buttons=QMessageBox.Ok, details=None, custom_style=True):
     """
-    显示一个弹窗来提示用户当前的状态
-    :param title: 弹窗标题
-    :param message: 弹窗显示的信息
-    :param icon_type: 弹窗的图标类型，如：QMessageBox.Information、QMessageBox.Warning、QMessageBox.Critical
+    显示一个美化的弹窗来提示用户当前的状态
+    
+    Args:
+        title: 弹窗标题
+        message: 弹窗显示的信息
+        icon_type: 弹窗的图标类型，如：QMessageBox.Information、QMessageBox.Warning、QMessageBox.Critical
+        parent: 父窗口
+        buttons: 显示的按钮，默认为确定按钮
+        details: 详细信息（可选）
+        custom_style: 是否使用自定义样式，默认为True
+    
+    Returns:
+        用户点击的按钮
     """
     msg_box = QMessageBox(parent)  # 创建一个消息框
     msg_box.setIcon(icon_type)  # 设置图标
     msg_box.setWindowTitle(title)  # 设置标题
     msg_box.setText(message)  # 设置显示的消息内容
-    msg_box.exec()  # 显示弹窗
+    msg_box.setStandardButtons(buttons)  # 设置按钮
+    
+    # 添加详细信息（如果有）
+    if details:
+        msg_box.setDetailedText(details)
+    
+    # 应用自定义样式
+    if custom_style:
+        # 保留窗口边框和标题栏，不使用无边框模式
+        # msg_box.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        # msg_box.setAttribute(Qt.WA_TranslucentBackground)
+        
+        # 自定义样式表
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #f8f9fa;
+                border-radius: 5px;
+                padding: 10px;
+            }
+            QLabel {
+                color: #212529;
+                font-size: 14px;
+                margin-bottom: 10px;
+                min-height: 32px;
+                qproperty-alignment: AlignVCenter;
+            }
+            /* 图标和文本标签垂直居中对齐 */
+            QMessageBox QLabel {
+                alignment: center;
+            }
+            QMessageBox QLabel#qt_msgbox_label { /* 消息框中的文本标签 */
+                qproperty-alignment: 'AlignVCenter | AlignLeft';
+            }
+            QMessageBox QLabel#qt_msgboxex_icon_label { /* 消息框中的图标标签 */
+                qproperty-alignment: 'AlignVCenter | AlignCenter';
+                padding-right: 10px;
+            }
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 13px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #0069d9;
+            }
+            QPushButton:pressed {
+                background-color: #0062cc;
+            }
+            QPushButton[text="取消"], QPushButton[text="Cancel"] {
+                background-color: #6c757d;
+            }
+            QPushButton[text="取消"]:hover, QPushButton[text="Cancel"]:hover {
+                background-color: #5a6268;
+            }
+            QTextEdit {
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                padding: 5px;
+            }
+        """)
+        
+        # 设置不同类型消息框的特殊样式
+        for button in msg_box.findChildren(QPushButton):
+            if button.text() in ["确定", "OK"]:
+                if icon_type == QMessageBox.Warning:
+                    # 警告消息使用黄色主题
+                    button.setStyleSheet("""
+                        background-color: #ffc107;
+                        color: #212529;
+                        border: none;
+                        border-radius: 5px;
+                        padding: 8px 16px;
+                        font-size: 13px;
+                        min-width: 80px;
+                    """)
+                elif icon_type == QMessageBox.Critical:
+                    # 错误消息使用红色主题
+                    button.setStyleSheet("""
+                        background-color: #dc3545;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        padding: 8px 16px;
+                        font-size: 13px;
+                        min-width: 80px;
+                    """)
+    
+    # 显示弹窗并返回结果
+    return msg_box.exec()
 
 def check_and_create_path(path: str) -> bool:
     """

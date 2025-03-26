@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QWidget, QDialog, QMessageBox, QFileDialog,
 
 import config
 from sample_handler import CustomListWidgetItem
-from ssh_server import Server
+from ssh_server import SSHServer
 from utils import show_message_box, join_path, is_image
 
 
@@ -93,7 +93,7 @@ class DetectHandler:
             self.ui.resultBrowser.clear()
 
     def connect_to_server(self):
-        self.server = Server()
+        self.server = SSHServer()
         try:
             self.server.connect_to_server()
         except Exception as e:

@@ -900,10 +900,6 @@ QPushButton:pressed {
           <property name="text">
            <string>裁剪</string>
           </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/crop.svg</normaloff>ui/icon/crop.svg</iconset>
-          </property>
          </widget>
          <widget class="QPushButton" name="acceptButton">
           <property name="geometry">
@@ -934,10 +930,6 @@ QPushButton:pressed {
           <property name="text">
            <string>接受</string>
           </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/check.svg</normaloff>ui/icon/check.svg</iconset>
-          </property>
          </widget>
          <widget class="QPushButton" name="saveButton">
           <property name="geometry">
@@ -967,10 +959,6 @@ QPushButton:pressed {
           </property>
           <property name="text">
            <string>保存</string>
-          </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/save.svg</normaloff>ui/icon/save.svg</iconset>
           </property>
          </widget>
          <widget class="QPushButton" name="scaleUpButton">
@@ -1118,10 +1106,6 @@ QPushButton:pressed {
           <property name="text">
            <string>拒绝</string>
           </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/reject.svg</normaloff>ui/icon/reject.svg</iconset>
-          </property>
          </widget>
          <widget class="QPushButton" name="cancelButton">
           <property name="geometry">
@@ -1151,10 +1135,6 @@ QPushButton:pressed {
           </property>
           <property name="text">
            <string>取消</string>
-          </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/reject.svg</normaloff>ui/icon/reject.svg</iconset>
           </property>
          </widget>
         </widget>
@@ -1603,19 +1583,19 @@ QPushButton:pressed {
        </property>
        <property name="styleSheet">
         <string notr="true">QPushButton {
-    background-color: #e6f7ff;
-    border: 1px solid #91d5ff;
+    background-color: #f6ffed;
+    border: 1px solid #b7eb8f;
     border-radius: 4px;
     padding: 4px 8px;
-    color: #1890ff;
+    color: #52c41a;
     font-weight: bold;
 }
 QPushButton:hover {
-    background-color: #bae7ff;
-    border: 1px solid #69c0ff;
+    background-color: #d9f7be;
+    border: 1px solid #95de64;
 }
 QPushButton:pressed {
-    background-color: #91d5ff;
+    background-color: #b7eb8f;
 }</string>
        </property>
        <property name="text">
