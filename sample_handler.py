@@ -13,7 +13,7 @@ from PySide6.QtUiTools import QUiLoader
 import config
 from http_server import HttpServer, UploadSampleGroup_HTTP
 from ssh_server import SSHServer, UploadSampleGroup_SSH
-from utils import LoadingAnimation, is_image, join_path, ProgressDialog, show_message_box, update_metadata
+from utils import LoadingAnimation, copy_image, is_image, join_path, ProgressDialog, show_message_box, update_metadata
 
 
 
@@ -57,22 +57,36 @@ class SampleHandler:
         # 同步配置和实例变量
         config.SAMPLE_GROUP = self.sample_group = sample_group
         self.group_path = group_path
-    
-    def check_before_operate(self, type = 1):
+
+    def update_sample_group(self):
         """
-        type: 1 检查是否存在样本组、导入样本、选择样本图片
-        type: 2 检查是否选择样本组、导入样本
+        跳转到样本标签页时，判断并更新样本组
+        """
+        if self.sample_group != config.SAMPLE_GROUP:
+            # 更新样本组
+            self.sample_group = config.SAMPLE_GROUP
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            # 重新加载图片
+            LoadImages(self.ui).load_with_progress()
+            # 更新按钮显示状态
+            self.update_button_visibility()
+    
+    def check_before_operate(self, type = 3):
+        """
+        type: 1 检查是否存在样本组
+        type: 2 检查是否存在样本组、导入样本
+        type: 3 检查是否存在样本组、导入样本、选择样本图片（默认）
         """
         # 检查是否存在样本组
         if not self.sample_group:
             show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical, self.ui)
             return False
         # 检查是否导入样本
-        if not os.listdir(self.group_path):
+        if type >= 2 and not os.listdir(self.group_path):
             show_message_box("提示", "请先导入样本！", QMessageBox.Information, self.ui)
             return False
         # 检查是否选择样本图片
-        if type == 1 and not self.ui.image_item:
+        if type == 3 and not self.ui.image_item:
             show_message_box("提示", "请先选择一个样本图片", QMessageBox.Information, self.ui)
             return False
         return True
@@ -108,6 +122,10 @@ class SampleHandler:
         
         # 如果用户点击了确定按钮且输入了名称
         if result == QDialog.Accepted and text:
+            # 检查样本组名称是否合法
+            if not text.isidentifier():  # 判断是否是合法的标识符
+                show_message_box("错误", "样本组名称不合法！", QMessageBox.Critical)
+                return
             # 创建样本组文件夹
             train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN_GOOD)
             if not os.path.exists(train_path):
@@ -203,30 +221,26 @@ class SampleHandler:
             if confirm == QMessageBox.Yes:
                 # 获取样本组路径
                 group_path = join_path(config.SAMPLE_PATH, sample_group)
+                # 删除样本组文件夹及其内容, 如果不存在则不删除
+                shutil.rmtree(group_path, ignore_errors=True)
+                # 对接 http_server: 删除样本组
                 try:
-                    # 删除样本组文件夹及其内容, 如果不存在则不删除
-                    shutil.rmtree(group_path, ignore_errors=True)
-                    # 对接 http_server: 删除样本组
-                    try:
-                        group_id = HttpServer().get_group_id(sample_group)
-                        HttpServer().delete_group(group_id)
-                        print(f"http_server删除样本组成功 ID={group_id}")
-                    except Exception as e:
-                        print(f"http_server删除样本组失败: {str(e)}")
-                    # 如果删除的是当前样本组，清空当前样本组
-                    if self.sample_group == sample_group:
-                        config.SAMPLE_GROUP = self.sample_group = None
-                        self.group_path = config.SAMPLE_PATH
-                        update_metadata('sample_group', None)
-                        # 更新按钮显示状态
-                        self.update_button_visibility()
-                        # 清空图片列表
-                        self.ui.imageList.clear()
-                    # 显示成功消息
-                    show_message_box("成功", f"已删除样本组：{sample_group}", QMessageBox.Information, self.ui)
+                    group_id = HttpServer().get_group_id(sample_group)
+                    HttpServer().delete_group(group_id)
+                    print(f"http_server删除样本组成功 ID={group_id}")
                 except Exception as e:
-                    # 如果删除失败，显示错误消息
-                    show_message_box("错误", f"删除样本组失败：{str(e)}", QMessageBox.Critical, self.ui)
+                    print(f"http_server删除样本组失败: {str(e)}")
+                # 如果删除的是当前样本组，清空当前样本组
+                if self.sample_group == sample_group:
+                    config.SAMPLE_GROUP = self.sample_group = None
+                    self.group_path = config.SAMPLE_PATH
+                    update_metadata('sample_group', None)
+                    # 更新按钮显示状态
+                    self.update_button_visibility()
+                    # 清空图片列表
+                    self.ui.imageList.clear()
+                # 显示成功消息
+                show_message_box("成功", f"已删除样本组：{sample_group}", QMessageBox.Information, self.ui)
 
     def upload_sample_group(self):
         """
@@ -255,6 +269,12 @@ class SampleHandler:
         if self.sample_group:
             LoadImages(self.ui).load_with_progress() # 加载图片列表
             self.update_button_visibility() # 更新按钮显示状态
+
+    def image_count(self):
+        """
+        获取图片数量
+        """
+        return len(os.listdir(self.group_path))
 
     def fold(self):
         """
@@ -346,16 +366,8 @@ class SampleHandler:
             for file_name in os.listdir(folder):
                 if is_image(file_name):
                     file_path = join_path(folder, file_name)
-                    self.copy_image(file_path)
+                    copy_image(file_path, self.group_path)
             LoadImages(self.ui).load_with_progress()  # 重新加载图片列表
-
-    def copy_image(self, file_path):
-        """
-        复制图片到 img 文件夹, 并修改权限为可读写
-        """
-        destination_path = join_path(self.group_path, os.path.basename(file_path))
-        shutil.copy(file_path, destination_path)
-        os.chmod(destination_path, 0o777)
 
     def import_images(self):
         """
@@ -368,7 +380,7 @@ class SampleHandler:
         if file_dialog.exec():
             selected_files = file_dialog.selectedFiles()
             for file_path in selected_files:
-                self.copy_image(file_path)
+                copy_image(file_path, self.group_path)
             LoadImages(self.ui).load_with_progress()  # 重新加载图片列表
 
 
@@ -1865,7 +1877,7 @@ class SampleGroupDialog(QDialog):
         super().__init__(parent)
         self.selected_group = None
         # 加载UI文件
-        self.ui = QUiLoader().load(r'ui\import_sample_group.ui')
+        self.ui = QUiLoader().load(r'ui\show_group_list.ui')
         # 设置主窗口属性
         self.setWindowTitle(self.ui.windowTitle())
         self.setMinimumSize(self.ui.width(), self.ui.height())
@@ -1887,12 +1899,10 @@ class SampleGroupDialog(QDialog):
         """
         # 清空列表
         self.ui.listWidget.clear()
-        # 获取样本文件夹路径
-        sample_folder = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
         # 获取样本文件夹下的所有子文件夹
         sample_groups = []
-        for item in os.listdir(sample_folder):
-            item_path = join_path(sample_folder, item)
+        for item in os.listdir(config.SAMPLE_PATH):
+            item_path = join_path(config.SAMPLE_PATH, item)
             if os.path.isdir(item_path):
                 # 检查good文件夹中是否有图片文件
                 has_images = any(is_image(f) for f in os.listdir(join_path(item_path, config.SAMPLE_LABEL_TRAIN_GOOD)))
@@ -1920,6 +1930,11 @@ class SampleGroupDialog(QDialog):
             # 根据文件夹中有无图片，设置图标
             item.setIcon(QIcon("ui/icon/non-empty_folder.svg" if has_images else "ui/icon/empty_folder.svg"))
             self.ui.listWidget.addItem(item)
+        # 如果是当前样本组，选中它
+        if group_name == config.SAMPLE_GROUP:
+            item.setSelected(True)
+            self.ui.listWidget.setCurrentItem(item)
+            self.selected_group = group_name
     
     def get_selected_group(self):
         """

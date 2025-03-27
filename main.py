@@ -1,6 +1,6 @@
 import os
 
-from PySide6.QtWidgets import QMainWindow, QApplication
+from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import Qt, QTimer
 
@@ -8,7 +8,8 @@ import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler
-from utils import FloatingTimer, join_path
+from utils import FloatingTimer, check_sample_group, join_path, show_message_box
+from http_server import HttpServer
 
 
 class MainWindow(QMainWindow):
@@ -18,6 +19,7 @@ class MainWindow(QMainWindow):
         self.ui = QUiLoader().load(r'ui\main.ui')
         # 将项目元数据保存为实例属性，便于使用
         config.SAMPLE_PATH = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
+        config.MODEL_PATH = join_path(config.PROJECT_METADATA['project_path'], config.MODEL_FOLDER)
         config.DETECT_PATH = join_path(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
 
         # 处理悬浮计时器
@@ -46,14 +48,44 @@ class MainWindow(QMainWindow):
         self.model_handler = ModelHandler(self.ui.modelWidget)
         # 设置 DetectWidget    
         self.detect_handler = DetectHandler(self.ui.detectWidget)
-        # Connect tab change signal to a slot
-        # self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
+        # 连接标签页切换信号
+        self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
         # self.cur_index = self.ui.tabWidget.currentIndex()
         # self.to_next = False # 用于判断是否点击下一步按钮
 
+    def on_tab_changed(self, index):
+        """
+        标签页切换时，更新样本组
+        """
+        if index == 1: # 样本标签页
+            self.sample_handler.update_sample_group()
+        elif index == 2: # 模型标签页
+            self.model_handler.update_sample_group()
     def switch_to_page_1(self):
         self.ui.tabWidget.setCurrentIndex(1)
     def switch_to_page_2(self):
+        # 检查是否有样本组
+        if not check_sample_group():
+            return
+        # 对接 http_server: 检查样本组是否上传到服务器
+        try:
+            # 连接服务器，检查样本组是否上传（样本数量是否相等）
+            http_server = HttpServer()
+            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
+            sample_list = http_server.get_sample_list(group_id)
+            if len(sample_list) < self.sample_handler.image_count():
+                result = show_message_box("提示", "样本组未上传到服务器，是否立即上传？", 
+                                         QMessageBox.Question, self.ui, 
+                                         buttons=QMessageBox.Yes | QMessageBox.No)
+                # 选择是否上传样本组
+                if result == QMessageBox.Yes:
+                    self.sample_handler.upload_sample_group()
+                else:
+                    return
+        except Exception as e:
+            show_message_box("错误", f"连接服务器失败：{str(e)}", QMessageBox.Critical, self.ui)
+            return
+        # 验证通过，跳转到下一页
         self.ui.tabWidget.setCurrentIndex(2)
     def switch_to_page_3(self):
         self.ui.tabWidget.setCurrentIndex(3)
@@ -92,7 +124,8 @@ if __name__ == "__main__":
         "project_path": "B:\\Development\\GraduationDesign\\app\\test",
         "description": "",
         "create_time": "2024-12-20 19:47:57",
-        "sample_group": "1"
+        "sample_group": "test",
+        "model_group": "test"
     }
 
     config.PROJECT_METADATA_PATH = join_path(config.PROJECT_METADATA['project_path'], config.PROJECT_METADATA_FILE)

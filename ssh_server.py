@@ -223,6 +223,106 @@ class UploadSampleGroup_SSH:
         finally:
             server.close_connection()
 
+
+
+class PatchCoreParamMapper_SSH:
+    """
+    将简化的三个参数（模型精度、缺陷大小和训练速度）映射到专业的PatchCore训练参数
+    """
+    def __init__(self):
+        # 精度选项
+        self.accuracy_options = {
+            "低精度": {
+                "backbone_names": ["wide_resnet50_2"],
+                "layers_to_extract_from": ["layer2", "layer3"],
+                "pretrain_embed_dimension": 256,
+                "target_embed_dimension": 256,
+                "anomaly_scorer_num_nn": 1
+            },
+            "中等精度": {
+                "backbone_names": ["wide_resnet50_2"],
+                "layers_to_extract_from": ["layer2", "layer3"],
+                "pretrain_embed_dimension": 512,
+                "target_embed_dimension": 512,
+                "anomaly_scorer_num_nn": 3
+            },
+            "高精度": {
+                "backbone_names": ["wide_resnet50_2"],
+                "layers_to_extract_from": ["layer2", "layer3"],
+                "pretrain_embed_dimension": 1024,
+                "target_embed_dimension": 1024,
+                "anomaly_scorer_num_nn": 5
+            }
+        }
+        
+        # 缺陷大小选项
+        self.defect_size_options = {
+            "小缺陷": {
+                "patchsize": 3,
+                "patchoverlap": 0.25
+            },
+            "中等缺陷": {
+                "patchsize": 5,
+                "patchoverlap": 0.5
+            },
+            "大缺陷": {
+                "patchsize": 9,
+                "patchoverlap": 0.75
+            }
+        }
+        
+        # 训练速度选项
+        self.training_speed_options = {
+            "快速": {
+                "preprocessing": "mean",
+                "aggregation": "mean"
+            },
+            "均衡": {
+                "preprocessing": "mean",
+                "aggregation": "mlp"
+            },
+            "慢速高质量": {
+                "preprocessing": "conv",
+                "aggregation": "mlp"
+            }
+        }
+    
+    def get_params(self, accuracy, defect_size, training_speed):
+        """
+        根据三个简化选项获取完整的PatchCore参数
+        
+        Args:
+            accuracy: 精度选项，可选值为"低精度"、"中等精度"、"高精度"
+            defect_size: 缺陷大小选项，可选值为"小缺陷"、"中等缺陷"、"大缺陷"
+            training_speed: 训练速度选项，可选值为"快速"、"均衡"、"慢速高质量"
+            
+        Returns:
+            完整的PatchCore参数字典
+        """
+        params = {}
+        params.update(self.accuracy_options[accuracy])
+        params.update(self.defect_size_options[defect_size])
+        params.update(self.training_speed_options[training_speed])
+        
+        # 添加固定参数
+        params.update({
+            "patchscore": "max",
+            "faiss_on_gpu": True,
+            "faiss_num_workers": 8
+        })
+        
+        return params
+    
+    def get_all_options(self):
+        """获取所有可用的选项"""
+        return {
+            "accuracy": list(self.accuracy_options.keys()),
+            "defect_size": list(self.defect_size_options.keys()),
+            "training_speed": list(self.training_speed_options.keys())
+        }
+    
+    
+
 if __name__ == "__main__":
     # Create a server instance（自动连接服务器）
     server = SSHServer()

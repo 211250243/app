@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>2</number>
     </property>
     <property name="iconSize">
      <size>
@@ -1977,19 +1977,6 @@ QLabel {
       <property name="title">
        <string>模型管理</string>
       </property>
-      <widget class="QPushButton" name="importModelButton">
-       <property name="geometry">
-        <rect>
-         <x>270</x>
-         <y>60</y>
-         <width>90</width>
-         <height>30</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>导入模型</string>
-       </property>
-      </widget>
       <widget class="QLineEdit" name="curModelEdit">
        <property name="enabled">
         <bool>false</bool>
@@ -1998,22 +1985,9 @@ QLabel {
         <rect>
          <x>120</x>
          <y>120</y>
-         <width>241</width>
+         <width>260</width>
          <height>30</height>
         </rect>
-       </property>
-      </widget>
-      <widget class="QPushButton" name="newModelButton">
-       <property name="geometry">
-        <rect>
-         <x>40</x>
-         <y>60</y>
-         <width>90</width>
-         <height>30</height>
-        </rect>
-       </property>
-       <property name="text">
-        <string>新建模型</string>
        </property>
       </widget>
       <widget class="QLabel" name="label_2">
@@ -2029,30 +2003,198 @@ QLabel {
         <string>当前模型：</string>
        </property>
       </widget>
+      <widget class="QLabel" name="label_12">
+       <property name="geometry">
+        <rect>
+         <x>42</x>
+         <y>60</y>
+         <width>81</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>模型操作：</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="newModelButton">
+       <property name="geometry">
+        <rect>
+         <x>120</x>
+         <y>60</y>
+         <width>80</width>
+         <height>28</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1890ff;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #bae7ff;
+    border: 1px solid #69c0ff;
+}
+QPushButton:pressed {
+    background-color: #91d5ff;
+}</string>
+       </property>
+       <property name="text">
+        <string>新建模型</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="importModelButton">
+       <property name="geometry">
+        <rect>
+         <x>210</x>
+         <y>60</y>
+         <width>80</width>
+         <height>28</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #e6f7ff;
+    border: 1px solid #91d5ff;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #1890ff;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #bae7ff;
+    border: 1px solid #69c0ff;
+}
+QPushButton:pressed {
+    background-color: #91d5ff;
+}</string>
+       </property>
+       <property name="text">
+        <string>导入模型</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="deleteModelButton">
+       <property name="geometry">
+        <rect>
+         <x>300</x>
+         <y>60</y>
+         <width>80</width>
+         <height>28</height>
+        </rect>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #fff1f0;
+    border: 1px solid #ffccc7;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #ff4d4f;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #ffccc7;
+    border: 1px solid #ff7875;
+}
+QPushButton:pressed {
+    background-color: #ffa39e;
+}</string>
+       </property>
+       <property name="text">
+        <string>删除模型</string>
+       </property>
+      </widget>
      </widget>
      <widget class="QGroupBox" name="groupBox_6">
       <property name="geometry">
        <rect>
         <x>50</x>
-        <y>270</y>
+        <y>260</y>
         <width>421</width>
-        <height>231</height>
+        <height>241</height>
        </rect>
       </property>
       <property name="title">
        <string>样本管理</string>
       </property>
-      <widget class="QPushButton" name="pushButton_3">
+      <widget class="QPushButton" name="importDirButton">
        <property name="geometry">
         <rect>
-         <x>30</x>
-         <y>40</y>
+         <x>130</x>
+         <y>60</y>
          <width>91</width>
          <height>30</height>
         </rect>
        </property>
        <property name="text">
-        <string>扩充样本</string>
+        <string>导入文件夹</string>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_10">
+       <property name="geometry">
+        <rect>
+         <x>42</x>
+         <y>120</y>
+         <width>81</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>当前样本组：</string>
+       </property>
+      </widget>
+      <widget class="QLineEdit" name="curSampleGroupEdit">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="geometry">
+        <rect>
+         <x>130</x>
+         <y>120</y>
+         <width>250</width>
+         <height>30</height>
+        </rect>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="importFileButton">
+       <property name="geometry">
+        <rect>
+         <x>289</x>
+         <y>60</y>
+         <width>91</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>导入文件</string>
+       </property>
+      </widget>
+      <widget class="QPushButton" name="changeSampleGroupButton">
+       <property name="geometry">
+        <rect>
+         <x>289</x>
+         <y>180</y>
+         <width>91</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>更换样本组</string>
+       </property>
+      </widget>
+      <widget class="QLabel" name="label_11">
+       <property name="geometry">
+        <rect>
+         <x>42</x>
+         <y>60</y>
+         <width>81</width>
+         <height>30</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>扩充样本组：</string>
        </property>
       </widget>
      </widget>

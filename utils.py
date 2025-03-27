@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QDateTime, QPoint, QSize
 from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
@@ -244,6 +245,24 @@ def update_metadata(key, value):
         with open(metadata_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, ensure_ascii=False, indent=4)
     config.PROJECT_METADATA = metadata
+
+def copy_image(file_path, dest_path):
+    """
+    复制图片到, 并修改权限为可读写
+    """
+    dest_path = join_path(dest_path, os.path.basename(file_path))
+    shutil.copy(file_path, dest_path)
+    os.chmod(dest_path, 0o777)
+
+def check_sample_group():
+    """
+    检查是否存在样本组
+    """
+    if not config.SAMPLE_GROUP:
+        show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical)
+        return False
+    return True
+
 
 class FloatingTimer(QWidget):
     """悬浮计时器，显示应用运行时间"""
