@@ -232,10 +232,8 @@ class SampleHandler:
         """
         上传样本组到服务器
         """
-        # UploadSampleGroup(self.ui).run()
-        # UploadSampleGroup_ssh(self.ui).run()
-        # UploadSampleGroup_HTTP(self.ui).run()
-        UploadSampleGroup_SSH(self.ui).run()
+        UploadSampleGroup_HTTP(self.ui).run()
+        # UploadSampleGroup_SSH(self.ui).run()
 
 
     def init_image_list(self):

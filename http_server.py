@@ -402,6 +402,25 @@ class HttpServer:
         except Exception as e:
             print(f"删除组失败: {str(e)}")
             raise
+
+    def clear_group(self, group_id):
+        """
+        清空组
+        
+        Args:
+            group_id: 组ID
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/clear_group/{group_id}"
+        try:
+            response = requests.delete(url)
+            if response.status_code == 200:
+                print(f"清空组: {group_id} -> {url}")
+                return response.json()
+            else:
+                raise Exception(f"清空组失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"清空组失败: {str(e)}")
+            raise
     
     def get_group_list(self):
         """
@@ -693,10 +712,12 @@ class UploadSampleGroup_HTTP:
         # 遍历并上传每个文件
         for index, file_name in enumerate(files):
             file_path = join_path(self.group_path, file_name)
-            # 上传文件，若失败则停止
+            # 上传文件，先清空组再上传(覆盖旧样本组)，若失败则停止
             try:
-                group_id = HttpServer().get_group_id(config.SAMPLE_GROUP)
-                HttpServer().upload_sample(file_path, group_id)
+                http_server = HttpServer()
+                group_id = http_server.get_group_id(config.SAMPLE_GROUP)
+                http_server.clear_group(group_id)
+                http_server.upload_sample(file_path, group_id)
             except Exception as e:
                 show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
                 return
@@ -715,11 +736,12 @@ if __name__ == "__main__":
     # group_id = server.add_group(group_name)
     # print(f"创建组成功: 名称={group_name}, ID={group_id}")
 
+    server.delete_group(2)
     # 2. 获取组列表
     groups = server.get_group_list()
     print(f"组列表: {groups}")
 
-    samples = server.get_sample_list(1)
+    samples = server.get_sample_list(2)
     print(f"样本列表: {samples}")
     
     # # 下载样本组
@@ -727,6 +749,7 @@ if __name__ == "__main__":
     # for sample in samples:
     #     server.save_downloaded_sample(sample, download_dir)
 
-    # # 删除样本组
+    # 删除样本组
+    # server.clear_group(1)
     # for group in groups:
     #     server.delete_group(group.get("id"))

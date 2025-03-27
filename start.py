@@ -2,9 +2,9 @@ import json
 import os
 from pathlib import Path  # 用于处理文件路径
 from PySide6.QtCore import QDateTime, Signal, Qt, QSize, QEvent
-from PySide6.QtGui import QKeySequence, QShortcut, QDragEnterEvent, QDropEvent, QIcon
+from PySide6.QtGui import QKeySequence, QShortcut, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, 
-                              QLabel, QListWidget, QListWidgetItem, QVBoxLayout, QWidget, QHBoxLayout)
+                              QLabel, QListWidgetItem, QWidget, QHBoxLayout)
 from PySide6.QtUiTools import QUiLoader
 
 import config

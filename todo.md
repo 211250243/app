@@ -109,7 +109,8 @@ async def infer_model(model_id: int, background_tasks: BackgroundTasks, group_id
 3. get_sample_list(group_id) // 获取一个组的样本名列表
 4. add_group(group_name) // 添加组
 5. delete_group(group_id) // 删除组
-6. get_group_list() // 获取组名列表
+6. clear_group(group_id) // 清空组
+7. get_group_list() // 获取组名列表
 
 ```python
 @app.post("/upload_sample")
@@ -155,6 +156,11 @@ def delete_group(group_id: int, db: Session = Depends(get_db)):
     db.query(File_Group_Info_DB).filter(File_Group_Info_DB.id==group_id).delete()
     db.commit()
     return {"message": "Model deleted successfully"}
+@app.post("/clear_group/{group_id}")
+def clear_group(group_id: int, db: Session = Depends(get_db)):
+    db.query(File_Group_Relation_DB).filter(File_Group_Relation_DB.group_id == group_id).delete()
+    db.commit()
+    return {"message": "Group cleared successfully"}
 @app.get("/get_group_list")
 def get_group_list(db: Session = Depends(get_db)):
     return db.query(File_Group_Info_DB).all()
