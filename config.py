@@ -30,6 +30,7 @@ SAMPLE_LABEL_TEST_GOOD = 'test/good'
 MODEL_FOLDER = 'models'
 MODEL_PATH = None
 MODEL_GROUP = None
+MODEL_PARAMS = None
 DETECT_FOLDER = 'detect'
 DETECT_PATH = None
 

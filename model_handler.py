@@ -8,10 +8,10 @@ from PySide6.QtGui import QIcon
 from PySide6.QtCore import Qt
 
 import config
-from http_server import HttpServer
+from http_server import HttpServer, PatchCoreParamMapper_Http, UploadSampleGroup_HTTP
 from sample_handler import SampleGroupDialog
 from ssh_server import PatchCoreParamMapper_SSH
-from utils import check_sample_group, copy_image, show_message_box, update_metadata, join_path, is_image
+from utils import check_model_group, check_sample_group, copy_image, show_message_box, update_metadata, join_path, is_image
 
 
 
@@ -29,19 +29,26 @@ class ModelHandler:
         self.init_sample_group()
         # 初始化模型组
         self.init_model_group()
-        # 初始化模型参数
-        self.init_model_params()
+        # 初始化训练参数
+        self.init_train_params()
 
     def init_sample_group(self):
         self.ui.importDirButton.clicked.connect(self.import_dir)
         self.ui.importFileButton.clicked.connect(self.import_files)
         self.ui.changeSampleGroupButton.clicked.connect(self.change_sample_group)
+        self.update_sample_group()
     
     def update_sample_group(self):
         """
         跳转到模型标签页时，更新样本组
         """
         self.ui.curSampleGroupEdit.setText(config.SAMPLE_GROUP)
+
+    def upload_sample_group(self):
+        """
+        上传样本组到服务器
+        """
+        UploadSampleGroup_HTTP(self.ui).run()
 
     def import_dir(self):
         """
@@ -57,6 +64,13 @@ class ModelHandler:
                 if is_image(file_name):
                     file_path = join_path(folder, file_name)
                     copy_image(file_path, sample_group_path)
+                    # 对接 http_server: 上传样本到服务器
+                    try:
+                        group_id = HttpServer().get_group_id(config.SAMPLE_GROUP)
+                        HttpServer().upload_sample(file_path, group_id)
+                    except Exception as e:
+                        print(f"上传样本失败: {str(e)}")
+            show_message_box("成功", "已导入文件夹至样本组！", QMessageBox.Information, self.ui)
     
     def import_files(self):
         """
@@ -65,12 +79,19 @@ class ModelHandler:
         # 检查是否存在样本组
         if not check_sample_group():
             return
-        files = QFileDialog.getOpenFileNames(self.ui, "选择图片文件", "", "图片文件 (*.png *.jpg *.jpeg)")
+        # getOpenFileNames 返回一个元组，包含文件路径列表和文件类型过滤器。
+        files, _ = QFileDialog.getOpenFileNames(self.ui, "选择图片文件", "", "图片文件 (*.png *.jpg *.jpeg)")
         if files:
             sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)
-            print(files)
             for file_path in files:
                 copy_image(file_path, sample_group_path)
+                # 对接 http_server: 上传样本到服务器
+                try:
+                    group_id = HttpServer().get_group_id(config.SAMPLE_GROUP)
+                    HttpServer().upload_sample(file_path, group_id)
+                except Exception as e:
+                    print(f"上传样本失败: {str(e)}")
+            show_message_box("成功", "已导入图片至样本组！", QMessageBox.Information, self.ui)
     
     def change_sample_group(self):
         """
@@ -89,14 +110,12 @@ class ModelHandler:
             else:
                 show_message_box("成功", "已切换样本组！", QMessageBox.Information)
             # 更新样本组显示
-            self.ui.curSampleGroupEdit.setText(dialog.selected_group)
+            self.update_sample_group()
 
     def init_model_group(self):
         self.ui.newModelButton.clicked.connect(self.new_model_group)
         self.ui.importModelButton.clicked.connect(self.import_model_group)
         self.ui.deleteModelButton.clicked.connect(self.delete_model_group)
-        self.ui.trainButton.clicked.connect(self.train_model) # 训练模型
-        self.ui.viewParamsButton.clicked.connect(self.view_parameters) # 查看参数
         # 获取模型组并初始化路径
         model_group = config.PROJECT_METADATA.get('model_group')
         group_path = config.MODEL_PATH  # 默认路径
@@ -124,26 +143,6 @@ class ModelHandler:
             self.group_path = config.MODEL_PATH
         self.ui.curModelEdit.setText(config.MODEL_GROUP)
 
-    def init_model_params(self):
-        """初始化模型选项下拉框"""
-        # 初始化参数映射器
-        self.param_mapper = PatchCoreParamMapper_SSH()
-        # 初始化选项，如果下拉框存在
-        options = self.param_mapper.get_all_options()
-        # 设置模型精度选项
-        self.ui.accuracyComboBox.clear()
-        self.ui.accuracyComboBox.addItems(options["accuracy"])
-        self.ui.accuracyComboBox.setCurrentIndex(1)  # 默认选中中等精度
-        # 设置缺陷大小选项
-        self.ui.defectSizeComboBox.clear()
-        self.ui.defectSizeComboBox.addItems(options["defect_size"])
-        self.ui.defectSizeComboBox.setCurrentIndex(1)  # 默认选中中等缺陷
-        # 设置训练速度选项
-        self.ui.speedComboBox.clear()
-        self.ui.speedComboBox.addItems(options["training_speed"])
-        self.ui.speedComboBox.setCurrentIndex(1)  # 默认选中均衡
-        
-
     def new_model_group(self):
         """
         创建新项目
@@ -160,12 +159,17 @@ class ModelHandler:
             # 创建模型文件夹
             group_path = join_path(config.MODEL_PATH, model_group)
             if not os.path.exists(group_path):
-                # # 对接 http_server: 创建模型组
-                # try:
-                #     id = HttpServer().add_model(model_group)
-                #     print(f"http_server创建模型组成功 ID={id}")
-                # except Exception as e:
-                #     print(f"http_server创建模型组失败: {str(e)}")
+                # 对接 http_server: 创建模型组
+                try:
+                    # 从UI获取参数选择，获取训练参数
+                    # 根据训练参数创建模型
+                    id = HttpServer().add_model({
+                        "name": model_group,
+                        **config.MODEL_PARAMS
+                    })
+                    print(f"http_server创建模型组成功 ID={id} \n模型参数={config.MODEL_PARAMS}")
+                except Exception as e:
+                    print(f"http_server创建模型组失败: {str(e)}")
                 # 创建模型文件夹
                 os.makedirs(group_path)
                 # 更新数据
@@ -185,10 +189,17 @@ class ModelHandler:
         result = dialog.exec()
         # 如果用户点击了确定按钮并选择了模型组
         if result == QDialog.Accepted and dialog.selected_group:
+            # 对接 http_server: 获取模型参数
+            try:
+                config.MODEL_PARAMS = HttpServer().get_model_params(dialog.selected_group)
+                self.update_params() # 更新参数显示
+                print(f"http_server获取模型参数成功: {config.MODEL_PARAMS}")
+            except Exception as e:
+                print(f"http_server获取模型参数失败: {str(e)}")
             # 更新数据
             config.MODEL_GROUP = dialog.selected_group
-            update_metadata('model_group', dialog.selected_group)            
-            self.update_model_group()
+            update_metadata('model_group', config.MODEL_GROUP)            
+            self.update_model_group() # 更新模型组路径和模型组名称
             show_message_box("成功", "已导入模型组！", QMessageBox.Information)
 
     def delete_model_group(self):
@@ -218,70 +229,331 @@ class ModelHandler:
                 # 删除模型组
                 group_path = join_path(config.MODEL_PATH, model_group)
                 shutil.rmtree(group_path, ignore_errors=True)
-                # # 对接 http_server: 删除模型组
-                # try:
-                #     id = HttpServer().get_model_id(model_group)
-                #     HttpServer().delete_model(id)
-                #     print(f"http_server删除模型组成功 ID={id}")
-                # except Exception as e:
-                #     print(f"http_server删除模型组失败: {str(e)}")
+                # 对接 http_server: 删除模型组
+                try:
+                    id = HttpServer().get_model_id(model_group)
+                    HttpServer().delete_model(id)
+                    print(f"http_server删除模型组成功 ID={id}")
+                except Exception as e:
+                    print(f"http_server删除模型组失败: {str(e)}")
                 # 如果删除的是当前模型组，清空当前模型组
                 if config.MODEL_GROUP == model_group:
                     config.MODEL_GROUP = None
                     update_metadata('model_group', None)
                     self.update_model_group()
+                    config.MODEL_PARAMS = self.get_params() # 设置默认参数
+                    self.update_params()
                 # 显示成功消息
                 show_message_box("成功", "已删除模型组！", QMessageBox.Information)
+
+
+
+    def init_train_params(self):
+        """初始化模型训练板块"""
+        self.ui.trainButton.clicked.connect(self.train_model)
+        self.ui.viewParamsButton.clicked.connect(self.view_params)
+        self.ui.editParamsButton.clicked.connect(self.edit_params)
+        self.ui.setParamsButton.clicked.connect(self.set_params)
+
+        # 初始化参数映射器
+        self.param_mapper = PatchCoreParamMapper_Http()
+        # 初始化选项，如果下拉框存在
+        options = self.param_mapper.get_all_options()
+        # 设置模型精度选项
+        self.ui.accuracyComboBox.clear()
+        self.ui.accuracyComboBox.addItems(options["accuracy"])
+        self.ui.accuracyComboBox.setCurrentIndex(1)  # 默认选中中等精度
+        # 设置缺陷大小选项
+        self.ui.defectSizeComboBox.clear()
+        self.ui.defectSizeComboBox.addItems(options["defect_size"])
+        self.ui.defectSizeComboBox.setCurrentIndex(1)  # 默认选中中等缺陷
+        # 设置训练速度选项
+        self.ui.speedComboBox.clear()
+        self.ui.speedComboBox.addItems(options["training_speed"])
+        self.ui.speedComboBox.setCurrentIndex(1)  # 默认选中均衡
+        # 初始化参数默认值
+        config.MODEL_PARAMS = self.get_params()
+        
+    def update_params(self):
+        """
+        TODO: 更新参数显示
+        """
+
+        
+    def get_params(self):
+        """
+        从UI获取参数选择，获取训练参数
+        """
+        accuracy = self.ui.accuracyComboBox.currentText()
+        defect_size = self.ui.defectSizeComboBox.currentText()
+        training_speed = self.ui.speedComboBox.currentText()
+        return self.param_mapper.get_params(accuracy, defect_size, training_speed)
+    
+    def set_params(self):
+        """
+        通过参数选择自动设置参数，并更新参数显示
+        """
+        # 检查是否存在模型组
+        if check_model_group():
+            config.MODEL_PARAMS = self.get_params()
+            self.update_params()
 
     def train_model(self):
         """
         训练模型
         """
         # 检查是否有选择模型和样本组
-        if not config.MODEL_PATH or not os.path.exists(config.MODEL_PATH):
-            show_message_box("错误", "请先创建或导入模型！", QMessageBox.Critical)
+        if not check_model_group() or not check_sample_group():
             return
-        if not config.SAMPLE_GROUP:
-            show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical)
-            return
-
-        # 从UI获取参数选择
-        accuracy = self.ui.accuracyComboBox.currentText()
-        defect_size = self.ui.defectSizeComboBox.currentText()
-        training_speed = self.ui.speedComboBox.currentText()
-        # 获取完整的训练参数
-        params = self.param_mapper.get_params(accuracy, defect_size, training_speed)
-        
-        # 这里可以调用实际的训练函数
-        # train_patchcore(config.MODEL_PATH, config.PROJECT_METADATA['sample_path'], params)
-        
         # 显示训练开始的消息
-        show_message_box("信息", "模型训练已开始，请耐心等待...", QMessageBox.Information)
-        # 这里应该有实际的训练代码，可能需要多线程实现
-        print(f"开始训练模型，参数：{params}")
+        show_message_box("信息", "模型训练已开始，请耐心等待...", QMessageBox.Information, self.ui)
+        # 对接 http_server: 训练模型
+        try:
+            http_server = HttpServer()
+            # 如果模型组不存在，删除本地模型组，并提示创建新模型组
+            model_id = http_server.get_model_id(config.MODEL_GROUP)
+            if not model_id:
+                # 删除本地模型组
+                shutil.rmtree(join_path(config.MODEL_PATH, config.MODEL_GROUP), ignore_errors=True)
+                # 更新数据
+                config.MODEL_GROUP = None
+                update_metadata('model_group', None)
+                self.update_model_group()
+                # 提示创建新模型组
+                show_message_box("错误", "模型组不存在于服务器，已删除本地模型组，请重新创建！", QMessageBox.Critical, self.ui)
+                return
+            # 如果样本组不存在，删除本地样本组，并提示创建新样本组
+            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
+            if not group_id:
+                # 删除本地样本组
+                shutil.rmtree(join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP), ignore_errors=True)
+                # 更新数据
+                config.SAMPLE_GROUP = None
+                update_metadata('sample_group', None)
+                self.update_sample_group()
+                # 提示创建新样本组
+                show_message_box("错误", "样本组不存在于服务器，已删除本地样本组，请重新创建！", QMessageBox.Critical, self.ui)
+                return
+            # 启动训练
+            http_server.train_model(model_id, group_id)
+        except Exception as e:
+            show_message_box("错误", f"训练失败: {str(e)}", QMessageBox.Critical, self.ui)
+
+    def view_params(self):
+        """
+        查看当前选择的参数对应的详细PatchCore参数（只读模式）
+        """
+        # 检查是否存在模型组
+        if check_model_group():
+            # 创建并显示参数查看对话框（只读模式）
+            dialog = ModelParamsDialog(self.ui, config.MODEL_PARAMS, editable=False)
+            dialog.exec()
+
+    def edit_params(self):
+        """
+        编辑模型参数，弹出编辑对话框让用户修改参数
+        """
+        # 检查是否存在模型组
+        if not check_model_group():
+            return
+        # 创建并显示参数编辑对话框
+        dialog = ModelParamsDialog(self.ui, config.MODEL_PARAMS, editable=True)
+        result = dialog.exec()
+        # 如果用户点击了确定按钮，更新参数
+        if result == QDialog.Accepted:
+            # 如果当前没有模型组，创建新模型组
+            if not check_model_group():
+                return
+            # 对接 http_server: 更新模型参数
+            try:
+                http_server = HttpServer()
+                model_id = http_server.get_model_id(config.MODEL_GROUP)
+                params = dialog.params
+                print(f"更新模型参数: {model_id} -> {params}")
+                # http_server.update_model_params(model_id, params)
+                show_message_box("成功", "模型参数已更新！", QMessageBox.Information, self.ui)
+            except Exception as e:
+                show_message_box("错误", f"更新参数失败: {str(e)}", QMessageBox.Critical, self.ui)
+
+    def is_model_trained(self):
+        """
+        检查当前选择的模型组是否已经训练过
         
-
-    def view_parameters(self):
+        Returns:
+            bool: 模型是否已训练
         """
-        查看当前选择的参数对应的详细PatchCore参数
-        """
-        # 从UI获取参数选择
-        accuracy = self.ui.accuracyComboBox.currentText()
-        defect_size = self.ui.defectSizeComboBox.currentText()
-        training_speed = self.ui.speedComboBox.currentText()
-        # 获取完整的参数
-        params = self.param_mapper.get_params(accuracy, defect_size, training_speed)
-        # 格式化参数显示
-        param_text = ""
-        for key, value in params.items():
-            param_text += f"{key}: {value}\n"
-        # 显示参数对话框
-        msg_box = QMessageBox()
-        msg_box.setWindowTitle("PatchCore 详细参数")
-        msg_box.setText(param_text)
-        msg_box.setIcon(QMessageBox.Information)
-        msg_box.exec()
+        # 首先检查是否选择了模型组和样本组
+        if not config.MODEL_GROUP or not config.SAMPLE_GROUP:
+            return False
+        # 对接 http_server: 检查模型训练状态
+        try:
+            http_server = HttpServer()
+            model_id = http_server.get_model_id(config.MODEL_GROUP)
+            if not model_id:
+                return False
+            # 获取模型状态
+            model_status = http_server.get_model_status(config.MODEL_GROUP)
+            # 检查模型状态，status=2表示训练已完成
+            return model_status == 2
+        except Exception as e:
+            print(f"检查模型训练状态失败: {str(e)}")
+            return False
 
+class ModelParamsDialog(QDialog):
+    """
+    模型参数编辑/查看对话框
+    """
+    def __init__(self, parent=None, params=None, editable=True):
+        super().__init__(parent)
+        self.params = params or {}
+        self.editable = editable
+        self.param_mapper = PatchCoreParamMapper_Http()
+        
+        # 加载UI文件
+        self.ui = QUiLoader().load(r'ui/model_params.ui')
+        
+        # 设置窗口标题
+        if editable:
+            self.ui.setWindowTitle("编辑模型参数")
+        else:
+            self.ui.setWindowTitle("查看模型参数")
+            self.ui.titleLabel.setText("PatchCore 模型参数查看")
+            
+        # 创建主布局
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.ui)
+        
+        # 连接信号
+        self.ui.saveButton.clicked.connect(self.validate_and_accept)
+        self.ui.cancelButton.clicked.connect(self.reject)
+        self.ui.resetButton.clicked.connect(self.reset_params)
+        
+        # 如果是只读模式，禁用编辑和保存
+        if not editable:
+            self.ui.saveButton.setVisible(False)
+            self.ui.resetButton.setVisible(False)
+            # 禁用所有输入控件
+            self._set_controls_enabled(False)
+            # 调整按钮位置，只保留取消按钮（作为关闭按钮）
+            self.ui.cancelButton.setText("关闭")
+            self.ui.cancelButton.setGeometry(225, 510, 100, 30)
+        
+        # 初始化界面
+        self.init_ui()
+        
+    def init_ui(self):
+        """初始化界面值"""
+        if self.params:
+            # 设置基本参数
+            if "input_h" in self.params:
+                self.ui.inputHSpin.setValue(self.params["input_h"])
+            if "input_w" in self.params:
+                self.ui.inputWSpin.setValue(self.params["input_w"])
+            if "patchsize" in self.params:
+                self.ui.patchSizeSpin.setValue(self.params["patchsize"])
+            if "end_acc" in self.params:
+                self.ui.endAccSpin.setValue(self.params["end_acc"])
+            if "embed_dimension" in self.params:
+                self.ui.embedDimSpin.setValue(self.params["embed_dimension"])
+                
+            # 设置特征层选择
+            if "layers" in self.params:
+                layers = self.params["layers"]
+                # 如果layers是字符串形式，转换为列表
+                if isinstance(layers, str):
+                    try:
+                        # 移除字符串格式的引号和方括号
+                        layers = layers.replace("'", "").replace("[", "").replace("]", "")
+                        layers = [l.strip() for l in layers.split(",")]
+                    except:
+                        layers = []
+                        
+                # 设置复选框状态
+                self.ui.layer1Check.setChecked("layer1" in layers)
+                self.ui.layer2Check.setChecked("layer2" in layers)
+                self.ui.layer3Check.setChecked("layer3" in layers)
+                self.ui.layer4Check.setChecked("layer4" in layers)
+    
+    def validate_and_accept(self):
+        """验证参数是否有效，有效则接受对话框"""
+        # 验证是否选择了特征层
+        layers_selected = (
+            self.ui.layer1Check.isChecked() or
+            self.ui.layer2Check.isChecked() or
+            self.ui.layer3Check.isChecked() or
+            self.ui.layer4Check.isChecked()
+        )
+        
+        if not layers_selected:
+            show_message_box("错误", "请至少选择一个特征层！", QMessageBox.Critical, self)
+            return
+        
+        # 验证输入尺寸
+        input_h = self.ui.inputHSpin.value()
+        input_w = self.ui.inputWSpin.value()
+        if input_h < 128 or input_w < 128:
+            show_message_box("错误", "输入尺寸不能小于128！", QMessageBox.Critical, self)
+            return
+        
+        # 验证嵌入维度
+        embed_dim = self.ui.embedDimSpin.value()
+        if embed_dim < 128:
+            show_message_box("错误", "嵌入维度不能小于128！", QMessageBox.Critical, self)
+            return
+        
+        # 获取参数并判断是否有变化
+        new_params = self.get_params()
+        has_changes = False
+        
+        # 如果参数不存在，视为有变化
+        if not self.params:
+            has_changes = True
+        else:
+            # 逐个比较关键参数
+            for key in ["input_h", "input_w", "patchsize", "end_acc", "embed_dimension", "layers"]:
+                if key not in self.params or str(self.params[key]) != str(new_params[key]):
+                    has_changes = True
+                    break
+        if not has_changes:
+            show_message_box("提示", "参数未发生变化！", QMessageBox.Information, self)
+            return
+            
+        # 更新参数并接受对话框
+        self.params = new_params
+        config.MODEL_PARAMS = new_params  # 更新全局参数
+        print(f"参数已更新: {self.params}")
+        super().accept()
+        
+    def _set_controls_enabled(self, enabled):
+        """设置所有控件的启用状态"""
+        # 基本参数
+        self.ui.inputHSpin.setEnabled(enabled)
+        self.ui.inputWSpin.setEnabled(enabled)
+        self.ui.patchSizeSpin.setEnabled(enabled)
+        self.ui.endAccSpin.setEnabled(enabled)
+        
+        # 特征提取参数
+        self.ui.embedDimSpin.setEnabled(enabled)
+        self.ui.layer1Check.setEnabled(enabled)
+        self.ui.layer2Check.setEnabled(enabled)
+        self.ui.layer3Check.setEnabled(enabled)
+        self.ui.layer4Check.setEnabled(enabled)
+        
+    def reset_params(self):
+        """重置参数为默认值"""
+        # 设置基本参数默认值
+        self.ui.inputHSpin.setValue(256)
+        self.ui.inputWSpin.setValue(256)
+        self.ui.patchSizeSpin.setValue(5)
+        self.ui.endAccSpin.setValue(0.92)
+        self.ui.embedDimSpin.setValue(512)
+        
+        # 设置特征层默认值
+        self.ui.layer1Check.setChecked(False)
+        self.ui.layer2Check.setChecked(True)
+        self.ui.layer3Check.setChecked(True)
+        self.ui.layer4Check.setChecked(False)
 
 
 class NewModelGroupDialog(QDialog):

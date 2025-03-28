@@ -3,8 +3,10 @@ import os
 import shutil
 import random
 import numpy as np
-from PySide6.QtCore import Qt, QRectF, QPointF
-from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon, QFont
+import json
+import threading
+from PySide6.QtCore import Qt, QRectF, QPointF, QRect, QTimer
+from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon, QFont, QFontMetrics, QBrush, QTransform
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
     QFileDialog, QAbstractItemView, QMessageBox, QDialog
@@ -65,7 +67,10 @@ class SampleHandler:
         if self.sample_group != config.SAMPLE_GROUP:
             # 更新样本组
             self.sample_group = config.SAMPLE_GROUP
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            if self.sample_group:
+                self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            else:
+                self.group_path = config.SAMPLE_PATH
             # 重新加载图片
             LoadImages(self.ui).load_with_progress()
             # 更新按钮显示状态
@@ -219,10 +224,10 @@ class SampleHandler:
             )
             # 如果用户确认删除
             if confirm == QMessageBox.Yes:
-                # 获取样本组路径
-                group_path = join_path(config.SAMPLE_PATH, sample_group)
+                # 获取样本组根路径
+                group_root_path = join_path(config.SAMPLE_PATH, sample_group)
                 # 删除样本组文件夹及其内容, 如果不存在则不删除
-                shutil.rmtree(group_path, ignore_errors=True)
+                shutil.rmtree(group_root_path, ignore_errors=True)
                 # 对接 http_server: 删除样本组
                 try:
                     group_id = HttpServer().get_group_id(sample_group)
@@ -269,12 +274,6 @@ class SampleHandler:
         if self.sample_group:
             LoadImages(self.ui).load_with_progress() # 加载图片列表
             self.update_button_visibility() # 更新按钮显示状态
-
-    def image_count(self):
-        """
-        获取图片数量
-        """
-        return len(os.listdir(self.group_path))
 
     def fold(self):
         """
@@ -462,8 +461,7 @@ class SampleHandler:
         print(f"图片路径: {image_path}\n尺寸: {self.ui.pixmap.width()}x{self.ui.pixmap.height()}px")
         # 设置裁剪区域大小
         self.ui.sampleView.setSceneRect(self.ui.pixmap.rect())
-        self.ui.sampleView.fitInView(self.ui.image_item, Qt.KeepAspectRatio)  # Ensure the view fits the image
-        
+        self.ui.sampleView.fitInView(self.ui.image_item, Qt.KeepAspectRatio)  # 确保视图适应图片
         # 重置裁剪框默认按钮状态
         self.restoreButtonState()
             
@@ -1653,6 +1651,32 @@ class SampleHandler:
         
         return result_image, mask
 
+    def is_sample_group_uploaded(self):
+        """
+        检查当前样本组是否已上传到服务器
+        
+        Returns:
+            bool: 样本组是否已上传到服务器
+        """
+        # 首先检查是否存在样本组
+        if not config.SAMPLE_GROUP:
+            return False
+        # 对接 http_server: 检查样本组是否上传
+        try:
+            # 连接服务器，检查样本组是否上传（样本数量是否相等）
+            http_server = HttpServer()
+            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
+            if not group_id:
+                return False
+            # 获取服务器上的样本列表
+            sample_list = http_server.get_sample_list(group_id)
+            # 获取本地样本数量
+            local_count = len(os.listdir(self.group_path))
+            # 样本数量相等或服务器数量更多，则认为已上传
+            return len(sample_list) >= local_count
+        except Exception as e:
+            print(f"检查样本组上传状态失败: {str(e)}")
+            return False
 
 
 class CustomListWidgetItem(QListWidgetItem):
@@ -1672,25 +1696,44 @@ class CustomListWidgetItem(QListWidgetItem):
     def create_item_widget(self, image_name, index):
         # 创建水平布局来包含复选框和图片
         item_layout = QHBoxLayout()
+        item_layout.setContentsMargins(5, 5, 5, 5)  # 减小边距
 
         # 添加序号标签
-        label = QLabel(str(index + 1)) # 序号从1开始
+        label = QLabel(str(index + 1))  # 序号从1开始
+        label.setFixedWidth(20)  # 固定序号宽度
         item_layout.addWidget(label)
 
         # 创建垂直布局用于放置图片和图片名
         image_layout = QVBoxLayout()
+        image_layout.setAlignment(Qt.AlignLeft)  # 确保内容靠左对齐
+        
         # 添加图片
-        pixmap = QPixmap(self.image_path).scaled(100, 100, Qt.KeepAspectRatio) # 设定图片缩放
+        pixmap = QPixmap(self.image_path).scaled(100, 100, Qt.KeepAspectRatio)  # 设定图片缩放
         self.image_label.setPixmap(pixmap)
+        self.image_label.setAlignment(Qt.AlignCenter)  # 图片居中
         image_layout.addWidget(self.image_label)
-        # 添加图片名称
-        name_label = QLabel(image_name)  # 直接显示图片的文件名
+        
+        # 添加图片名称 - 单行显示，中间省略
+        name_label = QLabel(image_name)
+        name_label.setAlignment(Qt.AlignLeft)  # 文本靠左对齐
+        name_label.setFixedWidth(100)  # 固定宽度
+        name_label.setWordWrap(False)  # 禁止文本换行
+        name_label.setToolTip(image_name)  # 鼠标悬停显示完整名称
+        
+        # 设置省略模式 - 中间省略
+        name_label.setTextFormat(Qt.PlainText)  # 使用纯文本格式
+        metrics = QFontMetrics(name_label.font())
+        elidedText = metrics.elidedText(image_name, Qt.ElideMiddle, name_label.width())
+        name_label.setText(elidedText)
+        
         image_layout.addWidget(name_label)
+        
         # 将垂直布局添加到水平布局中
-        item_layout.addLayout(image_layout)
+        item_layout.addLayout(image_layout, 1)  # 使用拉伸因子1，允许布局扩展
 
         # 添加复选框
-        item_layout.addWidget(self.checkbox)
+        self.checkbox.setFixedWidth(20)  # 固定复选框宽度
+        item_layout.addWidget(self.checkbox, 0, Qt.AlignRight)  # 靠右对齐
 
         # 创建一个用于显示该布局的 widget
         item_widget = QWidget()
@@ -1930,11 +1973,11 @@ class SampleGroupDialog(QDialog):
             # 根据文件夹中有无图片，设置图标
             item.setIcon(QIcon("ui/icon/non-empty_folder.svg" if has_images else "ui/icon/empty_folder.svg"))
             self.ui.listWidget.addItem(item)
-        # 如果是当前样本组，选中它
-        if group_name == config.SAMPLE_GROUP:
-            item.setSelected(True)
-            self.ui.listWidget.setCurrentItem(item)
-            self.selected_group = group_name
+            # 如果是当前样本组，选中它
+            if group_name == config.SAMPLE_GROUP:
+                item.setSelected(True)
+                self.ui.listWidget.setCurrentItem(item)
+                self.selected_group = group_name
     
     def get_selected_group(self):
         """

@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>550</width>
+    <height>566</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>550</width>
+    <height>566</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>模型参数编辑</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QDialog {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #f6f8fa, stop:1 #e0e4e8);
+}
+
+QLabel {
+    color: #333333;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 10pt;
+}
+
+QLabel#titleLabel {
+    color: #1e3a8a;
+    font-size: 14pt;
+    font-weight: bold;
+}
+
+QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox {
+    background-color: rgba(255, 255, 255, 200);
+    border: 1px solid #d0d0d0;
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: #333333;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+}
+
+QLineEdit:hover, QTextEdit:hover, QSpinBox:hover, QDoubleSpinBox:hover {
+    border: 1px solid #a0a0a0;
+    background-color: rgba(255, 255, 255, 230);
+}
+
+QLineEdit:focus, QTextEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid #2473bd;
+    background-color: white;
+}
+
+QLineEdit:disabled, QTextEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {
+    background-color: #f0f0f0;
+    color: #888888;
+}
+
+QPushButton {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 6px 16px;
+    color: #333333;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+}
+
+QPushButton:hover {
+    background-color: #f0f7ff;
+    border: 1px solid #2473bd;
+}
+
+QPushButton:pressed {
+    background-color: #e0e0e0;
+    border: 1px solid #006ad1;
+}
+
+QPushButton#saveButton {
+    background-color: #1e88e5;
+    color: white;
+    font-weight: bold;
+}
+
+QPushButton#saveButton:hover {
+    background-color: #0d6efd;
+}
+
+QPushButton#saveButton:pressed {
+    background-color: #0b5ed7;
+}
+
+QGroupBox {
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 11pt;
+    font-weight: bold;
+    color: #1e3a8a;
+    border: 1px solid #d0d0d0;
+    border-radius: 5px;
+    margin-top: 15px;
+    background-color: rgba(255, 255, 255, 80);
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 10px;
+    padding: 0px 5px;
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 200), stop:1 rgba(255, 255, 255, 80));
+}</string>
+  </property>
+  <widget class="QLabel" name="titleLabel">
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>20</y>
+     <width>470</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PatchCore 模型参数设置</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignmentFlag::AlignCenter</set>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="cancelButton">
+   <property name="geometry">
+    <rect>
+     <x>300</x>
+     <y>510</y>
+     <width>100</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>取消(C)</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="saveButton">
+   <property name="geometry">
+    <rect>
+     <x>410</x>
+     <y>510</y>
+     <width>100</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>保存(S)</string>
+   </property>
+  </widget>
+  <widget class="QGroupBox" name="basicGroup">
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>78</y>
+     <width>470</width>
+     <height>191</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>基本参数</string>
+   </property>
+   <widget class="QLabel" name="inputSizeLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>40</y>
+      <width>110</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>输入尺寸：</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="sizeXLabel">
+    <property name="geometry">
+     <rect>
+      <x>200</x>
+      <y>30</y>
+      <width>20</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>×</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="inputHSpin">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>40</y>
+      <width>88</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="minimum">
+     <number>128</number>
+    </property>
+    <property name="maximum">
+     <number>1024</number>
+    </property>
+    <property name="value">
+     <number>256</number>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="inputWSpin">
+    <property name="geometry">
+     <rect>
+      <x>250</x>
+      <y>40</y>
+      <width>88</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="minimum">
+     <number>128</number>
+    </property>
+    <property name="maximum">
+     <number>1024</number>
+    </property>
+    <property name="value">
+     <number>256</number>
+    </property>
+   </widget>
+   <widget class="QLabel" name="patchSizeLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>90</y>
+      <width>110</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>补丁大小：</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="patchSizeSpin">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>90</y>
+      <width>88</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="minimum">
+     <number>1</number>
+    </property>
+    <property name="maximum">
+     <number>32</number>
+    </property>
+    <property name="value">
+     <number>5</number>
+    </property>
+   </widget>
+   <widget class="QLabel" name="endAccLabel">
+    <property name="geometry">
+     <rect>
+      <x>50</x>
+      <y>140</y>
+      <width>80</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>结束精度：</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QDoubleSpinBox" name="endAccSpin">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>140</y>
+      <width>88</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="decimals">
+     <number>2</number>
+    </property>
+    <property name="minimum">
+     <double>0.800000000000000</double>
+    </property>
+    <property name="maximum">
+     <double>0.990000000000000</double>
+    </property>
+    <property name="singleStep">
+     <double>0.010000000000000</double>
+    </property>
+    <property name="value">
+     <double>0.920000000000000</double>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="featuresGroup">
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>300</y>
+     <width>470</width>
+     <height>180</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>特征提取参数</string>
+   </property>
+   <widget class="QLabel" name="embedDimLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>40</y>
+      <width>110</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>嵌入维度：</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="embedDimSpin">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>40</y>
+      <width>100</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="minimum">
+     <number>128</number>
+    </property>
+    <property name="maximum">
+     <number>2048</number>
+    </property>
+    <property name="singleStep">
+     <number>128</number>
+    </property>
+    <property name="value">
+     <number>512</number>
+    </property>
+   </widget>
+   <widget class="QLabel" name="layersLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>90</y>
+      <width>110</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>特征层：</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="layer1Check">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>90</y>
+      <width>80</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>layer1</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="layer2Check">
+    <property name="geometry">
+     <rect>
+      <x>220</x>
+      <y>90</y>
+      <width>80</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>layer2</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="layer3Check">
+    <property name="geometry">
+     <rect>
+      <x>300</x>
+      <y>90</y>
+      <width>80</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>layer3</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="layer4Check">
+    <property name="geometry">
+     <rect>
+      <x>380</x>
+      <y>90</y>
+      <width>80</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>layer4</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="layerInfoLabel">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>130</y>
+      <width>430</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: #666666;
+font-size: 9pt;</string>
+    </property>
+    <property name="text">
+     <string>提示：layer1为浅层特征，layer4为深层特征，请至少选择1个特征层</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QPushButton" name="resetButton">
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>510</y>
+     <width>100</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>重置(R)</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

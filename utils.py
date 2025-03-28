@@ -261,6 +261,17 @@ def check_sample_group():
     if not config.SAMPLE_GROUP:
         show_message_box("错误", "请先创建或导入样本组！", QMessageBox.Critical)
         return False
+    print(f"样本组存在: {config.SAMPLE_GROUP}")
+    return True
+
+def check_model_group():
+    """
+    检查是否存在模型组
+    """
+    if not config.MODEL_GROUP:
+        show_message_box("错误", "请先创建或导入模型组！", QMessageBox.Critical)
+        return False
+    print(f"模型组存在: {config.MODEL_GROUP}")
     return True
 
 

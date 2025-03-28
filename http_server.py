@@ -19,7 +19,7 @@ class HttpServer:
                 "input_h": 输入高度,
                 "input_w": 输入宽度,
                 "end_acc": 结束精度,
-                "layers": 层数列表_形如[layer1, ...],
+                "layers": 层数列表_形如'[layer1, ...]'字符串,
                 "patchsize": 补丁大小,
                 "embed_dimension": 嵌入维度
             }
@@ -60,7 +60,23 @@ class HttpServer:
         except Exception as e:
             print(f"删除模型失败: {str(e)}")
             raise
-    
+
+    def update_model_params(self, model_id, params):
+        """
+        更新模型参数
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/update_model_params/{model_id}"
+        try:
+            response = requests.post(url, json=params)
+            if response.status_code == 200:
+                print(f"成功更新模型 {model_id} 的参数: {params}")
+                return response.json()
+            else:
+                raise Exception(f"更新模型参数失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"更新模型参数失败: {str(e)}")
+            raise
+
     def list_model(self):
         """
         获取模型列表
@@ -90,6 +106,44 @@ class HttpServer:
             print(f"获取模型列表失败: {str(e)}")
             raise
     
+    def get_model_id(self, model_name):
+        """
+        根据模型名称获取模型ID
+        """
+        model_list = self.list_model()
+        for model in model_list:
+            if model.get("name") == model_name:
+                print(f"模型名称匹配成功: {model_name} -> {model.get('id')}")
+                return model.get("id")
+        print(f"http_server无该模型: {model_list}")
+        return None    
+    
+    def get_model_params(self, model_name):
+        """
+        根据模型名称获取模型参数
+        """
+        model_list = self.list_model()
+        for model in model_list:
+            if model.get("name") == model_name:
+                # params = model 除去 name 和 id 剩下的部分
+                params = {k: v for k, v in model.items() if k != "name" and k != "id"}
+                print(f"获取模型参数: {params}")
+                return params
+        print(f"http_server无该模型: {model_list}")
+        return None
+    
+    def get_model_status(self, model_name):
+        """
+        根据模型名称获取模型状态：0-新建的，1-训练中，2-训练完成，3-推理中
+        """
+        model_list = self.list_model()
+        for model in model_list:
+            if model.get("name") == model_name:
+                print(f"获取模型状态: {model_name} -> {model.get('status')}")
+                return model.get("status")
+        print(f"http_server无该模型: {model_list}")
+        return None
+
     def train_info(self, model_id):
         """
         获取模型训练完成后的图像列表
@@ -345,17 +399,17 @@ class HttpServer:
             
     def save_downloaded_sample(self, filename, save_path):
         """
-        下载样本并保存到指定路径
+        下载样本并保存到指定路径（去掉前缀）
         
         Args:
-            filename: 文件名
+            filename: 文件名（有前缀，用-连接）
             save_path: 保存路径
             
         Returns:
             保存文件的完整路径
         """
         content = self.download_sample(filename)
-        full_path = join_path(save_path, filename)
+        full_path = join_path(save_path, filename.split("-")[-1]) # 去掉前缀
         # 确保目录存在，写入
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, 'wb') as f:
@@ -724,25 +778,166 @@ class UploadSampleGroup_HTTP:
             # 更新进度条
             progress = int((index + 1) / total_files * 100)
             progressDialog.setValue(progress)
+
             
+
+class PatchCoreParamMapper_Http:
+    """
+    将简化的三个参数（模型精度、缺陷大小和训练速度）映射到HttpServer所需的专业PatchCore训练参数
+    """
+    def __init__(self):
+        # 精度选项
+        self.accuracy_options = {
+            "低精度": {
+                "end_acc": 0.85,
+                "embed_dimension": 256,
+                "layers": ["layer2"]
+            },
+            "中等精度": {
+                "end_acc": 0.92,
+                "embed_dimension": 512,
+                "layers": ["layer2", "layer3"]
+            },
+            "高精度": {
+                "end_acc": 0.98,
+                "embed_dimension": 1024,
+                "layers": ["layer1", "layer2", "layer3"]
+            }
+        }
+        
+        # 缺陷大小选项
+        self.defect_size_options = {
+            "小缺陷": {
+                "patchsize": 3,
+                "input_h": 224,
+                "input_w": 224
+            },
+            "中等缺陷": {
+                "patchsize": 5,
+                "input_h": 256,
+                "input_w": 256
+            },
+            "大缺陷": {
+                "patchsize": 9,
+                "input_h": 320,
+                "input_w": 320
+            }
+        }
+        
+        # 训练速度选项 - 影响多个参数以全面控制训练性能和质量
+        self.training_speed_options = {
+            "快速": {
+                # 低精度层
+                "layers_factor": -1,  # 减少使用的层数
+                # 减小嵌入维度以加快训练
+                "embed_dimension_factor": 0.7,
+                # 降低结束精度要求
+                "end_acc_delta": -0.03
+            },
+            "均衡": {
+                # 不修改层数
+                "layers_factor": 0,
+                # 不修改嵌入维度
+                "embed_dimension_factor": 1.0,
+                # 不修改结束精度
+                "end_acc_delta": 0.0
+            },
+            "慢速高质量": {
+                # 增加使用的层数
+                "layers_factor": 1,
+                # 增大嵌入维度以提高质量
+                "embed_dimension_factor": 1.3,
+                # 提高结束精度要求
+                "end_acc_delta": 0.02
+            }
+        }
+    
+    def get_params(self, accuracy, defect_size, training_speed):
+        """
+        根据三个简化选项获取完整的HttpServer所需PatchCore参数
+        
+        Args:
+            accuracy: 精度选项，可选值为"低精度"、"中等精度"、"高精度"
+            defect_size: 缺陷大小选项，可选值为"小缺陷"、"中等缺陷"、"大缺陷"
+            training_speed: 训练速度选项，可选值为"快速"、"均衡"、"慢速高质量"
+            
+        Returns:
+            包含六个必要参数 params：{
+                "input_h": 输入高度,
+                "input_w": 输入宽度,
+                "end_acc": 结束精度,
+                "layers": 使用的层数,
+                "patchsize": 补丁大小,
+                "embed_dimension": 嵌入维度
+            }
+        """
+        # 获取基础参数
+        params = {}
+        params.update(self.accuracy_options[accuracy])
+        params.update(self.defect_size_options[defect_size])
+        
+        # 应用训练速度对多个参数的影响
+        speed_params = self.training_speed_options[training_speed]
+        
+        # 1. 修改嵌入维度
+        params["embed_dimension"] = int(params["embed_dimension"] * speed_params["embed_dimension_factor"])
+        
+        # 2. 修改层数 - 基于layers_factor
+        layers_factor = speed_params["layers_factor"]
+        base_layers = params["layers"]
+        if layers_factor < 0 and len(base_layers) > 1:
+            # 减少层数（保留至少一层）
+            params["layers"] = base_layers[-min(len(base_layers), abs(layers_factor)+1):]
+        elif layers_factor > 0:
+            # 增加层数，可能添加额外的层
+            available_layers = ["layer1", "layer2", "layer3", "layer4"]
+            # 找出当前未使用的层
+            unused_layers = [l for l in available_layers if l not in base_layers]
+            # 按顺序添加未使用的层，最多添加layers_factor个
+            for i in range(min(layers_factor, len(unused_layers))):
+                if unused_layers[i] not in params["layers"]:
+                    params["layers"] = [unused_layers[i]] + params["layers"]
+        
+        # 3. 修改结束精度
+        params["end_acc"] = min(0.99, max(0.8, params["end_acc"] + speed_params["end_acc_delta"]))
+        
+        # 确保嵌入维度在合理范围内
+        params["embed_dimension"] = max(128, min(2048, params["embed_dimension"]))
+        
+        # 将layers列表转换为字符串化的列表表示形式
+        if isinstance(params["layers"], list):
+            # 格式化为 "['layer1', 'layer2', 'layer3']" 形式
+            params["layers"] = str(params["layers"])
+            
+        # 返回的字典包含必要的六个参数
+        print(f"训练参数: {params}")
+        return params
+    
+    def get_all_options(self):
+        """获取所有可用的选项"""
+        return {
+            "accuracy": list(self.accuracy_options.keys()),
+            "defect_size": list(self.defect_size_options.keys()),
+            "training_speed": list(self.training_speed_options.keys())
+        }
 
 if __name__ == "__main__":
     # test_sample_api()
     # test_model_api()
 
     server = HttpServer()
-    # print(server.list_model())
+    print(server.list_model())
     # group_name = f"测试组-{int(time.time())}"
     # group_id = server.add_group(group_name)
     # print(f"创建组成功: 名称={group_name}, ID={group_id}")
 
-    server.delete_group(2)
-    # 2. 获取组列表
-    groups = server.get_group_list()
-    print(f"组列表: {groups}")
+    # server.delete_group(2)
+    # # 2. 获取组列表
+    # groups = server.get_group_list()
+    # print(f"组列表: {groups}")
 
-    samples = server.get_sample_list(2)
-    print(f"样本列表: {samples}")
+    # samples = server.get_sample_list(1)
+    # print(f"样本列表: {samples}")
     
     # # 下载样本组
     # download_dir = "B:/Development/GraduationDesign/app/test/downloads"

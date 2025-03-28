@@ -63,31 +63,39 @@ class MainWindow(QMainWindow):
             self.model_handler.update_sample_group()
     def switch_to_page_1(self):
         self.ui.tabWidget.setCurrentIndex(1)
-    def switch_to_page_2(self):
-        # 检查是否有样本组
-        if not check_sample_group():
-            return
-        # 对接 http_server: 检查样本组是否上传到服务器
-        try:
-            # 连接服务器，检查样本组是否上传（样本数量是否相等）
-            http_server = HttpServer()
-            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
-            sample_list = http_server.get_sample_list(group_id)
-            if len(sample_list) < self.sample_handler.image_count():
-                result = show_message_box("提示", "样本组未上传到服务器，是否立即上传？", 
-                                         QMessageBox.Question, self.ui, 
-                                         buttons=QMessageBox.Yes | QMessageBox.No)
-                # 选择是否上传样本组
-                if result == QMessageBox.Yes:
-                    self.sample_handler.upload_sample_group()
-                else:
-                    return
-        except Exception as e:
-            show_message_box("错误", f"连接服务器失败：{str(e)}", QMessageBox.Critical, self.ui)
+    def switch_to_page_2(self):            
+        # 检查样本组是否上传到服务器
+        if not self.sample_handler.is_sample_group_uploaded():
+            # 提示用户是否要上传样本组
+            confirm = QMessageBox.question(
+                self.ui,
+                "上传提示",
+                "样本组未上传到服务器，是否立即上传？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            # 选择是否上传样本组
+            if confirm == QMessageBox.Yes:
+                self.sample_handler.upload_sample_group()
             return
         # 验证通过，跳转到下一页
         self.ui.tabWidget.setCurrentIndex(2)
     def switch_to_page_3(self):
+        # 检查是否训练过模型
+        if not self.model_handler.is_model_trained():
+            # 提示用户是否要训练模型
+            confirm = QMessageBox.question(
+                self.ui,
+                "训练提示",
+                "当前模型尚未训练，是否立即训练模型？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            # 如果用户选择训练
+            if confirm == QMessageBox.Yes:
+                self.model_handler.train_model()
+            return
+        # 验证通过，跳转到下一页
         self.ui.tabWidget.setCurrentIndex(3)
     # def on_tab_changed(self, index):
         # if index < self.cur_index:

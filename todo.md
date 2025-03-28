@@ -2,14 +2,15 @@
 
 1. add_model(model) // 添加模型
 2. delete_model(model_id) // 删除模型
-3. list_model() // 获取模型列表
-4. train_info(model_id) // 获取模型已训练的图像列表(由此可知训练进度)
-5. infer_info(model_id) // 获取模型已推理的图像列表(由此可知推理进度)
-6. train_process(model_id) // 获取模型训练实时信息
-7. infer_process(model_id) // 获取模型推理实时信息
-8. train_model(model_id, group_id) // 训练模型
-9. finish_model(model_id) // 结束训练
-10. infer_model(model_id, group_id) // 推理模型
+3. update_model_params(id, params) // 更新模型参数
+4. list_model() // 获取模型列表
+5. train_info(model_id) // 获取模型已训练的图像列表(由此可知训练进度)
+6. infer_info(model_id) // 获取模型已推理的图像列表(由此可知推理进度)
+7. train_process(model_id) // 获取模型训练实时信息
+8. infer_process(model_id) // 获取模型推理实时信息
+9. train_model(model_id, group_id) // 训练模型
+10. finish_model(model_id) // 结束训练
+11. infer_model(model_id, group_id) // 推理模型
 
 ```python
 # 增删查模型
