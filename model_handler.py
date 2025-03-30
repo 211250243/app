@@ -1,11 +1,15 @@
 import os
 import shutil
 import random
+import threading
+import time
+from datetime import datetime
 
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QWidget, QDialog, QMessageBox, QFileDialog, QVBoxLayout, QTreeWidgetItem, QListWidgetItem
-from PySide6.QtGui import QIcon
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QDialog, QMessageBox, QFileDialog, QVBoxLayout, QTreeWidgetItem, QListWidgetItem, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QRadioButton
+from PySide6.QtGui import QIcon, QPainter
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
 
 import config
 from http_server import HttpServer, PatchCoreParamMapper_Http, UploadSampleGroup_HTTP
@@ -48,7 +52,7 @@ class ModelHandler:
         """
         上传样本组到服务器
         """
-        UploadSampleGroup_HTTP(self.ui).run()
+        UploadSampleGroup_HTTP(self.ui, config.SAMPLE_GROUP).run()
 
     def import_dir(self):
         """
@@ -59,7 +63,7 @@ class ModelHandler:
             return
         folder = QFileDialog.getExistingDirectory(self.ui, "选择图片文件夹")
         if folder:
-            sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)
+            sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP)
             for file_name in os.listdir(folder):
                 if is_image(file_name):
                     file_path = join_path(folder, file_name)
@@ -82,7 +86,7 @@ class ModelHandler:
         # getOpenFileNames 返回一个元组，包含文件路径列表和文件类型过滤器。
         files, _ = QFileDialog.getOpenFileNames(self.ui, "选择图片文件", "", "图片文件 (*.png *.jpg *.jpeg)")
         if files:
-            sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)
+            sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP)
             for file_path in files:
                 copy_image(file_path, sample_group_path)
                 # 对接 http_server: 上传样本到服务器
@@ -104,7 +108,7 @@ class ModelHandler:
             # 更新数据
             config.SAMPLE_GROUP = dialog.selected_group
             update_metadata('sample_group', dialog.selected_group)
-            sample_group_path = join_path(config.SAMPLE_PATH, dialog.selected_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            sample_group_path = join_path(config.SAMPLE_PATH, dialog.selected_group)
             if not os.listdir(sample_group_path):
                 show_message_box("警告", "该样本组为空，建议更换！", QMessageBox.Warning)
             else:
@@ -118,29 +122,19 @@ class ModelHandler:
         self.ui.deleteModelButton.clicked.connect(self.delete_model_group)
         # 获取模型组并初始化路径
         model_group = config.PROJECT_METADATA.get('model_group')
-        group_path = config.MODEL_PATH  # 默认路径
-        os.makedirs(group_path, exist_ok=True) # 确保路径存在
-        if model_group:
-            # 尝试构建模型组路径
-            tmp_path = join_path(group_path, model_group)
-            if os.path.exists(tmp_path):
-                group_path = tmp_path
-            else:
-                # 路径无效时清除模型组配置
-                model_group = None
-                update_metadata('model_group', None)
+        os.makedirs(config.MODEL_PATH, exist_ok=True) # 确保路径存在
+        if model_group and not os.path.exists(join_path(config.MODEL_PATH, model_group)):
+            # 路径无效时清除模型组配置
+            model_group = None
+            update_metadata('model_group', None)
         # 同步配置和实例变量
         config.MODEL_GROUP = model_group
-        self.group_path = group_path
+        self.update_model_group()
 
     def update_model_group(self):
         """
         更新模型组路径和模型组名称
         """
-        if config.MODEL_GROUP:
-            self.group_path = join_path(config.MODEL_PATH, config.MODEL_GROUP)
-        else:
-            self.group_path = config.MODEL_PATH
         self.ui.curModelEdit.setText(config.MODEL_GROUP)
 
     def new_model_group(self):
@@ -336,8 +330,12 @@ class ModelHandler:
                 return
             # 启动训练
             http_server.train_model(model_id, group_id)
+            
+            # 弹出训练进度对话框
+            progress_dialog = TrainingProgressDialog(self.ui, model_id, config.MODEL_GROUP)
+            progress_dialog.show()            
         except Exception as e:
-            show_message_box("错误", f"训练失败: {str(e)}", QMessageBox.Critical, self.ui)
+            show_message_box("错误", f"训练模型失败: {str(e)}", QMessageBox.Critical, self.ui)
 
     def view_params(self):
         """
@@ -370,7 +368,10 @@ class ModelHandler:
                 model_id = http_server.get_model_id(config.MODEL_GROUP)
                 params = dialog.params
                 print(f"更新模型参数: {model_id} -> {params}")
-                # http_server.update_model_params(model_id, params)
+                http_server.update_model(model_id, {
+                    "name": config.MODEL_GROUP,
+                    **params
+                })
                 show_message_box("成功", "模型参数已更新！", QMessageBox.Information, self.ui)
             except Exception as e:
                 show_message_box("错误", f"更新参数失败: {str(e)}", QMessageBox.Critical, self.ui)
@@ -540,6 +541,35 @@ class ModelParamsDialog(QDialog):
         self.ui.layer3Check.setEnabled(enabled)
         self.ui.layer4Check.setEnabled(enabled)
         
+    def get_params(self):
+        """获取界面上的参数值"""
+        # 获取所有特征层
+        layers = []
+        if self.ui.layer1Check.isChecked():
+            layers.append("layer1")
+        if self.ui.layer2Check.isChecked():
+            layers.append("layer2")
+        if self.ui.layer3Check.isChecked():
+            layers.append("layer3")
+        if self.ui.layer4Check.isChecked():
+            layers.append("layer4")
+            
+        # 至少选择一个特征层
+        if not layers:
+            layers = ["layer2"]
+            
+        # 构造参数字典
+        params = {
+            "input_h": self.ui.inputHSpin.value(),
+            "input_w": self.ui.inputWSpin.value(),
+            "patchsize": self.ui.patchSizeSpin.value(),
+            "end_acc": self.ui.endAccSpin.value(),
+            "embed_dimension": self.ui.embedDimSpin.value(),
+            "layers": str(layers).replace('"', "'")
+        }
+        
+        return params
+    
     def reset_params(self):
         """重置参数为默认值"""
         # 设置基本参数默认值
@@ -665,3 +695,308 @@ class ModelGroupDialog(QDialog):
             super().accept()
         else:
             show_message_box("提示", "请选择一个模型组", QMessageBox.Information, self)
+
+class TrainingProgressDialog(QDialog):
+    """
+    训练进度可视化对话框，用于实时显示模型训练信息
+    """
+    def __init__(self, parent=None, model_id=None, model_name=None):
+        super().__init__(parent)
+        self.setWindowTitle("模型训练进度")
+        self.resize(800, 500)
+        self.model_id = model_id
+        self.model_name = model_name
+        self.http_server = HttpServer()
+        self.stopped = False
+        
+        # 创建布局
+        main_layout = QVBoxLayout()
+        
+        # 添加标题
+        title_label = QLabel(f"模型 [{model_name}] 训练进度")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title_label)
+        
+        # 创建图表
+        self.create_chart()
+        main_layout.addWidget(self.chart_view)
+        
+        # 创建信息展示区域
+        info_layout = QHBoxLayout()
+        
+        # 左侧信息
+        left_info = QVBoxLayout()
+        self.epoch_label = QLabel("当前轮数: 0")
+        self.loss_label = QLabel("损失值: 0.0")
+        self.p_true_label = QLabel("真实样本概率: 0.0")
+        self.p_fake_label = QLabel("生成样本概率: 0.0")
+        self.distance_loss_label = QLabel("距离损失: 0.0")
+        
+        left_info.addWidget(self.epoch_label)
+        left_info.addWidget(self.loss_label)
+        left_info.addWidget(self.p_true_label)
+        left_info.addWidget(self.p_fake_label)
+        left_info.addWidget(self.distance_loss_label)
+        
+        # 右侧信息
+        right_info = QVBoxLayout()
+        self.begin_time_label = QLabel("开始时间: --")
+        self.current_time_label = QLabel("当前时间: --")
+        self.elapsed_time_label = QLabel("已运行时间: 0分0秒")
+        self.status_label = QLabel("状态: 训练中")
+        self.status_label.setStyleSheet("color: blue; font-weight: bold;")
+        
+        right_info.addWidget(self.begin_time_label)
+        right_info.addWidget(self.current_time_label)
+        right_info.addWidget(self.elapsed_time_label)
+        right_info.addWidget(self.status_label)
+        
+        # 添加按钮
+        button_layout = QHBoxLayout()
+        self.stop_button = QPushButton("停止训练")
+        self.stop_button.clicked.connect(self.stop_training)
+        button_layout.addStretch()
+        button_layout.addWidget(self.stop_button)
+        button_layout.addStretch()
+        
+        # 将所有布局添加到主布局
+        info_layout.addLayout(left_info)
+        info_layout.addLayout(right_info)
+        main_layout.addLayout(info_layout)
+        main_layout.addLayout(button_layout)
+        
+        self.setLayout(main_layout)
+        
+        # 启动定时器，每秒更新一次
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_data)
+        self.timer.start(1000)
+        
+        # 记录初始时间
+        self.start_time = time.time()
+        
+    def create_chart(self):
+        """创建图表"""
+        # 创建图表和视图
+        self.chart = QChart()
+        self.chart.setTitle("训练损失与概率")
+        self.chart_view = QChartView(self.chart)
+        self.chart_view.setRenderHint(QPainter.Antialiasing)
+        
+        # 创建数据系列
+        self.loss_series = QLineSeries()
+        self.loss_series.setName("损失值")
+        
+        self.p_true_series = QLineSeries()
+        self.p_true_series.setName("真实样本概率")
+        
+        self.p_fake_series = QLineSeries()
+        self.p_fake_series.setName("生成样本概率")
+        
+        self.distance_loss_series = QLineSeries()
+        self.distance_loss_series.setName("距离损失")
+        
+        # 添加系列到图表
+        self.chart.addSeries(self.loss_series)
+        self.chart.addSeries(self.p_true_series)
+        self.chart.addSeries(self.p_fake_series)
+        self.chart.addSeries(self.distance_loss_series)
+        
+        # 创建坐标轴
+        self.axis_x = QValueAxis()
+        self.axis_x.setTitleText("训练轮数")
+        self.axis_x.setRange(0, 10)  # 初始显示10轮
+        self.axis_x.setTickCount(11)
+        self.axis_x.setLabelFormat("%d")  # 整数格式
+        self.axis_x.setLabelsFont(self.font())
+        
+        self.axis_y = QValueAxis()
+        self.axis_y.setTitleText("损失值和概率")  # 更明确的标题
+        self.axis_y.setRange(0, 1)
+        self.axis_y.setTickCount(6)  # 减少刻度数量，避免拥挤
+        self.axis_y.setLabelFormat("%.3f")  # 三位小数格式
+        self.axis_y.setLabelsFont(self.font())
+        self.axis_y.setTitleFont(self.font())
+        
+        # 将坐标轴添加到图表
+        self.chart.addAxis(self.axis_x, Qt.AlignBottom)
+        self.chart.addAxis(self.axis_y, Qt.AlignLeft)
+        
+        # 将系列附加到坐标轴
+        self.loss_series.attachAxis(self.axis_x)
+        self.loss_series.attachAxis(self.axis_y)
+        
+        self.p_true_series.attachAxis(self.axis_x)
+        self.p_true_series.attachAxis(self.axis_y)
+        
+        self.p_fake_series.attachAxis(self.axis_x)
+        self.p_fake_series.attachAxis(self.axis_y)
+        
+        self.distance_loss_series.attachAxis(self.axis_x)
+        self.distance_loss_series.attachAxis(self.axis_y)
+        
+        # 调整图表外观
+        self.chart.setBackgroundVisible(False)
+        self.chart.legend().setVisible(True)
+        self.chart.legend().setAlignment(Qt.AlignBottom)
+        self.chart_view.setMinimumHeight(300)
+    
+    def update_data(self):
+        """获取并更新训练数据"""
+        if self.stopped:
+            return
+            
+        try:
+            # 获取训练进度信息
+            train_process = self.http_server.train_process(self.model_id)
+            
+            # 更新图表数据
+            epochs = train_process.get("epoch", [0])
+            losses = train_process.get("loss", [])
+            p_trues = train_process.get("p_true", [0])
+            p_fakes = train_process.get("p_fake", [0])
+            distance_losses = train_process.get("distance_loss", [])
+            begin_time = train_process.get("begin_time", "")
+            end_time = train_process.get("end_time", "")
+            
+            # 清除当前所有数据点
+            self.loss_series.clear()
+            self.p_true_series.clear()
+            self.p_fake_series.clear()
+            self.distance_loss_series.clear()
+            
+            # 添加所有数据点
+            for i, epoch in enumerate(epochs):
+                # p_true和p_fake数据
+                if i < len(p_trues):
+                    self.p_true_series.append(epoch, p_trues[i])
+                if i < len(p_fakes):
+                    self.p_fake_series.append(epoch, p_fakes[i])
+                
+                # loss数据（如果存在）
+                if i < len(losses):
+                    self.loss_series.append(epoch, losses[i])
+                
+                # distance_loss数据（如果存在）
+                if i < len(distance_losses):
+                    self.distance_loss_series.append(epoch, distance_losses[i])
+            
+            # 获取最新的数据点用于显示
+            latest_epoch = epochs[-1] if epochs else 0
+            latest_loss = losses[-1] if losses else 0.0
+            latest_p_true = p_trues[-1] if p_trues else 0.0
+            latest_p_fake = p_fakes[-1] if p_fakes else 0.0
+            latest_distance_loss = distance_losses[-1] if distance_losses else 0.0
+            
+            # 调整X轴范围，始终显示最新的20个点
+            if latest_epoch > 10:
+                self.axis_x.setRange(max(0, latest_epoch - 20), latest_epoch)
+            
+            # 调整Y轴范围
+            all_values = p_trues + p_fakes
+            if losses:
+                all_values += losses
+            if distance_losses:
+                all_values += distance_losses
+                
+            max_y = max(all_values + [0.1]) if all_values else 0.1
+            self.axis_y.setRange(0, max_y * 1.1)  # 留出10%的空间
+            
+            # 确保Y轴有足够的刻度以显示数据
+            if max_y > 0.5:
+                self.axis_y.setTickCount(6)  # 减少刻度数
+            else:
+                self.axis_y.setTickCount(6)  # 减少刻度数
+                
+            # 根据数值范围调整小数点格式
+            if max_y < 0.01:
+                self.axis_y.setLabelFormat("%.4f")  # 更多小数位
+            elif max_y < 0.1:
+                self.axis_y.setLabelFormat("%.3f")
+            else:
+                self.axis_y.setLabelFormat("%.2f")
+            
+            # 更新标签信息
+            self.epoch_label.setText(f"当前轮数: {latest_epoch}")
+            self.loss_label.setText(f"损失值: {latest_loss:.4f}")
+            self.p_true_label.setText(f"真实样本概率: {latest_p_true:.4f}")
+            self.p_fake_label.setText(f"生成样本概率: {latest_p_fake:.4f}")
+            self.distance_loss_label.setText(f"距离损失: {latest_distance_loss:.4f}")
+            
+            # 更新时间信息
+            if begin_time:
+                if isinstance(begin_time, (int, float)):
+                    # 如果是时间戳，转换为可读格式
+                    begin_time_str = datetime.fromtimestamp(begin_time).strftime("%Y-%m-%d %H:%M:%S")
+                    self.begin_time_label.setText(f"开始时间: {begin_time_str}")
+                else:
+                    self.begin_time_label.setText(f"开始时间: {begin_time}")
+            
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.current_time_label.setText(f"当前时间: {current_time}")
+            
+            # 计算已经运行的时间
+            elapsed_seconds = int(time.time() - self.start_time)
+            minutes, seconds = divmod(elapsed_seconds, 60)
+            hours, minutes = divmod(minutes, 60)
+            if hours > 0:
+                self.elapsed_time_label.setText(f"已运行时间: {hours}小时{minutes}分{seconds}秒")
+            else:
+                self.elapsed_time_label.setText(f"已运行时间: {minutes}分{seconds}秒")
+            
+            # 检查训练是否已经结束
+            if end_time:
+                if isinstance(end_time, (int, float)):
+                    # 如果是时间戳，转换为可读格式
+                    end_time_str = datetime.fromtimestamp(end_time).strftime("%Y-%m-%d %H:%M:%S")
+                    self.status_label.setText(f"状态: 训练已完成 (结束于 {end_time_str})")
+                else:
+                    self.status_label.setText("状态: 训练已完成")
+                    
+                self.status_label.setStyleSheet("color: green; font-weight: bold;")
+                self.stop_button.setEnabled(False)
+                
+            # 检查模型状态
+            try:
+                model_status = self.http_server.get_model_status(self.model_name)
+                if model_status != 1:  # 如果不是训练中状态
+                    if model_status == 2:  # 训练完成
+                        self.status_label.setText("状态: 训练已完成")
+                        self.status_label.setStyleSheet("color: green; font-weight: bold;")
+                    else:
+                        self.status_label.setText(f"状态: 训练中断 (状态码: {model_status})")
+                        self.status_label.setStyleSheet("color: red; font-weight: bold;")
+                    self.stop_button.setEnabled(False)
+                    self.timer.stop()
+            except Exception as e:
+                print(f"获取模型状态失败: {str(e)}")
+                
+        except Exception as e:
+            print(f"更新训练数据失败: {str(e)}")
+            # 如果连续多次失败，可以考虑停止更新
+    
+    def stop_training(self):
+        """停止训练"""
+        confirm = QMessageBox.question(
+            self,
+            "确认停止",
+            "确定要停止训练吗？停止后无法继续。",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if confirm == QMessageBox.Yes:
+            try:
+                # 停止训练
+                self.http_server.finish_model(self.model_id)
+                self.status_label.setText("状态: 已手动停止训练")
+                self.status_label.setStyleSheet("color: orange; font-weight: bold;")
+                self.stop_button.setEnabled(False)
+                self.stopped = True
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"停止训练失败: {str(e)}")
+    
+    def closeEvent(self, event):
+        """关闭窗口事件"""
+        self.timer.stop()
+        event.accept()

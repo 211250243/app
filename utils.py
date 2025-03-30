@@ -264,6 +264,16 @@ def check_sample_group():
     print(f"样本组存在: {config.SAMPLE_GROUP}")
     return True
 
+def check_detect_sample_group():
+    """
+    检查是否存在检测样本组
+    """
+    if not config.DETECT_SAMPLE_GROUP:
+        show_message_box("错误", "请先创建或导入检测样本组！", QMessageBox.Critical)
+        return False
+    print(f"检测样本组存在: {config.DETECT_SAMPLE_GROUP}")
+    return True
+    
 def check_model_group():
     """
     检查是否存在模型组

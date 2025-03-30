@@ -1,6 +1,9 @@
 import os
 import paramiko
 from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt
 
 import config
 from utils import show_message_box, ProgressDialog, is_image, join_path
@@ -338,3 +341,81 @@ if __name__ == "__main__":
 
     # Close the connection
     server.close_connection()
+
+class DefectSamples:
+    """
+    处理样本检测的类
+    """
+    def __init__(self, ui):
+        self.ui = ui
+        self.processed_files = set()
+        self.server = None
+        self.result_timer = None
+
+    def defect_samples(self):
+        """启动检测样本的过程"""
+        self.server = SSHServer()
+        try:
+            self.server.connect_to_server()
+        except Exception as e:
+            show_message_box("连接失败", str(e), QMessageBox.Critical)
+            return
+            
+        self.result_timer = QTimer()
+        self.result_timer.timeout.connect(self.fetch_new_results)
+        self.result_timer.start(1000)  # Check every second
+        # 更新UI状态
+        self.ui.startDetectButton.setEnabled(False)
+        self.ui.infoLabel.setText("检测中...")
+
+    def fetch_new_results(self):
+        """获取检测结果"""
+        try:
+            result_dir = config.SERVER_DOWNLOAD_PATH
+            files = self.server.listdir(result_dir)
+
+            # 过滤新的图片文件
+            new_files = [f for f in files if f not in self.processed_files
+                        and f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+
+            if new_files:
+                # 获取最新的文件：按时间排序，返回修改时间最晚的
+                newest_file = max(new_files, key=lambda x:
+                self.server.stat(join_path(result_dir, x)).st_mtime)
+
+                # 下载最新的文件
+                local_path = join_path(config.PROJECT_METADATA['project_path'], 'results', newest_file)
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                self.server.download_file(
+                    join_path(result_dir, newest_file),
+                    local_path
+                )
+
+                # 显示检测结果
+                self.display_result(local_path)
+                self.processed_files.add(newest_file)
+        except Exception as e:
+            print(f"获取检测结果失败: {str(e)}")
+
+    def display_result(self, image_path: str):
+        """显示检测结果图片"""
+        if os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            scaled_pixmap = pixmap.scaled(
+                self.ui.resultLabel.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.ui.resultLabel.setPixmap(scaled_pixmap)
+            self.ui.resultLabel.setToolTip(f"检测结果: {os.path.basename(image_path)}")
+
+    def disconnect_from_server(self):
+        """断开服务器连接"""
+        # 停止定时器，并断开服务器连接
+        if hasattr(self, 'result_timer') and self.result_timer.isActive():
+            self.result_timer.stop()
+        if hasattr(self, 'server') and self.server:
+            self.server.close_connection()
+        # 恢复UI状态
+        self.ui.startDetectButton.setEnabled(True)
+        self.ui.infoLabel.setText("检测完成")

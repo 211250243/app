@@ -15,7 +15,7 @@ from PySide6.QtUiTools import QUiLoader
 import config
 from http_server import HttpServer, UploadSampleGroup_HTTP
 from ssh_server import SSHServer, UploadSampleGroup_SSH
-from utils import LoadingAnimation, copy_image, is_image, join_path, ProgressDialog, show_message_box, update_metadata
+from utils import LoadingAnimation, check_sample_group, copy_image, is_image, join_path, ProgressDialog, show_message_box, update_metadata
 
 
 
@@ -49,7 +49,7 @@ class SampleHandler:
         os.makedirs(group_path, exist_ok=True) # 确保路径存在
         if sample_group:
             # 尝试构建样本组路径
-            tmp_path = join_path(group_path, sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            tmp_path = join_path(group_path, sample_group)
             if os.path.exists(tmp_path):
                 group_path = tmp_path
             else:
@@ -68,11 +68,11 @@ class SampleHandler:
             # 更新样本组
             self.sample_group = config.SAMPLE_GROUP
             if self.sample_group:
-                self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+                self.group_path = join_path(config.SAMPLE_PATH, self.sample_group)
             else:
                 self.group_path = config.SAMPLE_PATH
             # 重新加载图片
-            LoadImages(self.ui).load_with_progress()
+            LoadImages(self.ui, self.group_path, 'imageList').load_with_progress()
             # 更新按钮显示状态
             self.update_button_visibility()
     
@@ -132,7 +132,7 @@ class SampleHandler:
                 show_message_box("错误", "样本组名称不合法！", QMessageBox.Critical)
                 return
             # 创建样本组文件夹
-            train_path = join_path(config.SAMPLE_PATH, text, config.SAMPLE_LABEL_TRAIN_GOOD)
+            train_path = join_path(config.SAMPLE_PATH, text)
             if not os.path.exists(train_path):
                 # 对接 http_server: 创建样本组
                 try:
@@ -167,7 +167,7 @@ class SampleHandler:
         if result == QDialog.Accepted and dialog.selected_group:
             # 更新数据
             config.SAMPLE_GROUP = self.sample_group = dialog.selected_group
-            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group, config.SAMPLE_LABEL_TRAIN_GOOD)
+            self.group_path = join_path(config.SAMPLE_PATH, self.sample_group)
             update_metadata('sample_group', self.sample_group)
             # 对接 http_server: 如果样本组为空，则从服务器下载样本
             os.makedirs(self.group_path, exist_ok=True) # 确保本地文件夹存在
@@ -193,7 +193,7 @@ class SampleHandler:
                 except Exception as e:
                     print(f"从http_server加载图片失败: {str(e)}")
             # 加载样本组中的图片
-            LoadImages(self.ui).load_with_progress()
+            LoadImages(self.ui, self.group_path, 'imageList').load_with_progress()
             # 更新按钮显示状态
             self.update_button_visibility()
             # 显示成功消息
@@ -251,7 +251,7 @@ class SampleHandler:
         """
         上传样本组到服务器
         """
-        UploadSampleGroup_HTTP(self.ui).run()
+        UploadSampleGroup_HTTP(self.ui, self.sample_group).run()
         # UploadSampleGroup_SSH(self.ui).run()
 
 
@@ -272,7 +272,7 @@ class SampleHandler:
         self.ui.completeButton.clicked.connect(self.select_disabled)
         # 加载图片
         if self.sample_group:
-            LoadImages(self.ui).load_with_progress() # 加载图片列表
+            LoadImages(self.ui, self.group_path, 'imageList').load_with_progress() # 加载图片列表
             self.update_button_visibility() # 更新按钮显示状态
 
     def fold(self):
@@ -292,6 +292,9 @@ class SampleHandler:
         """
         选中所有图片
         """
+        # 检查是否有样本组
+        if not check_sample_group():
+            return
         self.ui.imageList.clearSelection()  # Clear any selected items
         self.ui.imageList.setSelectionMode(QAbstractItemView.MultiSelection)  # Enable multi-selection mode
         for index in range(self.ui.imageList.count()):
@@ -323,6 +326,7 @@ class SampleHandler:
             item = self.ui.imageList.item(index)
             checkbox = item.checkbox  # Retrieve the checkbox from the item's data
             if checkbox:
+                checkbox.setChecked(False)
                 checkbox.setVisible(False)
         # 恢复按钮显示状态
         self.updateButtonState(True)
@@ -349,7 +353,7 @@ class SampleHandler:
             if os.path.exists(image_path):
                 os.remove(image_path)  # 删除文件
             # self.ui.imageList.takeItem(self.ui.imageList.row(item))  # 从列表中移除项
-        LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
+        LoadImages(self.ui, self.group_path, 'imageList').load_with_animation()  # 重新加载图片列表
         self.clear_detail_frame()  # 清除detailFrame
         # 删除完图片后，重置选择模式为禁用状态
         self.select_disabled()
@@ -358,6 +362,9 @@ class SampleHandler:
         """
         从本地选择文件夹，导入其中的图片
         """
+        # 检查是否有样本组
+        if not check_sample_group():
+            return
         # 打开文件夹选择对话框
         folder = QFileDialog.getExistingDirectory(self.ui, "选择图片文件夹")
         if folder:
@@ -366,12 +373,15 @@ class SampleHandler:
                 if is_image(file_name):
                     file_path = join_path(folder, file_name)
                     copy_image(file_path, self.group_path)
-            LoadImages(self.ui).load_with_progress()  # 重新加载图片列表
+            LoadImages(self.ui, self.group_path, 'imageList').load_with_progress()  # 重新加载图片列表
 
     def import_images(self):
         """
         从本地文件夹中选择图片导入
         """
+        # 检查是否有样本组
+        if not check_sample_group():
+            return
         # 打开文件对话框选择图片
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFiles) # 设置文件对话框模式为选择多个文件
@@ -380,7 +390,7 @@ class SampleHandler:
             selected_files = file_dialog.selectedFiles()
             for file_path in selected_files:
                 copy_image(file_path, self.group_path)
-            LoadImages(self.ui).load_with_progress()  # 重新加载图片列表
+            LoadImages(self.ui, self.group_path, 'imageList').load_with_progress()  # 重新加载图片列表
 
 
 
@@ -677,8 +687,8 @@ class SampleHandler:
             self.refresh_image_item()
             self.refresh_detail_frame()
         else:
-            LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
-        # LoadImages(self.ui).run()
+            LoadImages(self.ui, self.group_path, 'imageList').load_with_animation()  # 重新加载图片列表
+        # LoadImages(self.ui, self.group_path, 'imageList').run()
         # if len(selected_items) == 1:
         #     self.ui.imageList.setCurrentItem(selected_items[0]) # 移动到当前项
 
@@ -717,7 +727,7 @@ class SampleHandler:
                 cv2.imwrite(augmented_image_path, augmented_image)
                 print(f"保存增强后的图像: {augmented_image_path}")
 
-        LoadImages(self.ui).load_with_animation()  # 重新加载图片列表
+        LoadImages(self.ui, self.group_path, 'imageList').load_with_animation()  # 重新加载图片列表
 
     def random_augmentation(self, image):
         """
@@ -1651,32 +1661,6 @@ class SampleHandler:
         
         return result_image, mask
 
-    def is_sample_group_uploaded(self):
-        """
-        检查当前样本组是否已上传到服务器
-        
-        Returns:
-            bool: 样本组是否已上传到服务器
-        """
-        # 首先检查是否存在样本组
-        if not config.SAMPLE_GROUP:
-            return False
-        # 对接 http_server: 检查样本组是否上传
-        try:
-            # 连接服务器，检查样本组是否上传（样本数量是否相等）
-            http_server = HttpServer()
-            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
-            if not group_id:
-                return False
-            # 获取服务器上的样本列表
-            sample_list = http_server.get_sample_list(group_id)
-            # 获取本地样本数量
-            local_count = len(os.listdir(self.group_path))
-            # 样本数量相等或服务器数量更多，则认为已上传
-            return len(sample_list) >= local_count
-        except Exception as e:
-            print(f"检查样本组上传状态失败: {str(e)}")
-            return False
 
 
 class CustomListWidgetItem(QListWidgetItem):
@@ -1849,9 +1833,10 @@ class ResizableRectItem(QGraphicsRectItem):
 
 class LoadImages:
     """加载图片列表的类，提供两种加载方式：进度条和加载动画"""
-    def __init__(self, ui):
-        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD)
+    def __init__(self, ui, path, list_name):
         self.ui = ui
+        self.group_path = path
+        self.list_widget = getattr(self.ui, list_name)
     
     def load_with_progress(self):
         # QCoreApplication.processEvents() # 强制处理所有之前的UI更新事件（现已移至ProgressDialog）
@@ -1864,9 +1849,9 @@ class LoadImages:
         # 显示对话框并开始加载
         progress_dialog.show()
         # QCoreApplication.processEvents() # 确保进度条显示！！！（现已移至ProgressDialog）
-
+        
         # 重新获取图片列表
-        self.ui.imageList.clear()
+        self.list_widget.clear()
         images = [f for f in os.listdir(self.group_path) if is_image(f)]
         total_images = len(images)
         # 处理空图片列表情况
@@ -1891,7 +1876,7 @@ class LoadImages:
         # QCoreApplication.processEvents()  # 确保动画显示！！！（现已移至LoadingAnimation）
 
         # 重新获取图片列表
-        self.ui.imageList.clear()
+        self.list_widget.clear()
         images = [f for f in os.listdir(self.group_path) if is_image(f)]
         # 添加所有图片到列表
         for index, image in enumerate(images):
@@ -1904,8 +1889,8 @@ class LoadImages:
     def _add_to_list(self, image_path, image_name, index):
         """将图片添加到列表中"""
         item = CustomListWidgetItem(image_path, image_name, index)
-        self.ui.imageList.addItem(item) # 添加 QListWidgetItem
-        self.ui.imageList.setItemWidget(item, item.item_widget) # 设置 QWidget 小部件作为项的显示内容
+        self.list_widget.addItem(item) # 添加 QListWidgetItem
+        self.list_widget.setItemWidget(item, item.item_widget) # 设置 QWidget 小部件作为项的显示内容
         # 存储复选框（或其他控件）作为该项的数据
         # 1: item.setData(0, checkbox) -> item.data(0)
         # 2: 也可直接查找widget中的控件
@@ -1948,7 +1933,7 @@ class SampleGroupDialog(QDialog):
             item_path = join_path(config.SAMPLE_PATH, item)
             if os.path.isdir(item_path):
                 # 检查good文件夹中是否有图片文件
-                has_images = any(is_image(f) for f in os.listdir(join_path(item_path, config.SAMPLE_LABEL_TRAIN_GOOD)))
+                has_images = any(is_image(f) for f in os.listdir(join_path(item_path)))
                 sample_groups.append((item, has_images))
         # 对接 http_server: 如果样本组列表为空，则从服务器获取样本组列表
         if not sample_groups:

@@ -4,8 +4,9 @@ import requests
 import config
 from typing import Optional
 from PySide6.QtWidgets import QMessageBox
-from utils import ProgressDialog, is_image, join_path, show_message_box
-
+from utils import ProgressDialog, check_detect_sample_group, check_model_group, is_image, join_path, show_message_box
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QPixmap
 
 class HttpServer:        
     # -------------------- 模型操作 --------------------
@@ -61,15 +62,15 @@ class HttpServer:
             print(f"删除模型失败: {str(e)}")
             raise
 
-    def update_model_params(self, model_id, params):
+    def update_model(self, model_id, model):
         """
-        更新模型参数
+        更新模型
         """
-        url = f"http://{config.HOSTNAME}:{config.PORT}/update_model_params/{model_id}"
+        url = f"http://{config.HOSTNAME}:{config.PORT}/update_model/{model_id}"
         try:
-            response = requests.post(url, json=params)
+            response = requests.post(url, json=model)
             if response.status_code == 200:
-                print(f"成功更新模型 {model_id} 的参数: {params}")
+                print(f"成功更新模型 {model_id} : {model}")
                 return response.json()
             else:
                 raise Exception(f"更新模型参数失败: HTTP错误: {response.status_code} - {response.text}")
@@ -144,115 +145,6 @@ class HttpServer:
         print(f"http_server无该模型: {model_list}")
         return None
 
-    def train_info(self, model_id):
-        """
-        获取模型训练完成后的图像列表
-        
-        Args:
-            model_id: 模型ID
-            
-        Returns:
-            已训练的图像列表 ['image1.jpg', 'image2.jpg', ...]
-        """
-        url = f"http://{config.HOSTNAME}:{config.PORT}/train_info/{model_id}"
-        try:
-            response = requests.post(url)
-            if response.status_code == 200:
-                print(f"获取已训练的图像列表: 模型ID={model_id} -> {url}")
-                return response.json()
-            else:
-                raise Exception(f"获取已训练的图像列表失败: HTTP错误: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"获取已训练的图像列表失败: {str(e)}")
-            raise
-    
-    def infer_info(self, model_id):
-        """
-        获取模型推理完成后的图像列表（相当于infer_process的最终状态）
-        
-        Args:
-            model_id: 模型ID
-            
-        Returns: 
-            已推理的图像列表：[{
-                'img_result_filename': 推理结果文件名,
-                'id': 所属的样本组ID,
-                'bm_score': 边界框得分,
-                'score': 得分,
-                'model_id': 模型ID,
-                'img_filename': 图像文件名
-            }]
-        """
-        url = f"http://{config.HOSTNAME}:{config.PORT}/infer_info/{model_id}"
-        try:
-            response = requests.post(url)
-            if response.status_code == 200:
-                print(f"获取已推理的图像列表: 模型ID={model_id} -> {url}")
-                return response.json()
-            else:
-                raise Exception(f"获取已推理的图像列表失败: HTTP错误: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"获取已推理的图像列表失败: {str(e)}")
-            raise
-    
-    def train_process(self, model_id):
-        """
-        获取模型训练实时信息
-        
-        Args:
-            model_id: 模型ID
-            
-        Returns:
-            训练信息 {
-                "p_true": 真实样本概率,
-                "p_fake": 生成样本概率,
-                "loss": 损失,
-                "epoch": 当前训练轮数,
-                "distance_loss": 距离损失,
-                "begin_time": 开始时间,
-                "end_time": 结束时间
-            }
-        """
-        url = f"http://{config.HOSTNAME}:{config.PORT}/train_process/{model_id}"
-        try:
-            response = requests.post(url)
-            if response.status_code == 200:
-                print(f"获取模型训练信息: 模型ID={model_id} -> {url}")
-                return response.json()
-            else:
-                raise Exception(f"获取模型训练信息失败: HTTP错误: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"获取模型训练信息失败: {str(e)}")
-            raise
-    
-    def infer_process(self, model_id):
-        """
-        获取模型推理实时信息
-        
-        Args:
-            model_id: 模型ID
-            
-        Returns:
-            推理信息：{
-                'inferPercentage': 推理进度,
-                'have_infer_img_list': [{
-                    'name': 图像文件名,
-                    'score': 得分
-                }]
-            }
-        """
-        url = f"http://{config.HOSTNAME}:{config.PORT}/infer_process/{model_id}"
-        try:
-            response = requests.post(url)
-            if response.status_code == 200:
-                print(f"获取模型推理信息: 模型ID={model_id} -> {url}")
-                return response.json()
-            else:
-                raise Exception(f"获取模型推理信息失败: HTTP错误: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"获取模型推理信息失败: {str(e)}")
-            raise
-    
     def train_model(self, model_id, group_id):
         """
         训练模型
@@ -298,6 +190,58 @@ class HttpServer:
         except Exception as e:
             print(f"结束模型训练失败: {str(e)}")
             raise
+        
+    def train_info(self, model_id):
+        """
+        获取模型训练完成后的图像列表
+        
+        Args:
+            model_id: 模型ID
+            
+        Returns:
+            已训练的图像列表 ['image1.jpg', 'image2.jpg', ...]
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/train_info/{model_id}"
+        try:
+            response = requests.post(url)
+            if response.status_code == 200:
+                print(f"获取已训练的图像列表: 模型ID={model_id} -> {url}")
+                return response.json()
+            else:
+                raise Exception(f"获取已训练的图像列表失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"获取已训练的图像列表失败: {str(e)}")
+            raise
+
+    def train_process(self, model_id):
+        """
+        获取模型训练实时信息
+        
+        Args:
+            model_id: 模型ID
+            
+        Returns:
+            训练信息 {
+                "p_true": 真实样本概率,
+                "p_fake": 生成样本概率,
+                "loss": 损失,
+                "epoch": 当前训练轮数,
+                "distance_loss": 距离损失,
+                "begin_time": 开始时间,
+                "end_time": 结束时间
+            }
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/train_process/{model_id}"
+        try:
+            response = requests.post(url)
+            if response.status_code == 200:
+                print(f"获取模型训练信息: 模型ID={model_id} -> {url}")
+                return response.json()
+            else:
+                raise Exception(f"获取模型训练信息失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"获取模型训练信息失败: {str(e)}")
+            raise
 
     def infer_model(self, model_id, group_id):
         """
@@ -322,6 +266,82 @@ class HttpServer:
         except Exception as e:
             print(f"开始模型推理失败: {str(e)}")
             raise
+
+    def infer_info(self, model_id):
+        """
+        获取模型推理完成后的图像列表（相当于infer_process的最终状态）
+        
+        Args:
+            model_id: 模型ID
+            
+        Returns: 
+            已推理的图像列表：[{
+                'id': 所属的样本组ID,
+                'bm_score': 边界框得分（无用）,
+                'score': 得分,
+                'model_id': 模型ID,
+                'img_filename': 图像文件名
+            }]
+            注：推理结果的图像名为原图加后缀，其中_0.png是前景分割图，_1.png是结果图，_2.png是背景过滤后的结果图，_3.png是异常图，_4.png是背景过滤后的异常图
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/infer_info/{model_id}"
+        try:
+            response = requests.post(url)
+            if response.status_code == 200:
+                print(f"获取已推理的图像列表: 模型ID={model_id} -> {url}")
+                return response.json()
+            else:
+                raise Exception(f"获取已推理的图像列表失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"获取已推理的图像列表失败: {str(e)}")
+            raise
+    
+    def infer_process(self, model_id):
+        """
+        获取模型推理实时信息
+        
+        Args:
+            model_id: 模型ID
+            
+        Returns:
+            推理信息：{
+                'inferPercentage': 推理进度,
+                'have_infer_img_list': [{
+                    'name': 图像文件名,
+                    'score': 得分
+                }]
+            }
+            注：推理结果的图像名为原图加后缀，其中_0.png是前景分割图，_1.png是结果图，_2.png是背景过滤后的结果图，_3.png是异常图，_4.png是背景过滤后的异常图
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/infer_process/{model_id}"
+        try:
+            response = requests.post(url)
+            if response.status_code == 200:
+                print(f"获取模型推理信息: 模型ID={model_id} -> {url}")
+                return response.json()
+            else:
+                raise Exception(f"获取模型推理信息失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"获取模型推理信息失败: {str(e)}")
+            raise
+    
+    def download_result_images(self, filename, save_path):
+        """
+        下载五种结果热图：_0.png, _1.png, _2.png, _3.png, _4.png
+
+        Returns:
+            xxx-yyy.png -> yyy
+        """
+        base_name = os.path.splitext(filename)[0]
+        for i in range(5):
+            result_name = f"{base_name}_{i}.png"
+            try:
+                self.save_downloaded_sample(result_name, save_path)
+                print(f"下载热图成功: {result_name} -> {save_path}")
+            except Exception as e:
+                print(f"下载热图失败({i}): {str(e)}")
+        return base_name.split("-")[-1] # 返回原图名
+
 
     # -------------------- 样本组操作 --------------------
         
@@ -593,6 +613,7 @@ def test_model_api():
     # 0. 准备样本
     test_dir = "B:/Development/GraduationDesign/app/test"
     image_dir = join_path(test_dir, "img")
+    download_dir = join_path(test_dir, "downloads")
     test_images = os.listdir(image_dir)[:2]
     # 添加组
     group_name = f"测试组-{int(time.time())}"
@@ -711,16 +732,25 @@ def test_model_api():
         except Exception as e:
             print(f"获取推理信息失败: {str(e)}")
             break
-
-    # 10. 删除模型和组
-    print(f"\n10. 测试删除模型 (模型ID: {model_id})")
+    # 根据infer_info下载热图
+    print(f"测试下载热图 (模型ID: {model_id})")
     try:
-        result = server.delete_model(model_id)
-        print(f"删除模型结果: {result}")
-        result = server.delete_group(group_id)
-        print(f"删除组结果: {result}")
+        for result in infer_info:
+            img = result.get("img_filename")
+            server.download_result_images(img, download_dir)
+        print(f"下载热图结果: {img}")
     except Exception as e:
-        print(f"删除模型失败: {str(e)}")
+        print(f"下载{img}的结果热图失败: {str(e)}")
+
+    # # 10. 删除模型和组
+    # print(f"\n10. 测试删除模型 (模型ID: {model_id})")
+    # try:
+    #     result = server.delete_model(model_id)
+    #     print(f"删除模型结果: {result}")
+    #     result = server.delete_group(group_id)
+    #     print(f"删除组结果: {result}")
+    # except Exception as e:
+    #     print(f"删除模型失败: {str(e)}")
 
     # 11. 再次获取模型列表
     print("\n11. 再次测试获取模型列表")
@@ -740,12 +770,47 @@ def test_model_api():
     print("\n======= 测试完成 =======")
 
 
+
+# ----------------------其它功能函数----------------------
+def is_sample_group_uploaded(sample_group):
+        """
+        检查当前样本组是否已上传到服务器
+        
+        Returns:
+            bool: 样本组是否已上传到服务器
+        """
+        # 首先检查是否存在样本组
+        if not sample_group:
+            return False
+        # 对接 http_server: 检查样本组是否上传
+        group_path = join_path(config.SAMPLE_PATH, sample_group)
+        try:
+            # 连接服务器，检查样本组是否上传（样本数量是否相等）
+            http_server = HttpServer()
+            group_id = http_server.get_group_id(sample_group)
+            if not group_id:
+                return False
+            # 获取服务器上的样本列表
+            sample_list = http_server.get_sample_list(group_id)
+            # 获取本地样本数量
+            local_count = len(os.listdir(group_path))
+            # 样本数量相等或服务器数量更多，则认为已上传
+            print(sample_list)
+            print(len(sample_list))
+            return len(sample_list) >= local_count
+        except Exception as e:
+            print(f"检查样本组上传状态失败: {str(e)}")
+            return False
+
+
+
 class UploadSampleGroup_HTTP:
     """
     上传样本组到服务器的线程
     """
-    def __init__(self, ui):
-        self.group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP, config.SAMPLE_LABEL_TRAIN_GOOD) 
+    def __init__(self, ui, sample_group):
+        self.sample_group = sample_group
+        self.group_path = join_path(config.SAMPLE_PATH, sample_group) 
         self.ui = ui
 
     def run(self):
@@ -763,14 +828,18 @@ class UploadSampleGroup_HTTP:
             return
         # 更新进度条文本
         progressDialog.setLabelText(f"正在上传 {total_files} 个文件...")
-        # 遍历并上传每个文件
+        # 先清空组，再遍历并上传每个文件
+        http_server = HttpServer()
+        try:
+            group_id = http_server.get_group_id(self.sample_group)
+            http_server.clear_group(group_id)
+        except Exception as e:
+            show_message_box("错误", f"清空组失败: {str(e)}", QMessageBox.Critical)
+            return
         for index, file_name in enumerate(files):
             file_path = join_path(self.group_path, file_name)
             # 上传文件，先清空组再上传(覆盖旧样本组)，若失败则停止
             try:
-                http_server = HttpServer()
-                group_id = http_server.get_group_id(config.SAMPLE_GROUP)
-                http_server.clear_group(group_id)
                 http_server.upload_sample(file_path, group_id)
             except Exception as e:
                 show_message_box("错误", f"上传失败: {str(e)}", QMessageBox.Critical)
@@ -921,12 +990,169 @@ class PatchCoreParamMapper_Http:
             "training_speed": list(self.training_speed_options.keys())
         }
 
+class HttpDetectSamples:
+    """
+    使用HTTP服务器处理样本检测的类
+    """
+    def __init__(self, ui):
+        self.ui = ui
+        self.processed_files = set()  # 已处理的文件名集合
+        self.http_server = HttpServer()
+        self.result_timer = None
+        self.model_id = None
+        self.group_id = None
+        self.save_path = None  # 保存图片的路径
+
+    def detect_samples(self):
+        """启动检测样本的过程"""
+        # 检查是否已选择模型和检测样本组
+        if not check_detect_sample_group() or not check_model_group():
+            return
+        # 检查样本组是否上传到服务器
+        if not is_sample_group_uploaded(config.DETECT_SAMPLE_GROUP):
+            # 提示用户是否要上传样本组
+            confirm = QMessageBox.question(
+                self.ui,
+                "上传提示",
+                "样本组未上传到服务器，是否立即上传？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            # 选择是否上传样本组
+            if confirm == QMessageBox.Yes:
+                UploadSampleGroup_HTTP(self.ui, config.DETECT_SAMPLE_GROUP).run()
+            else:
+                return
+        # 获取模型ID
+        try:
+            self.model_id = self.http_server.get_model_id(config.MODEL_GROUP)
+            if not self.model_id:
+                show_message_box("错误", f"未找到模型：{config.MODEL_GROUP}", QMessageBox.Critical)
+                return
+            # 获取样本组ID
+            self.group_id = self.http_server.get_group_id(config.DETECT_SAMPLE_GROUP)
+            if not self.group_id:
+                show_message_box("错误", f"未找到样本组：{config.DETECT_SAMPLE_GROUP}", QMessageBox.Critical)
+                return
+            
+            # 创建保存路径
+            self.save_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP)
+            os.makedirs(self.save_path, exist_ok=True)
+            
+            # 清空已处理文件的记录
+            self.processed_files.clear()
+                
+            # 启动推理
+            infer_result = self.http_server.infer_model(self.model_id, self.group_id)
+            print(f"启动推理结果: {infer_result}")
+            
+            # 开始定时检查结果
+            self.result_timer = QTimer()
+            self.result_timer.timeout.connect(self.fetch_new_results)
+            self.result_timer.start(1000)  # 每秒检查一次
+            
+            # 更新UI状态
+            self.ui.startDetectButton.setEnabled(False)
+            self.ui.infoLabel.setText("检测中...")
+            
+        except Exception as e:
+            show_message_box("错误", f"启动检测失败: {str(e)}", QMessageBox.Critical)
+            print(f"启动检测失败: {str(e)}")
+
+    def fetch_new_results(self):
+        """获取检测结果"""
+        try:
+            if not self.model_id:
+                return
+                
+            # 获取推理实时信息
+            infer_process = self.http_server.infer_process(self.model_id)
+            if not infer_process or 'have_infer_img_list' not in infer_process:
+                return
+                
+            # 获取已推理的图像列表
+            image_list = infer_process.get('have_infer_img_list', [])
+            
+            # 找出未处理的图像
+            for img_info in image_list:
+                img_name = img_info.get('name')
+                if not img_name or img_name in self.processed_files:
+                    continue
+                
+                # 下载热图（5种不同后缀的结果图）
+                try:
+                    base_name = self.http_server.download_result_images(img_name, self.save_path)
+                    
+                    # 显示结果（_1.png是结果图）
+                    result_path = join_path(self.save_path, f"{base_name}_1.png")
+                    print(f"显示结果: {result_path}")
+                    if os.path.exists(result_path):
+                        self.display_result(result_path, img_info)
+                        
+                    # 标记为已处理
+                    self.processed_files.add(img_name)
+                    
+                except Exception as e:
+                    print(f"处理图片结果失败: {str(e)}")
+            
+            # 检查推理是否已完成
+            infer_percentage = infer_process.get('inferPercentage', 0)
+            if infer_percentage >= 1.0:
+                # 检查模型状态
+                model_status = self.http_server.get_model_status(config.MODEL_GROUP)
+                if model_status != 3:  # 不再是推理中状态
+                    self.end_detection("检测已完成")
+                    
+        except Exception as e:
+            print(f"获取检测结果失败: {str(e)}")
+
+    def display_result(self, image_path: str, result_info: dict):
+        """显示检测结果图片和信息"""
+        if os.path.exists(image_path):
+            # 显示结果图片
+            pixmap = QPixmap(image_path)
+            scaled_pixmap = pixmap.scaled(
+                self.ui.resultLabel.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.ui.resultLabel.setPixmap(scaled_pixmap)
+            self.ui.resultLabel.setToolTip(f"检测结果: {os.path.basename(image_path)}")
+            
+            # 显示检测信息
+            score = result_info.get('score', 0)
+            self.ui.infoLabel.setText(f"缺陷得分: {score:.4f}")
+            
+            # 在结果浏览器中显示详细信息
+            if hasattr(self.ui, 'resultBrowser'):
+                self.ui.resultBrowser.clear()
+                self.ui.resultBrowser.append(f"<b>文件名:</b> {result_info.get('name', '未知')}")
+                self.ui.resultBrowser.append(f"<b>缺陷得分:</b> {score:.4f}")
+                self.ui.resultBrowser.append(f"<b>检测状态:</b> {'异常' if float(score) > 0.5 else '正常'}")
+                self.ui.resultBrowser.append(f"<b>保存位置:</b> {self.save_path}")
+
+    def end_detection(self, message="检测已完成"):
+        """结束检测过程"""
+        if self.result_timer:
+            self.result_timer.stop()
+            self.result_timer = None
+            
+        # 更新UI状态
+        self.ui.startDetectButton.setEnabled(True)
+        self.ui.infoLabel.setText(message)
+        show_message_box("提示", message, QMessageBox.Information)
+        
+        # 清理
+        self.model_id = None
+        self.group_id = None
+
 if __name__ == "__main__":
     # test_sample_api()
-    # test_model_api()
+    test_model_api()
 
-    server = HttpServer()
-    print(server.list_model())
+    # server = HttpServer()
+
+    # print(server.list_model())
     # group_name = f"测试组-{int(time.time())}"
     # group_id = server.add_group(group_name)
     # print(f"创建组成功: 名称={group_name}, ID={group_id}")
@@ -939,12 +1165,19 @@ if __name__ == "__main__":
     # samples = server.get_sample_list(1)
     # print(f"样本列表: {samples}")
     
-    # # 下载样本组
+    # 下载样本组
     # download_dir = "B:/Development/GraduationDesign/app/test/downloads"
-    # for sample in samples:
-    #     server.save_downloaded_sample(sample, download_dir)
+    # server.save_downloaded_sample('36592fc0-af3e-42cd-9c28-a3ebdd7708cb-001.png', download_dir)
 
     # 删除样本组
     # server.clear_group(1)
     # for group in groups:
     #     server.delete_group(group.get("id"))
+
+
+
+# 训练实时信息train_process: {'p_true': [0.40771484375, 0.3984375, 0.287841796875, 0.3447265625, 0.2747802734375, 0.2491455078125, 0.2037353515625, 0.146728515625, 0.1463623046875, 0.1300048828125, 0.086181640625, 0.0740966796875, 0.0496826171875, 0.0281982421875, 0.026611328125, 0.03955078125, 0.0440673828125, 0.045166015625, 0.0345458984375, 0.021484375, 0.0177001953125, 0.0203857421875, 0.021240234375, 0.0169677734375, 0.0159912109375, 0.0120849609375, 0.0101318359375, 0.007080078125, 0.0048828125, 0.0081787109375, 0.0166015625, 0.0146484375, 0.0081787109375, 0.002685546875, 0.0018310546875, 0.0013427734375, 0.00146484375, 0.00244140625, 0.0037841796875, 0.005126953125, 0.0050048828125, 0.0045166015625, 0.0040283203125, 0.003173828125, 0.002197265625, 0.001708984375, 0.00146484375, 0.00146484375, 0.0006103515625, 0.001220703125, 0.001708984375, 0.0023193359375, 0.0030517578125, 0.0028076171875, 0.0010986328125], 'p_fake': [0.1591796875, 0.208251953125, 0.1669921875, 0.1199951171875, 0.1175537109375, 0.1151123046875, 0.113037109375, 0.076416015625, 0.0892333984375, 0.1064453125, 0.0814208984375, 0.085693359375, 0.10107421875, 0.11865234375, 0.1103515625, 0.094482421875, 0.0733642578125, 0.05712890625, 0.0394287109375, 0.0302734375, 0.0322265625, 0.0428466796875, 0.0433349609375, 0.03515625, 0.03076171875, 0.01806640625, 0.0157470703125, 0.01513671875, 0.0111083984375, 0.01220703125, 0.013427734375, 0.013671875, 0.01171875, 0.0078125, 0.005859375, 0.0050048828125, 0.0054931640625, 0.0054931640625, 0.00537109375, 0.0042724609375, 0.00341796875, 0.00341796875, 0.0025634765625, 0.0025634765625, 0.0018310546875, 0.0028076171875, 0.00390625, 0.0048828125, 0.004638671875, 0.0052490234375, 0.0048828125, 0.0050048828125, 0.0048828125, 0.0068359375, 0.0054931640625], 'loss': [], 'epoch': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55], 'distance_loss': [], 'begin_time': 1743310973.1871567, 'end_time': 1743310981.645206}
+
+# 推理实时信息infer_process: {'inferPercentage': 1.0, 'have_infer_img_list': [{'name': '9f91f2f7-9035-4a27-b2e0-8374225441ff.png', 'score': -0.4169386327266693}, {'name': '652b745f-1903-42fb-a6c9-30d4f4434316.png', 'score': -0.4127034544944763}]}
+
+# 已推理的图像列表infer_info: [{'id': 1, 'bm_score': 2.0059027671813965, 'score': -0.4169386327266693, 'model_id': 4, 'img_filename': '09d7fbc2-8e66-42e0-aa70-bba7d3c4f06d-000.png'}, {'id': 2, 'bm_score': 2.010138511657715, 'score': -0.4127034544944763, 'model_id': 4, 'img_filename': '6eb1cc47-820c-425e-9806-a53c19a9eea1-001.png'}]

@@ -8,8 +8,8 @@ import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler
-from utils import FloatingTimer, check_sample_group, join_path, show_message_box
-from http_server import HttpServer
+from utils import FloatingTimer, join_path, show_message_box
+from http_server import HttpServer, is_sample_group_uploaded
 
 
 class MainWindow(QMainWindow):
@@ -65,7 +65,7 @@ class MainWindow(QMainWindow):
         self.ui.tabWidget.setCurrentIndex(1)
     def switch_to_page_2(self):            
         # 检查样本组是否上传到服务器
-        if not self.sample_handler.is_sample_group_uploaded():
+        if not is_sample_group_uploaded(config.SAMPLE_GROUP):
             # 提示用户是否要上传样本组
             confirm = QMessageBox.question(
                 self.ui,
@@ -124,6 +124,14 @@ class MainWindow(QMainWindow):
             # 重新定位
             self.floating_timer.set_initial_position()
 
+    def closeEvent(self, event):
+        """处理窗口关闭事件"""
+        # 关闭资源
+        if hasattr(self, 'detect_handler'):
+            self.detect_handler.close_resources()
+        # 继续关闭窗口
+        super().closeEvent(event)
+
 
 if __name__ == "__main__":
     # 模拟项目元数据
@@ -133,7 +141,8 @@ if __name__ == "__main__":
         "description": "",
         "create_time": "2024-12-20 19:47:57",
         "sample_group": "test",
-        "model_group": "test"
+        "model_group": "test",
+        "detect_sample_group": "test"
     }
 
     config.PROJECT_METADATA_PATH = join_path(config.PROJECT_METADATA['project_path'], config.PROJECT_METADATA_FILE)
