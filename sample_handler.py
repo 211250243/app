@@ -1933,8 +1933,8 @@ class SampleGroupDialog(QDialog):
             item_path = join_path(config.SAMPLE_PATH, item)
             if os.path.isdir(item_path):
                 # 检查good文件夹中是否有图片文件
-                has_images = any(is_image(f) for f in os.listdir(join_path(item_path)))
-                sample_groups.append((item, has_images))
+                image_count = len([f for f in os.listdir(item_path) if is_image(f)])
+                sample_groups.append((item, image_count))
         # 对接 http_server: 如果样本组列表为空，则从服务器获取样本组列表
         if not sample_groups:
             try:
@@ -1943,7 +1943,7 @@ class SampleGroupDialog(QDialog):
                 if group_list:
                     for group in group_list:
                         group_name = group.get("group_name")
-                        sample_groups.append((group_name, True))
+                        sample_groups.append((group_name, -1))
             except Exception as e:
                 print(f"从http_server获取样本组失败: {str(e)}")
         # 如果没有样本组，显示提示
@@ -1953,11 +1953,14 @@ class SampleGroupDialog(QDialog):
             self.ui.listWidget.addItem(empty_item)
             return
         # 添加样本组到列表
-        for group_name, has_images in sample_groups:
-            item = QListWidgetItem(group_name)
+        for group_name, image_count in sample_groups:
             # 根据文件夹中有无图片，设置图标
-            item.setIcon(QIcon("ui/icon/non-empty_folder.svg" if has_images else "ui/icon/empty_folder.svg"))
+            icon = "ui/icon/non-empty_folder.svg" if image_count > 0 else "ui/icon/empty_folder.svg"
+            text = "待拉取..." if image_count == -1 else f"{image_count}张图片" if image_count > 0 else "（空）"
+            item = GroupListItem(group_name, icon, text)
             self.ui.listWidget.addItem(item)
+            # 设置自定义widget到列表项
+            self.ui.listWidget.setItemWidget(item, item.custom_widget)
             # 如果是当前样本组，选中它
             if group_name == config.SAMPLE_GROUP:
                 item.setSelected(True)
@@ -1970,7 +1973,8 @@ class SampleGroupDialog(QDialog):
         """
         selected_items = self.ui.listWidget.selectedItems()
         if selected_items:
-            return selected_items[0].text()
+            # 从GroupListItem中获取group_name属性
+            return selected_items[0].group_name
         return None
     
     def accept(self):
@@ -1983,6 +1987,38 @@ class SampleGroupDialog(QDialog):
         else:
             show_message_box("提示", "请选择一个样本组", QMessageBox.Information, self)
 
+class GroupListItem(QListWidgetItem):
+    """
+    样本组列表项，左侧显示图标和组名，右侧显示描述文本
+    """
+    def __init__(self, group_name, icon_path, text):
+        # 调用父类构造函数，但不设置文本
+        super().__init__()
+        self.group_name = group_name
+        self.setIcon(QIcon(icon_path))
+        
+        # 创建自定义显示小部件
+        self.custom_widget = QWidget()
+        layout = QHBoxLayout(self.custom_widget)
+        layout.setContentsMargins(5, 2, 5, 2)
+        
+        # 左侧组名标签
+        self.name_label = QLabel(group_name)
+        self.name_label.setStyleSheet("font-weight: bold;")
+        
+        # 右侧描述文本标签
+        self.desc_label = QLabel(text)
+        self.desc_label.setStyleSheet("color: #666;")
+        self.desc_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
+        # 添加弹性空间，使描述文本靠右显示
+        layout.addWidget(self.name_label)
+        layout.addStretch(1)
+        layout.addWidget(self.desc_label)
+        
+    # def get_widget(self):
+    #     """返回自定义小部件，用于在列表中显示"""
+    #     return self.custom_widget
 
 class NewSampleGroupDialog(QDialog):
     """

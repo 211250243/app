@@ -284,6 +284,18 @@ def check_model_group():
     print(f"模型组存在: {config.MODEL_GROUP}")
     return True
 
+def get_model_status(model_group):
+        """
+        从本地获取模型组状态
+        """
+        model_info_path = join_path(config.MODEL_PATH, model_group, config.MODEL_INFO_FILE)
+        if os.path.exists(model_info_path):
+            with open(model_info_path, 'r', encoding='utf-8') as f:
+                model_info = json.load(f)
+                return model_info.get("status")
+        return -1
+
+
 
 class FloatingTimer(QWidget):
     """悬浮计时器，显示应用运行时间"""

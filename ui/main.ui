@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>3</number>
+     <number>2</number>
     </property>
     <property name="iconSize">
      <size>
@@ -2366,7 +2366,7 @@ QPushButton:pressed {
          <string>输入高度：</string>
         </property>
        </widget>
-       <widget class="QLineEdit" name="lineEdit_2">
+       <widget class="QLineEdit" name="heightEdit">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -2392,7 +2392,7 @@ QPushButton:pressed {
          <string>输入宽度：</string>
         </property>
        </widget>
-       <widget class="QLineEdit" name="lineEdit_3">
+       <widget class="QLineEdit" name="widthEdit">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -2418,7 +2418,7 @@ QPushButton:pressed {
          <string>结束精度：</string>
         </property>
        </widget>
-       <widget class="QLineEdit" name="lineEdit_4">
+       <widget class="QLineEdit" name="endAccuracyEdit">
         <property name="enabled">
          <bool>false</bool>
         </property>

@@ -31,6 +31,7 @@ MODEL_FOLDER = 'models'
 MODEL_PATH = None
 MODEL_GROUP = None
 MODEL_PARAMS = None
+MODEL_INFO_FILE = 'model.json'
 DETECT_FOLDER = 'detect'
 DETECT_PATH = None
 DETECT_SAMPLE_GROUP = None

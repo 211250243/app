@@ -124,13 +124,6 @@ class MainWindow(QMainWindow):
             # 重新定位
             self.floating_timer.set_initial_position()
 
-    def closeEvent(self, event):
-        """处理窗口关闭事件"""
-        # 关闭资源
-        if hasattr(self, 'detect_handler'):
-            self.detect_handler.close_resources()
-        # 继续关闭窗口
-        super().closeEvent(event)
 
 
 if __name__ == "__main__":

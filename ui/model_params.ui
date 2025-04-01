@@ -122,7 +122,7 @@ QGroupBox::title {
     </rect>
    </property>
    <property name="text">
-    <string>PatchCore 模型参数设置</string>
+    <string>缺陷检测模型参数设置</string>
    </property>
    <property name="alignment">
     <set>Qt::AlignmentFlag::AlignCenter</set>

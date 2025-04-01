@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import random
@@ -13,9 +14,9 @@ from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis, QDateT
 
 import config
 from http_server import HttpServer, PatchCoreParamMapper_Http, UploadSampleGroup_HTTP
-from sample_handler import SampleGroupDialog
+from sample_handler import GroupListItem, SampleGroupDialog
 from ssh_server import PatchCoreParamMapper_SSH
-from utils import check_model_group, check_sample_group, copy_image, show_message_box, update_metadata, join_path, is_image
+from utils import LoadingAnimation, check_model_group, check_sample_group, copy_image, get_model_status, show_message_box, update_metadata, join_path, is_image
 
 
 
@@ -123,19 +124,21 @@ class ModelHandler:
         # 获取模型组并初始化路径
         model_group = config.PROJECT_METADATA.get('model_group')
         os.makedirs(config.MODEL_PATH, exist_ok=True) # 确保路径存在
-        if model_group and not os.path.exists(join_path(config.MODEL_PATH, model_group)):
-            # 路径无效时清除模型组配置
-            model_group = None
-            update_metadata('model_group', None)
+        if model_group:
+            model_info_path = join_path(config.MODEL_PATH, model_group, config.MODEL_INFO_FILE)
+            if not os.path.exists(model_info_path):
+                # 路径无效时清除模型组配置
+                model_group = None
+                update_metadata('model_group', None)
+            else:
+                # 读取模型信息
+                with open(model_info_path, 'r', encoding='utf-8') as f:
+                    model_info = json.load(f)
+                # 更新模型组配置
+                config.MODEL_PARAMS = model_info
         # 同步配置和实例变量
         config.MODEL_GROUP = model_group
-        self.update_model_group()
-
-    def update_model_group(self):
-        """
-        更新模型组路径和模型组名称
-        """
-        self.ui.curModelEdit.setText(config.MODEL_GROUP)
+        self.update_model_view() # 更新模型显示
 
     def new_model_group(self):
         """
@@ -153,14 +156,12 @@ class ModelHandler:
             # 创建模型文件夹
             group_path = join_path(config.MODEL_PATH, model_group)
             if not os.path.exists(group_path):
+                # 根据训练参数创建模型
+                model = {"name": model_group, **config.MODEL_PARAMS}
                 # 对接 http_server: 创建模型组
                 try:
-                    # 从UI获取参数选择，获取训练参数
-                    # 根据训练参数创建模型
-                    id = HttpServer().add_model({
-                        "name": model_group,
-                        **config.MODEL_PARAMS
-                    })
+                    id = HttpServer().add_model(model)
+                    model = {"id": id, **model}
                     print(f"http_server创建模型组成功 ID={id} \n模型参数={config.MODEL_PARAMS}")
                 except Exception as e:
                     print(f"http_server创建模型组失败: {str(e)}")
@@ -169,7 +170,8 @@ class ModelHandler:
                 # 更新数据
                 config.MODEL_GROUP = model_group
                 update_metadata('model_group', model_group)
-                self.update_model_group()
+                self.update_model_info(model) # 更新模型信息
+                self.update_model_view() # 更新模型显示
                 show_message_box("成功", "已创建模型组！", QMessageBox.Information, self.ui)
             else:
                 show_message_box("错误", "模型已存在，请选择其他名称！", QMessageBox.Critical, self.ui)
@@ -183,17 +185,19 @@ class ModelHandler:
         result = dialog.exec()
         # 如果用户点击了确定按钮并选择了模型组
         if result == QDialog.Accepted and dialog.selected_group:
+            # 更新数据
+            config.MODEL_GROUP = dialog.selected_group
+            update_metadata('model_group', config.MODEL_GROUP)   
             # 对接 http_server: 获取模型参数
             try:
-                config.MODEL_PARAMS = HttpServer().get_model_params(dialog.selected_group)
-                self.update_params() # 更新参数显示
+                model = HttpServer().get_model(dialog.selected_group)
+                config.MODEL_PARAMS = {k: v for k, v in model.items() if k != "name" and k != "id"} # 除去 name 和 id 剩下的部分
+                self.update_model_info(model) # 更新模型信息
                 print(f"http_server获取模型参数成功: {config.MODEL_PARAMS}")
             except Exception as e:
                 print(f"http_server获取模型参数失败: {str(e)}")
-            # 更新数据
-            config.MODEL_GROUP = dialog.selected_group
-            update_metadata('model_group', config.MODEL_GROUP)            
-            self.update_model_group() # 更新模型组路径和模型组名称
+            # 更新模型显示
+            self.update_model_view() 
             show_message_box("成功", "已导入模型组！", QMessageBox.Information)
 
     def delete_model_group(self):
@@ -234,9 +238,8 @@ class ModelHandler:
                 if config.MODEL_GROUP == model_group:
                     config.MODEL_GROUP = None
                     update_metadata('model_group', None)
-                    self.update_model_group()
                     config.MODEL_PARAMS = self.get_params() # 设置默认参数
-                    self.update_params()
+                    self.update_model_view() # 更新模型显示
                 # 显示成功消息
                 show_message_box("成功", "已删除模型组！", QMessageBox.Information)
 
@@ -268,11 +271,52 @@ class ModelHandler:
         # 初始化参数默认值
         config.MODEL_PARAMS = self.get_params()
         
-    def update_params(self):
+    def update_model_view(self):
         """
-        TODO: 更新参数显示
+        更新模型组及其参数显示
         """
+        self.ui.curModelEdit.setText(config.MODEL_GROUP)
+        if config.MODEL_GROUP:
+            self.ui.heightEdit.setText(str(config.MODEL_PARAMS["input_h"]))
+            self.ui.widthEdit.setText(str(config.MODEL_PARAMS["input_w"]))
+            self.ui.endAccuracyEdit.setText(str(config.MODEL_PARAMS["end_acc"]))
+        else:
+            self.ui.heightEdit.setText("")
+            self.ui.widthEdit.setText("")
+            self.ui.endAccuracyEdit.setText("")
 
+    def update_model_info(self, model_info):
+        """
+        创建或更新模型信息
+        """
+        model_file = join_path(config.MODEL_PATH, config.MODEL_GROUP, config.MODEL_INFO_FILE)
+        model = {}
+        # 如果模型文件存在，读取模型信息
+        if os.path.exists(model_file):
+            with open(model_file, "r", encoding="utf-8") as f:
+                model = json.load(f)
+        # 更新模型信息
+        model.update(model_info)
+        # 保存更新后的模型信息
+        with open(model_file, "w", encoding="utf-8") as f:
+            json.dump(model, f, ensure_ascii=False, indent=4)
+
+    def upload_model_info(self):
+        """
+        # 对接 http_server: 更新模型参数
+        """
+        try:
+            http_server = HttpServer()
+            model_id = http_server.get_model_id(config.MODEL_GROUP)
+            params = config.MODEL_PARAMS
+            print(f"更新模型参数: {model_id} -> {params}")
+            http_server.update_model(model_id, {
+                "name": config.MODEL_GROUP,
+                **params
+            })
+            show_message_box("成功", "模型参数已更新！", QMessageBox.Information, self.ui)
+        except Exception as e:
+            show_message_box("错误", f"更新参数失败: {str(e)}", QMessageBox.Critical, self.ui)
         
     def get_params(self):
         """
@@ -290,52 +334,9 @@ class ModelHandler:
         # 检查是否存在模型组
         if check_model_group():
             config.MODEL_PARAMS = self.get_params()
-            self.update_params()
-
-    def train_model(self):
-        """
-        训练模型
-        """
-        # 检查是否有选择模型和样本组
-        if not check_model_group() or not check_sample_group():
-            return
-        # 显示训练开始的消息
-        show_message_box("信息", "模型训练已开始，请耐心等待...", QMessageBox.Information, self.ui)
-        # 对接 http_server: 训练模型
-        try:
-            http_server = HttpServer()
-            # 如果模型组不存在，删除本地模型组，并提示创建新模型组
-            model_id = http_server.get_model_id(config.MODEL_GROUP)
-            if not model_id:
-                # 删除本地模型组
-                shutil.rmtree(join_path(config.MODEL_PATH, config.MODEL_GROUP), ignore_errors=True)
-                # 更新数据
-                config.MODEL_GROUP = None
-                update_metadata('model_group', None)
-                self.update_model_group()
-                # 提示创建新模型组
-                show_message_box("错误", "模型组不存在于服务器，已删除本地模型组，请重新创建！", QMessageBox.Critical, self.ui)
-                return
-            # 如果样本组不存在，删除本地样本组，并提示创建新样本组
-            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
-            if not group_id:
-                # 删除本地样本组
-                shutil.rmtree(join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP), ignore_errors=True)
-                # 更新数据
-                config.SAMPLE_GROUP = None
-                update_metadata('sample_group', None)
-                self.update_sample_group()
-                # 提示创建新样本组
-                show_message_box("错误", "样本组不存在于服务器，已删除本地样本组，请重新创建！", QMessageBox.Critical, self.ui)
-                return
-            # 启动训练
-            http_server.train_model(model_id, group_id)
-            
-            # 弹出训练进度对话框
-            progress_dialog = TrainingProgressDialog(self.ui, model_id, config.MODEL_GROUP)
-            progress_dialog.show()            
-        except Exception as e:
-            show_message_box("错误", f"训练模型失败: {str(e)}", QMessageBox.Critical, self.ui)
+            self.upload_model_info() # 服务器更新模型参数
+            self.update_model_info(config.MODEL_PARAMS) # 更新模型信息
+            self.update_model_view() # 更新模型显示
 
     def view_params(self):
         """
@@ -362,19 +363,52 @@ class ModelHandler:
             # 如果当前没有模型组，创建新模型组
             if not check_model_group():
                 return
-            # 对接 http_server: 更新模型参数
-            try:
-                http_server = HttpServer()
-                model_id = http_server.get_model_id(config.MODEL_GROUP)
-                params = dialog.params
-                print(f"更新模型参数: {model_id} -> {params}")
-                http_server.update_model(model_id, {
-                    "name": config.MODEL_GROUP,
-                    **params
-                })
-                show_message_box("成功", "模型参数已更新！", QMessageBox.Information, self.ui)
-            except Exception as e:
-                show_message_box("错误", f"更新参数失败: {str(e)}", QMessageBox.Critical, self.ui)
+            self.upload_model_info() # 服务器更新模型参数
+            self.update_model_info(config.MODEL_PARAMS) # 更新模型信息
+            self.update_model_view() # 更新模型显示
+
+    def train_model(self):
+        """
+        训练模型
+        """
+        # 检查是否有选择模型和样本组
+        if not check_model_group() or not check_sample_group():
+            return
+        # 对接 http_server: 训练模型
+        try:
+            http_server = HttpServer()
+            # 如果模型组不存在，删除本地模型组，并提示创建新模型组
+            model_id = http_server.get_model_id(config.MODEL_GROUP)
+            if not model_id:
+                # 删除本地模型组
+                shutil.rmtree(join_path(config.MODEL_PATH, config.MODEL_GROUP), ignore_errors=True)
+                # 更新数据
+                config.MODEL_GROUP = None
+                update_metadata('model_group', None)
+                self.update_model_view() # 更新模型显示
+                # 提示创建新模型组
+                show_message_box("错误", "模型组不存在于服务器，已删除本地模型组，请重新创建！", QMessageBox.Critical, self.ui)
+                return
+            # 如果样本组不存在，删除本地样本组，并提示创建新样本组
+            group_id = http_server.get_group_id(config.SAMPLE_GROUP)
+            if not group_id:
+                # 删除本地样本组
+                shutil.rmtree(join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP), ignore_errors=True)
+                # 更新数据
+                config.SAMPLE_GROUP = None
+                update_metadata('sample_group', None)
+                self.update_sample_group()
+                # 提示创建新样本组
+                show_message_box("错误", "样本组不存在于服务器，已删除本地样本组，请重新创建！", QMessageBox.Critical, self.ui)
+                return
+            # 启动训练
+            http_server.train_model(model_id, group_id)
+            
+            # 弹出训练进度对话框
+            progress_dialog = TrainingProgressDialog(self.ui, model_id, config.MODEL_GROUP)
+            progress_dialog.show()            
+        except Exception as e:
+            show_message_box("错误", f"训练模型失败: {str(e)}", QMessageBox.Critical, self.ui)
 
     def is_model_trained(self):
         """
@@ -646,7 +680,9 @@ class ModelGroupDialog(QDialog):
             if os.path.isdir(item_path):
                 # 检查模型文件夹中是否有文件
                 has_files = bool(os.listdir(item_path))
-                model_groups.append((item, has_files))
+                # 从本地获取模型组状态
+                status = get_model_status(item)
+                model_groups.append((item, has_files, status))
         # 对接 http_server: 如果模型组列表为空，则从服务器获取模型组列表
         if not model_groups:
             try:
@@ -655,7 +691,7 @@ class ModelGroupDialog(QDialog):
                 if group_list:
                     for group in group_list:
                         group_name = group.get("name")
-                        model_groups.append((group_name, True))
+                        model_groups.append((group_name, True, group.get("status")))
             except Exception as e:
                 print(f"从http_server获取模型组失败: {str(e)}")
         # 如果没有模型组，显示提示
@@ -665,12 +701,36 @@ class ModelGroupDialog(QDialog):
             self.ui.listWidget.addItem(empty_item)
             return
         # 添加模型组到列表
-        for group_name, has_files in model_groups:
-            item = QListWidgetItem(group_name)
+        for group_name, has_files, status in model_groups:
             # 根据文件夹中有无文件，设置图标
-            icon_path = "ui/icon/non-empty_folder.svg" if has_files else "ui/icon/empty_folder.svg"
-            item.setIcon(QIcon(icon_path))
+            icon = "ui/icon/non-empty_folder.svg" if has_files else "ui/icon/empty_folder.svg"
+            
+            # 根据状态设置不同颜色和文本
+            if status == 0:
+                text = "未训练"
+                color = "#666"  # 灰色
+            elif status == 1:
+                text = "训练中"
+                color = "#FF9800"  # 黄色
+            elif status == 2:
+                text = "已训练"
+                color = "#4CAF50"  # 绿色
+            elif status == 3:
+                text = "推理中"
+                color = "#FF9800"  # 黄色
+            else:
+                text = "未知状态"
+                color = "#666"  # 灰色
+                
+            item = GroupListItem(group_name, icon, text)
             self.ui.listWidget.addItem(item)
+            
+            # 设置自定义widget到列表项
+            self.ui.listWidget.setItemWidget(item, item.custom_widget)
+            
+            # 应用颜色样式到描述标签
+            item.desc_label.setStyleSheet(f"color: {color};")
+            
             # 如果是当前模型组，选中它
             if group_name == config.MODEL_GROUP:
                 item.setSelected(True)
@@ -683,7 +743,7 @@ class ModelGroupDialog(QDialog):
         """
         selected_items = self.ui.listWidget.selectedItems()
         if selected_items:
-            return selected_items[0].text()
+            return selected_items[0].group_name
         return None
     
     def accept(self):
@@ -708,8 +768,9 @@ class TrainingProgressDialog(QDialog):
         self.model_name = model_name
         self.http_server = HttpServer()
         self.stopped = False
+        self.show_full_curve = True  # 默认显示全部曲线
         
-        # 创建布局
+        # 创建主布局
         main_layout = QVBoxLayout()
         
         # 添加标题
@@ -721,6 +782,16 @@ class TrainingProgressDialog(QDialog):
         # 创建图表
         self.create_chart()
         main_layout.addWidget(self.chart_view)
+        
+        # 创建图表控制区域
+        chart_control_layout = QHBoxLayout()
+        
+        # 添加切换视图按钮
+        self.view_toggle_button = QPushButton("切换为最近视图")
+        self.view_toggle_button.clicked.connect(self.toggle_chart_view)
+        chart_control_layout.addWidget(self.view_toggle_button)
+        
+        main_layout.addLayout(chart_control_layout)
         
         # 创建信息展示区域
         info_layout = QHBoxLayout()
@@ -742,14 +813,14 @@ class TrainingProgressDialog(QDialog):
         # 右侧信息
         right_info = QVBoxLayout()
         self.begin_time_label = QLabel("开始时间: --")
-        self.current_time_label = QLabel("当前时间: --")
-        self.elapsed_time_label = QLabel("已运行时间: 0分0秒")
+        self.end_time_label = QLabel("结束时间: --")
+        self.total_time_label = QLabel("训练总时间: --")
         self.status_label = QLabel("状态: 训练中")
         self.status_label.setStyleSheet("color: blue; font-weight: bold;")
         
         right_info.addWidget(self.begin_time_label)
-        right_info.addWidget(self.current_time_label)
-        right_info.addWidget(self.elapsed_time_label)
+        right_info.addWidget(self.end_time_label)
+        right_info.addWidget(self.total_time_label)
         right_info.addWidget(self.status_label)
         
         # 添加按钮
@@ -776,6 +847,23 @@ class TrainingProgressDialog(QDialog):
         # 记录初始时间
         self.start_time = time.time()
         
+        # 创建加载动画，设置为对话框的子部件
+        self.loading = LoadingAnimation(self)
+        self.loading.set_text("正在准备训练...")
+        # 确保加载动画显示在对话框中央
+        self.loading.setGeometry(self.rect())
+        self.loading.show()
+
+    def toggle_chart_view(self):
+        """切换图表显示模式：全部曲线或最近20个点"""
+        self.show_full_curve = not self.show_full_curve
+        if self.show_full_curve:
+            self.view_toggle_button.setText("切换为最近视图")
+        else:
+            self.view_toggle_button.setText("切换为全部视图")
+        # 强制更新图表
+        self.update_data()
+        
     def create_chart(self):
         """创建图表"""
         # 创建图表和视图
@@ -783,6 +871,10 @@ class TrainingProgressDialog(QDialog):
         self.chart.setTitle("训练损失与概率")
         self.chart_view = QChartView(self.chart)
         self.chart_view.setRenderHint(QPainter.Antialiasing)
+        
+        # 启用图表缩放
+        self.chart_view.setRubberBand(QChartView.RectangleRubberBand)
+        self.chart_view.setDragMode(QChartView.ScrollHandDrag)
         
         # 创建数据系列
         self.loss_series = QLineSeries()
@@ -841,7 +933,7 @@ class TrainingProgressDialog(QDialog):
         self.chart.legend().setVisible(True)
         self.chart.legend().setAlignment(Qt.AlignBottom)
         self.chart_view.setMinimumHeight(300)
-    
+        
     def update_data(self):
         """获取并更新训练数据"""
         if self.stopped:
@@ -851,6 +943,10 @@ class TrainingProgressDialog(QDialog):
             # 获取训练进度信息
             train_process = self.http_server.train_process(self.model_id)
             
+            # 如果获取到数据，关闭加载动画
+            if train_process and hasattr(self, 'loading') and self.loading.isVisible():
+                self.loading.close_animation()
+                
             # 更新图表数据
             epochs = train_process.get("epoch", [0])
             losses = train_process.get("loss", [])
@@ -889,9 +985,37 @@ class TrainingProgressDialog(QDialog):
             latest_p_fake = p_fakes[-1] if p_fakes else 0.0
             latest_distance_loss = distance_losses[-1] if distance_losses else 0.0
             
-            # 调整X轴范围，始终显示最新的20个点
-            if latest_epoch > 10:
-                self.axis_x.setRange(max(0, latest_epoch - 20), latest_epoch)
+            # 调整X轴范围
+            start_epoch = epochs[0] if epochs else 0
+            
+            if self.show_full_curve:
+                # 显示全部曲线
+                if latest_epoch > 10:
+                    # 计算合适的刻度间隔，确保刻度数量在5-10之间
+                    tick_interval = max(1, (latest_epoch - start_epoch) // 10)
+                    tick_count = (latest_epoch - start_epoch) // tick_interval + 1
+                    
+                    # 确保刻度数量合理
+                    if tick_count > 15:
+                        tick_interval = (latest_epoch - start_epoch) // 10
+                        tick_count = 11
+                    
+                    self.axis_x.setRange(start_epoch, latest_epoch)
+                    self.axis_x.setTickCount(tick_count)
+                else:
+                    self.axis_x.setRange(0, 10)
+                    self.axis_x.setTickCount(11)
+            else:
+                # 只显示最近20个点
+                window_size = min(20, len(epochs))
+                if window_size > 0 and latest_epoch > 10:
+                    start_idx = max(0, len(epochs) - window_size)
+                    recent_start = epochs[start_idx]
+                    self.axis_x.setRange(recent_start, latest_epoch)
+                    self.axis_x.setTickCount(min(11, window_size + 1))
+                else:
+                    self.axis_x.setRange(0, 10)
+                    self.axis_x.setTickCount(11)
             
             # 调整Y轴范围
             all_values = p_trues + p_fakes
@@ -901,7 +1025,11 @@ class TrainingProgressDialog(QDialog):
                 all_values += distance_losses
                 
             max_y = max(all_values + [0.1]) if all_values else 0.1
-            self.axis_y.setRange(0, max_y * 1.1)  # 留出10%的空间
+            min_y = min(all_values + [0.0]) if all_values else 0.0
+            
+            # 在最小值和最大值基础上留出一定的空间
+            y_range = max_y - min_y
+            self.axis_y.setRange(max(0, min_y - y_range * 0.1), max_y * 1.1)
             
             # 确保Y轴有足够的刻度以显示数据
             if max_y > 0.5:
@@ -925,6 +1053,9 @@ class TrainingProgressDialog(QDialog):
             self.distance_loss_label.setText(f"距离损失: {latest_distance_loss:.4f}")
             
             # 更新时间信息
+            current_time = time.time()
+            
+            # 更新开始时间
             if begin_time:
                 if isinstance(begin_time, (int, float)):
                     # 如果是时间戳，转换为可读格式
@@ -933,48 +1064,69 @@ class TrainingProgressDialog(QDialog):
                 else:
                     self.begin_time_label.setText(f"开始时间: {begin_time}")
             
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.current_time_label.setText(f"当前时间: {current_time}")
-            
-            # 计算已经运行的时间
-            elapsed_seconds = int(time.time() - self.start_time)
-            minutes, seconds = divmod(elapsed_seconds, 60)
-            hours, minutes = divmod(minutes, 60)
-            if hours > 0:
-                self.elapsed_time_label.setText(f"已运行时间: {hours}小时{minutes}分{seconds}秒")
-            else:
-                self.elapsed_time_label.setText(f"已运行时间: {minutes}分{seconds}秒")
-            
-            # 检查训练是否已经结束
-            if end_time:
-                if isinstance(end_time, (int, float)):
-                    # 如果是时间戳，转换为可读格式
-                    end_time_str = datetime.fromtimestamp(end_time).strftime("%Y-%m-%d %H:%M:%S")
-                    self.status_label.setText(f"状态: 训练已完成 (结束于 {end_time_str})")
-                else:
-                    self.status_label.setText("状态: 训练已完成")
-                    
-                self.status_label.setStyleSheet("color: green; font-weight: bold;")
-                self.stop_button.setEnabled(False)
-                
-            # 检查模型状态
+            # 检查模型状态并更新结束时间和训练状态
+            training_complete = False
             try:
                 model_status = self.http_server.get_model_status(self.model_name)
-                if model_status != 1:  # 如果不是训练中状态
-                    if model_status == 2:  # 训练完成
+                
+                # 状态为2表示训练完成，或者手动停止训练时
+                if model_status == 2 or self.stopped:
+                    training_complete = True
+                    # 设置结束时间为当前时间，如果之前没有设置过
+                    if not hasattr(self, 'actual_end_time'):
+                        self.actual_end_time = current_time
+                        # 格式化结束时间
+                        end_time_str = datetime.fromtimestamp(self.actual_end_time).strftime("%Y-%m-%d %H:%M:%S")
+                        self.end_time_label.setText(f"结束时间: {end_time_str}")
+                    
+                    # 更新状态标签
+                    if self.stopped:
+                        self.status_label.setText("状态: 已手动停止训练")
+                        self.status_label.setStyleSheet("color: orange; font-weight: bold;")
+                    else:
                         self.status_label.setText("状态: 训练已完成")
                         self.status_label.setStyleSheet("color: green; font-weight: bold;")
-                    else:
-                        self.status_label.setText(f"状态: 训练中断 (状态码: {model_status})")
-                        self.status_label.setStyleSheet("color: red; font-weight: bold;")
+                    
+                    # 禁用停止按钮
                     self.stop_button.setEnabled(False)
+                    # 停止定时器
                     self.timer.stop()
+                else:
+                    # 训练仍在进行中，显示实时状态
+                    self.status_label.setText("状态: 训练中")
+                    self.status_label.setStyleSheet("color: blue; font-weight: bold;")
+                    # 确保停止按钮可用
+                    self.stop_button.setEnabled(True)
+                    self.end_time_label.setText("结束时间: --")
             except Exception as e:
                 print(f"获取模型状态失败: {str(e)}")
                 
+            # 计算训练总时间
+            if training_complete and hasattr(self, 'actual_end_time'):
+                # 使用实际结束时间计算
+                if isinstance(begin_time, (int, float)):
+                    total_seconds = int(self.actual_end_time - begin_time)
+                else:
+                    total_seconds = int(self.actual_end_time - self.start_time)
+            else:
+                # 使用当前时间计算训练中的总时间
+                if isinstance(begin_time, (int, float)):
+                    total_seconds = int(current_time - begin_time)
+                else:
+                    total_seconds = int(current_time - self.start_time)
+            
+            # 显示训练总时间
+            minutes, seconds = divmod(total_seconds, 60)
+            hours, minutes = divmod(minutes, 60)
+            if hours > 0:
+                self.total_time_label.setText(f"训练总时间: {hours}小时{minutes}分{seconds}秒")
+            else:
+                self.total_time_label.setText(f"训练总时间: {minutes}分{seconds}秒")
+                
         except Exception as e:
             print(f"更新训练数据失败: {str(e)}")
-            # 如果连续多次失败，可以考虑停止更新
+            import traceback
+            traceback.print_exc()
     
     def stop_training(self):
         """停止训练"""
@@ -987,13 +1139,29 @@ class TrainingProgressDialog(QDialog):
         )
         if confirm == QMessageBox.Yes:
             try:
+                # 设置停止标志
+                self.stopped = True
+                # 记录实际结束时间
+                self.actual_end_time = time.time()
                 # 停止训练
-                self.http_server.finish_model(self.model_id)
+                result = self.http_server.finish_model(self.model_id)
+                print(f"停止训练结果: {result}")
+                
+                # 更新UI状态
                 self.status_label.setText("状态: 已手动停止训练")
                 self.status_label.setStyleSheet("color: orange; font-weight: bold;")
                 self.stop_button.setEnabled(False)
-                self.stopped = True
+                
+                # 更新结束时间
+                end_time_str = datetime.fromtimestamp(self.actual_end_time).strftime("%Y-%m-%d %H:%M:%S")
+                self.end_time_label.setText(f"结束时间: {end_time_str}")
+                
+                # 更新一次数据以刷新界面
+                self.update_data()
             except Exception as e:
+                print(f"停止训练失败: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 QMessageBox.critical(self, "错误", f"停止训练失败: {str(e)}")
     
     def closeEvent(self, event):

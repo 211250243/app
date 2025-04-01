@@ -119,17 +119,15 @@ class HttpServer:
         print(f"http_server无该模型: {model_list}")
         return None    
     
-    def get_model_params(self, model_name):
+    def get_model(self, model_name):
         """
-        根据模型名称获取模型参数
+        根据模型名称获取模型
         """
         model_list = self.list_model()
         for model in model_list:
             if model.get("name") == model_name:
-                # params = model 除去 name 和 id 剩下的部分
-                params = {k: v for k, v in model.items() if k != "name" and k != "id"}
-                print(f"获取模型参数: {params}")
-                return params
+                print(f"获取模型: {model}")
+                return model
         print(f"http_server无该模型: {model_list}")
         return None
     
