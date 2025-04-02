@@ -15,7 +15,7 @@ from utils import ProgressDialog, check_detect_sample_group, check_sample_group,
 from model_handler import ModelGroupDialog
 
 
-class DetectHandler(QObject):
+class DetectHandler:
     """
     处理 DetectWidget中的所有操作
     """
@@ -39,18 +39,9 @@ class DetectHandler(QObject):
         
         # 启动检测按钮        
         self.ui.startDetectButton.clicked.connect(self.detect_samples_handler.detect_samples)
-        # 设置事件过滤器（外部过滤器 -> handler继承QObject并重写eventFilter）
-        self.ui.resultLabel.setCursor(Qt.PointingHandCursor)
-        # self.event_filter = ImageClickEventFilter(self)
-        # self.ui.resultLabel.installEventFilter(self.event_filter)
-        self.ui.resultLabel.installEventFilter(self)
-
-    def eventFilter(self, obj, event):
-        """事件过滤器，处理图片点击事件"""
-        if obj is self.ui.resultLabel and event.type() == QEvent.MouseButtonPress:
-            self.toggle_image()
-            return True
-        return super(DetectHandler, self).eventFilter(obj, event)
+        # 设置事件过滤器
+        self.event_filter = ImageClickEventFilter(self)
+        self.ui.resultLabel.installEventFilter(self.event_filter)
 
     def init_sample_group(self):
         """
@@ -431,7 +422,7 @@ class DetectHandler(QObject):
         base_name = os.path.splitext(os.path.basename(original_path))[0]
         result_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP, f"{base_name}_combined.png")
         
-        # 检查是否存在结果图
+         # 检查是否存在结果图
         has_result = os.path.exists(result_path)
         
         # 保存当前图像信息
@@ -476,11 +467,12 @@ class DetectHandler(QObject):
         
         # 清空结果浏览器
         self.ui.resultBrowser.clear()
-    
+        
     def toggle_image(self):
         """切换原图和结果图的显示"""
+        print(f"----------------点击切换图片----------------")
         if self.has_result:  # 只有在有结果图的情况下才切换
-            print("切换至结果图" if self.show_result else "切换至原图")
+            print(f"切换图片: {self.current_original_path}")
             self.show_result = not self.show_result
             self.update_image_display()
 
@@ -489,22 +481,17 @@ class DetectHandler(QObject):
         self.ui.resultBrowser.clear()
         self.ui.resultLabel.clear()
         self.ui.infoLabel.setText("等待检测...")
-        # 重置图像状态
-        self.current_original_path = None
-        self.current_result_path = None
-        self.has_result = False
-        self.show_result = False
             
 
 
-# class ImageClickEventFilter(QObject):
-#     """图片点击事件过滤器"""
-#     def __init__(self, detect_handler):
-#         super().__init__()
-#         self.detect_handler = detect_handler
+class ImageClickEventFilter(QObject):
+    """图片点击事件过滤器"""
+    def __init__(self, detect_handler):
+        super().__init__()
+        self.detect_handler = detect_handler
         
-#     def eventFilter(self, obj, event):
-#         if obj is self.detect_handler.ui.resultLabel and event.type() == QEvent.MouseButtonPress:
-#             self.detect_handler.toggle_image()
-#             return True
-#         return super().eventFilter(obj, event)
+    def eventFilter(self, obj, event):
+        if obj is self.detect_handler.ui.resultLabel and event.type() == QEvent.MouseButtonPress:
+            self.detect_handler.toggle_image()
+            return True
+        return super().eventFilter(obj, event)

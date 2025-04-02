@@ -3,10 +3,10 @@ import time
 import requests
 import config
 from typing import Optional
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget, QHBoxLayout, QVBoxLayout, QLabel
 from utils import ProgressDialog, check_detect_sample_group, check_model_group, is_image, join_path, show_message_box
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QPainter, QFont
 
 class HttpServer:        
     # -------------------- 模型操作 --------------------
@@ -305,11 +305,12 @@ class HttpServer:
             推理信息：{
                 'inferPercentage': 推理进度,
                 'have_infer_img_list': [{
-                    'name': 图像文件名,
+                    'img_filename': 图像文件名,
+                    'result_name': 结果图文件名前缀,
                     'score': 得分
                 }]
             }
-            注：推理结果的图像名为原图加后缀，其中_0.png是前景分割图，_1.png是结果图，_2.png是背景过滤后的结果图，_3.png是异常图，_4.png是背景过滤后的异常图
+            注：推理结果的图像名为result_name加后缀，其中_0.png是前景分割图，_1.png是结果图，_2.png是背景过滤后的结果图，_3.png是异常图，_4.png是背景过滤后的异常图
         """
         url = f"http://{config.HOSTNAME}:{config.PORT}/infer_process/{model_id}"
         try:
@@ -323,22 +324,33 @@ class HttpServer:
             print(f"获取模型推理信息失败: {str(e)}")
             raise
     
-    def download_result_images(self, filename, save_path):
+    def download_result_images(self, origin_name, alias_name, save_path):
         """
         下载五种结果热图：_0.png, _1.png, _2.png, _3.png, _4.png
 
+        Args:
+            origin_name: 服务器原图名 xxx-yyy.png
+            alias_name: 结果图别名前缀 zzz
+            save_path: 保存路径
+
         Returns:
-            xxx-yyy.png -> yyy
+            xxx-yyy.png -> yyy 本地初始图名
         """
-        base_name = os.path.splitext(filename)[0]
+        base_name = os.path.splitext(origin_name)[0].split("-")[-1] # 返回原图名
         for i in range(5):
-            result_name = f"{base_name}_{i}.png"
+            result_name = f"{alias_name}_{i}.png"
+            rename = f"{base_name}_{i}.png"
             try:
-                self.save_downloaded_sample(result_name, save_path)
-                print(f"下载热图成功: {result_name} -> {save_path}")
+                content = self.download_sample(result_name)
+                full_path = join_path(save_path, rename)
+                # 确保目录存在，写入
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                with open(full_path, 'wb') as f:
+                    f.write(content)
+                print(f"下载热图成功: {result_name} -> {full_path}")
             except Exception as e:
                 print(f"下载热图失败({i}): {str(e)}")
-        return base_name.split("-")[-1] # 返回原图名
+        return base_name
 
 
     # -------------------- 样本组操作 --------------------
@@ -638,7 +650,7 @@ def test_model_api():
         "name": model_name,
         "input_h": 256,
         "input_w": 256,
-        "end_acc": 0.95,
+        "end_acc": 0.5,
         "layers": layers,
         "patchsize": patchsize,
         "embed_dimension": embed_dimension
@@ -1036,6 +1048,7 @@ class HttpDetectSamples:
             # 创建保存路径
             self.save_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP)
             os.makedirs(self.save_path, exist_ok=True)
+            self.origin_path = join_path(config.SAMPLE_PATH, config.DETECT_SAMPLE_GROUP)
             
             # 清空已处理文件的记录
             self.processed_files.clear()
@@ -1065,6 +1078,7 @@ class HttpDetectSamples:
                 
             # 获取推理实时信息
             infer_process = self.http_server.infer_process(self.model_id)
+            print(f"infer_process: {infer_process}")
             if not infer_process or 'have_infer_img_list' not in infer_process:
                 return
                 
@@ -1073,22 +1087,47 @@ class HttpDetectSamples:
             
             # 找出未处理的图像
             for img_info in image_list:
-                img_name = img_info.get('name')
-                if not img_name or img_name in self.processed_files:
+                origin_name = img_info.get('img_filename') # 原图名
+                alias_name = img_info.get('result_name') # 服务器中结果图的别名前缀
+                print(f"alias_name: {alias_name}")
+                if not alias_name or origin_name in self.processed_files:
                     continue
                 
                 # 下载热图（5种不同后缀的结果图）
                 try:
-                    base_name = self.http_server.download_result_images(img_name, self.save_path)
+                    base_name = self.http_server.download_result_images(origin_name, alias_name, self.save_path)
                     
-                    # 显示结果（_1.png是结果图）
+                    # 准备路径
+                    original_path = join_path(self.origin_path, f"{base_name}.png")
                     result_path = join_path(self.save_path, f"{base_name}_1.png")
-                    print(f"显示结果: {result_path}")
+                    heatmap_path = join_path(self.save_path, f"{base_name}_3.png")
+                    
+                    # 显示原图，直接使用结果标签（最简单的方法）
                     if os.path.exists(result_path):
-                        self.display_result(result_path, img_info)
+                        # 合并三张图为一张图
+                        combined_pixmap = self.combine_images(original_path, result_path, heatmap_path)
                         
+                        # 显示在原来的resultLabel上
+                        self.ui.resultLabel.setPixmap(combined_pixmap)
+                        self.ui.resultLabel.setToolTip(f"检测结果保存在: {self.save_path}")
+                        
+                        # 显示检测信息
+                        score = img_info.get('score', 0)
+                        self.ui.infoLabel.setText(f"缺陷得分: {score:.4f}")
+                        
+                        # 在结果浏览器中显示详细信息
+                        self.ui.resultBrowser.clear()
+                        self.ui.resultBrowser.append(f"<b>文件名:</b> {img_info.get('name', '未知')}")
+                        self.ui.resultBrowser.append(f"<b>缺陷得分:</b> {score:.4f}")
+                        self.ui.resultBrowser.append(f"<b>检测状态:</b> {'异常' if float(score) > 0.5 else '正常'}")
+                        self.ui.resultBrowser.append(f"<b>保存位置:</b> {self.save_path}")
+                        
+                        print(f"显示结果: 原图、检测结果图和热力图")
+                    else:
+                        print(f"结果图 {result_path} 不存在")
+                    
                     # 标记为已处理
-                    self.processed_files.add(img_name)
+                    self.processed_files.add(origin_name)
                     
                 except Exception as e:
                     print(f"处理图片结果失败: {str(e)}")
@@ -1104,31 +1143,6 @@ class HttpDetectSamples:
         except Exception as e:
             print(f"获取检测结果失败: {str(e)}")
 
-    def display_result(self, image_path: str, result_info: dict):
-        """显示检测结果图片和信息"""
-        if os.path.exists(image_path):
-            # 显示结果图片
-            pixmap = QPixmap(image_path)
-            scaled_pixmap = pixmap.scaled(
-                self.ui.resultLabel.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            self.ui.resultLabel.setPixmap(scaled_pixmap)
-            self.ui.resultLabel.setToolTip(f"检测结果: {os.path.basename(image_path)}")
-            
-            # 显示检测信息
-            score = result_info.get('score', 0)
-            self.ui.infoLabel.setText(f"缺陷得分: {score:.4f}")
-            
-            # 在结果浏览器中显示详细信息
-            if hasattr(self.ui, 'resultBrowser'):
-                self.ui.resultBrowser.clear()
-                self.ui.resultBrowser.append(f"<b>文件名:</b> {result_info.get('name', '未知')}")
-                self.ui.resultBrowser.append(f"<b>缺陷得分:</b> {score:.4f}")
-                self.ui.resultBrowser.append(f"<b>检测状态:</b> {'异常' if float(score) > 0.5 else '正常'}")
-                self.ui.resultBrowser.append(f"<b>保存位置:</b> {self.save_path}")
-
     def end_detection(self, message="检测已完成"):
         """结束检测过程"""
         if self.result_timer:
@@ -1143,6 +1157,105 @@ class HttpDetectSamples:
         # 清理
         self.model_id = None
         self.group_id = None
+
+    def combine_images(self, original_path, result_path, heatmap_path):
+        """
+        将三张图像水平合并为一张图像
+        总宽度适应resultLabel宽度，高度按等比例缩放
+        并保存合并后的图像
+        """
+        # 获取resultLabel的宽度
+        label_width = self.ui.resultLabel.width()
+        
+        # 加载三张图像
+        pixmaps = []
+        titles = ["原图", "检测结果", "热力图"]
+        paths = [original_path, result_path, heatmap_path]
+        
+        # 首先加载所有图像
+        for path in paths:
+            if os.path.exists(path):
+                pixmap = QPixmap(path)
+                if pixmap.isNull():
+                    # 如果图像加载失败，创建一个空白图像
+                    pixmap = QPixmap(200, 200)
+                    pixmap.fill(Qt.white)
+            else:
+                # 如果图像不存在，创建一个空白图像
+                pixmap = QPixmap(200, 200)
+                pixmap.fill(Qt.white)
+            
+            pixmaps.append(pixmap)
+        
+        # 确定每张图像在合并后的宽度比例(相同比例)
+        single_width = label_width // 3
+        
+        # 计算每张图像的缩放比例和最终高度
+        max_height = 0
+        scaled_pixmaps = []
+        
+        for pixmap in pixmaps:
+            if pixmap.width() > 0:  # 避免除以零错误
+                # 计算按宽度缩放的比例
+                scale_factor = single_width / pixmap.width()
+                # 计算缩放后的高度
+                scaled_height = int(pixmap.height() * scale_factor)
+                # 缩放图像
+                scaled_pixmap = pixmap.scaled(
+                    single_width, scaled_height, 
+                    Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+                max_height = max(max_height, scaled_pixmap.height())
+            else:
+                scaled_pixmap = pixmap
+            
+            scaled_pixmaps.append(scaled_pixmap)
+        
+        # 创建一个足够大的图像来容纳所有图像和标题
+        TITLE_HEIGHT = 30  # 标题高度
+        result = QPixmap(label_width, max_height + TITLE_HEIGHT)
+        result.fill(Qt.white)  # 设置白色背景
+        
+        # 创建画师
+        painter = QPainter(result)
+        # 设置字体
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(12)
+        painter.setFont(font)
+        
+        # 绘制所有图像和标题
+        x_offset = 0
+        for i, pixmap in enumerate(scaled_pixmaps):
+            # 计算每个图像的宽度
+            img_width = single_width
+            
+            # 绘制标题
+            painter.drawText(
+                x_offset, 0, img_width, TITLE_HEIGHT, 
+                Qt.AlignCenter, titles[i]
+            )
+            
+            # 垂直居中绘制图像
+            y_offset = TITLE_HEIGHT + (max_height - pixmap.height()) // 2
+            painter.drawPixmap(x_offset, y_offset, pixmap)
+            
+            # 更新x偏移
+            x_offset += img_width
+        
+        # 完成绘制
+        painter.end()
+        
+        # 保存合并后的图像
+        result_file_path = ''
+        if original_path:
+            # 从原图路径提取文件名
+            base_name = os.path.splitext(os.path.basename(original_path))[0]
+            result_file_path = join_path(self.save_path, f"{base_name}_combined.png")
+            result.save(result_file_path, "PNG")
+            print(f"保存合并图像: {result_file_path}")
+        
+        return result
 
 if __name__ == "__main__":
     # test_sample_api()
