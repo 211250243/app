@@ -1,3 +1,45 @@
+"""
+让 `DetectHandler` 继承 `QObject` 并内部实现事件处理与使用单独的 `ImageClickEventFilter` 类相比，各有优劣：
+
+### 性能方面
+
+从运行速度来看，两种方式几乎没有明显差异：
+
+1. **事件传递路径**：
+   - 内部实现：事件直接从 `resultLabel` → `DetectHandler`
+   - 外部过滤器：事件从 `resultLabel` → `ImageClickEventFilter` → `DetectHandler`
+
+   外部过滤器多了一次函数调用，但这种微小的差异在现代处理器上基本可以忽略不计。
+
+2. **内存占用**：
+   - 内部实现：只需要一个 `DetectHandler` 对象
+   - 外部过滤器：需要 `DetectHandler` 和 `ImageClickEventFilter` 两个对象
+
+   但额外的小对象所占用的内存非常少，不会对应用性能产生实质影响。
+
+### 设计方面
+
+1. **继承 QObject 的影响**：
+   - 让 `DetectHandler` 继承 `QObject` 意味着它获得了 Qt 的信号槽机制和事件系统支持
+   - 如果 `DetectHandler` 将来需要发射信号或与其他 Qt 组件更深入地交互，这是有益的
+   - 但如果 `DetectHandler` 只是作为一个功能类，不需要 Qt 的特性，那么无谓的继承会增加类的复杂性
+
+2. **职责划分**：
+   - 外部过滤器：遵循单一职责原则，`ImageClickEventFilter` 只负责事件过滤，`DetectHandler` 负责业务逻辑
+   - 内部实现：将事件处理和业务逻辑混合在一起，可能导致类变得更庞大
+
+### 哪种更好？
+
+**从实用角度看**：内部实现更简单直接，对于这种简单的交互场景足够了。
+
+**从设计角度看**：如果应用正在不断扩展，外部过滤器提供了更好的扩展性和维护性。
+
+**我的建议**：
+- 如果 `DetectHandler` 已经是或将来可能成为 Qt 组件体系的一部分（需要使用信号槽或其他 Qt 特性），那么让它继承 `QObject` 并内部实现事件处理是合理的
+- 如果 `DetectHandler` 主要是业务逻辑类，而且应用正在变得复杂，那么使用专门的事件过滤器类可能更有利于长期维护
+
+对于当前的应用场景，考虑到功能相对简单，我认为内部实现（让 `DetectHandler` 继承 `QObject` 并自行处理事件）是更合适的选择，它减少了类的数量，让代码更紧凑，同时没有显著的性能影响。
+"""
 import os
 import shutil
 
@@ -15,7 +57,7 @@ from utils import ProgressDialog, check_detect_sample_group, check_sample_group,
 from model_handler import ModelGroupDialog
 
 
-class DetectHandler:
+class DetectHandler():
     """
     处理 DetectWidget中的所有操作
     """
@@ -39,9 +81,18 @@ class DetectHandler:
         
         # 启动检测按钮        
         self.ui.startDetectButton.clicked.connect(self.detect_samples_handler.detect_samples)
-        # 设置事件过滤器
+        # 设置事件过滤器（外部过滤器 -> handler继承QObject并重写eventFilter）
+        self.ui.resultLabel.setCursor(Qt.PointingHandCursor)
         self.event_filter = ImageClickEventFilter(self)
         self.ui.resultLabel.installEventFilter(self.event_filter)
+        # self.ui.resultLabel.installEventFilter(self)
+
+    # def eventFilter(self, obj, event):
+    #     """事件过滤器，处理图片点击事件"""
+    #     if obj is self.ui.resultLabel and event.type() == QEvent.MouseButtonPress:
+    #         self.toggle_image()
+    #         return True
+    #     return super(DetectHandler, self).eventFilter(obj, event)
 
     def init_sample_group(self):
         """
@@ -422,7 +473,7 @@ class DetectHandler:
         base_name = os.path.splitext(os.path.basename(original_path))[0]
         result_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP, f"{base_name}_combined.png")
         
-         # 检查是否存在结果图
+        # 检查是否存在结果图
         has_result = os.path.exists(result_path)
         
         # 保存当前图像信息
@@ -467,12 +518,11 @@ class DetectHandler:
         
         # 清空结果浏览器
         self.ui.resultBrowser.clear()
-        
+    
     def toggle_image(self):
         """切换原图和结果图的显示"""
-        print(f"----------------点击切换图片----------------")
         if self.has_result:  # 只有在有结果图的情况下才切换
-            print(f"切换图片: {self.current_original_path}")
+            print("切换至结果图" if self.show_result else "切换至原图")
             self.show_result = not self.show_result
             self.update_image_display()
 
@@ -481,6 +531,11 @@ class DetectHandler:
         self.ui.resultBrowser.clear()
         self.ui.resultLabel.clear()
         self.ui.infoLabel.setText("等待检测...")
+        # 重置图像状态
+        self.current_original_path = None
+        self.current_result_path = None
+        self.has_result = False
+        self.show_result = False
             
 
 

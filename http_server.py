@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import requests
@@ -1064,7 +1065,6 @@ class HttpDetectSamples:
             
             # 更新UI状态
             self.ui.startDetectButton.setEnabled(False)
-            self.ui.infoLabel.setText("检测中...")
             
         except Exception as e:
             show_message_box("错误", f"启动检测失败: {str(e)}", QMessageBox.Critical)
@@ -1083,10 +1083,10 @@ class HttpDetectSamples:
                 return
                 
             # 获取已推理的图像列表
-            image_list = infer_process.get('have_infer_img_list', [])
+            self.image_list = infer_process.get('have_infer_img_list', [])
             
             # 找出未处理的图像
-            for img_info in image_list:
+            for img_info in self.image_list:
                 origin_name = img_info.get('img_filename') # 原图名
                 alias_name = img_info.get('result_name') # 服务器中结果图的别名前缀
                 print(f"alias_name: {alias_name}")
@@ -1113,13 +1113,18 @@ class HttpDetectSamples:
                         
                         # 显示检测信息
                         score = img_info.get('score', 0)
-                        self.ui.infoLabel.setText(f"缺陷得分: {score:.4f}")
                         
                         # 在结果浏览器中显示详细信息
                         self.ui.resultBrowser.clear()
                         self.ui.resultBrowser.append(f"<b>文件名:</b> {img_info.get('name', '未知')}")
                         self.ui.resultBrowser.append(f"<b>缺陷得分:</b> {score:.4f}")
-                        self.ui.resultBrowser.append(f"<b>检测状态:</b> {'异常' if float(score) > 0.5 else '正常'}")
+                        self.ui.resultBrowser.append(f"<b>当前阈值:</b> {config.DEFECT_THRESHOLD:.2f}")
+                        
+                        # 根据阈值判断状态
+                        is_defect = float(score) > config.DEFECT_THRESHOLD
+                        status_text = "异常" if is_defect else "正常"
+                        status_color = "red" if is_defect else "green"
+                        self.ui.resultBrowser.append(f"<b>检测状态:</b> <font color='{status_color}'>{status_text}</font>")
                         self.ui.resultBrowser.append(f"<b>保存位置:</b> {self.save_path}")
                         
                         print(f"显示结果: 原图、检测结果图和热力图")
@@ -1151,9 +1156,37 @@ class HttpDetectSamples:
             
         # 更新UI状态
         self.ui.startDetectButton.setEnabled(True)
-        self.ui.infoLabel.setText(message)
         show_message_box("提示", message, QMessageBox.Information)
+
+        # 将 image_list 存入本地
+        result = []
+        for image_info in self.image_list:
+            # 获取得分
+            score = image_info.get('score', 0)
+            if isinstance(score, str):
+                try:
+                    score = float(score)
+                except:
+                    score = 0.0
+            
+            # 使用配置的阈值判断是否异常
+            is_defect = score > config.DEFECT_THRESHOLD
+            status = "异常" if is_defect else "正常"
+            
+            result.append({
+                'file_name': image_info.get('img_filename'),
+                'score': score,
+                'status': status,
+                'alias_name': image_info.get('result_name'),
+                'origin_name': image_info.get('img_filename').split('-')[-1]
+            })
         
+        config.DETECT_LIST = result
+        
+        # 保存结果到JSON文件
+        with open(join_path(self.save_path, "detect_list.json"), "w") as f:
+            json.dump(result, f, ensure_ascii=False, indent=4)
+
         # 清理
         self.model_id = None
         self.group_id = None

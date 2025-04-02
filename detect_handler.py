@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 
@@ -36,7 +37,12 @@ class DetectHandler(QObject):
         self.init_model_group()
         # 初始化检测列表
         self.init_detect_list()
+        # 初始化检测组件
+        self.init_detect_group()
         
+
+    def init_detect_group(self):
+        """初始化检测组件"""
         # 启动检测按钮        
         self.ui.startDetectButton.clicked.connect(self.detect_samples_handler.detect_samples)
         # 设置事件过滤器（外部过滤器 -> handler继承QObject并重写eventFilter）
@@ -44,6 +50,34 @@ class DetectHandler(QObject):
         # self.event_filter = ImageClickEventFilter(self)
         # self.ui.resultLabel.installEventFilter(self.event_filter)
         self.ui.resultLabel.installEventFilter(self)
+        # 设置阈值
+        config.DEFECT_THRESHOLD = config.PROJECT_METADATA.get('defect_threshold', 0.5)
+        self.ui.thresholdSlider.setValue(int(config.DEFECT_THRESHOLD * 100))
+        self.ui.thresholdValueLabel.setText(f"阈值: {config.DEFECT_THRESHOLD:.2f}")
+        self.ui.thresholdSlider.valueChanged.connect(self.on_threshold_changed)
+        self.ui.applyThresholdButton.clicked.connect(self.apply_threshold)
+        # 初始化检测列表
+        detect_list_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP, 'detect_list.json')
+        if config.DETECT_SAMPLE_GROUP and os.path.exists(detect_list_path):
+            config.DETECT_LIST = json.load(open(detect_list_path))
+    
+    def on_threshold_changed(self, value):
+        """阈值变化时更新显示"""
+        threshold = value / 100.0
+        self.ui.thresholdValueLabel.setText(f"阈值: {threshold:.2f}")
+    
+    def apply_threshold(self):
+        """应用新的阈值设置"""
+        new_threshold = self.ui.thresholdSlider.value() / 100.0
+        config.DEFECT_THRESHOLD = new_threshold
+        update_metadata('defect_threshold', new_threshold)
+        
+        # 如果当前有显示结果，使用新阈值刷新显示
+        if hasattr(self, 'has_result') and self.has_result:
+            self.update_image_display()
+        
+        # 提示用户
+        show_message_box("阈值设置", f"已应用新阈值: {new_threshold:.2f}", QMessageBox.Information)
 
     def eventFilter(self, obj, event):
         """事件过滤器，处理图片点击事件"""
@@ -451,31 +485,49 @@ class DetectHandler(QObject):
     def update_image_display(self):
         """根据当前状态更新图片显示"""
         if self.show_result and self.has_result:
-            # 显示结果图
-            pixmap = QPixmap(self.current_result_path)
-            tooltip = f"检测结果图: {os.path.basename(self.current_result_path)}"
+            pixmap_path = self.current_result_path
         else:
-            # 显示原图
-            pixmap = QPixmap(self.current_original_path)
-            tooltip = f"原图: {os.path.basename(self.current_original_path)}"
+            pixmap_path = self.current_original_path
             
         # 缩放图片以适应显示区域
-        scaled_pixmap = pixmap.scaled(
+        scaled_pixmap = QPixmap(pixmap_path).scaled(
             self.ui.resultLabel.size(),
             Qt.KeepAspectRatio,
             Qt.SmoothTransformation
         )
         self.ui.resultLabel.setPixmap(scaled_pixmap)
-        self.ui.resultLabel.setToolTip(tooltip)
+        self.ui.resultLabel.setToolTip("点击图片切换显示原图和结果图" if self.has_result else "等待检测...")
         
-        # 更新状态文本
-        if self.has_result:
-            self.ui.infoLabel.setText("点击图片切换显示原图和结果图")
-        else:
-            self.ui.infoLabel.setText("等待检测...")
-        
-        # 清空结果浏览器
+        # 在结果浏览器中显示详细信息
         self.ui.resultBrowser.clear()
+        if not self.has_result:
+            return
+        
+        for img_info in config.DETECT_LIST:
+            if img_info.get('origin_name') == os.path.basename(self.current_original_path):
+                # 获取分数
+                score = img_info.get('score')
+                if isinstance(score, str):
+                    try:
+                        score = float(score)
+                    except:
+                        score = 0.0
+                
+                # 根据阈值判断状态
+                is_defect = score > config.DEFECT_THRESHOLD
+                status_text = "异常" if is_defect else "正常"
+                status_color = "red" if is_defect else "green"
+                
+                # 更新UI显示
+                self.ui.resultBrowser.append(f"<b>检测样本名:</b> {img_info.get('origin_name', '未知')}")
+                self.ui.resultBrowser.append(f"<b>缺陷得分:</b> {score:.4f}")
+                self.ui.resultBrowser.append(f"<b>当前阈值:</b> {config.DEFECT_THRESHOLD:.2f}")
+                self.ui.resultBrowser.append(f"<b>检测状态:</b> <font color='{status_color}'>{status_text}</font>")
+                self.ui.resultBrowser.append(f"<b>结果保存位置:</b> {self.current_result_path}")
+                
+                # 更新状态（可能在阈值变化后状态发生变化）
+                img_info['status'] = status_text
+                return
     
     def toggle_image(self):
         """切换原图和结果图的显示"""
@@ -488,7 +540,6 @@ class DetectHandler(QObject):
         """清除检测信息"""
         self.ui.resultBrowser.clear()
         self.ui.resultLabel.clear()
-        self.ui.infoLabel.setText("等待检测...")
         # 重置图像状态
         self.current_original_path = None
         self.current_result_path = None

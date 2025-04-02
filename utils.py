@@ -295,7 +295,31 @@ def get_model_status(model_group):
                 return model_info.get("status")
         return -1
 
-
+def load_metadata():
+    """
+    从本地加载项目的元数据
+    """    
+    if os.path.exists(config.PROJECT_METADATA_PATH):
+        try:
+            with open(config.PROJECT_METADATA_PATH, 'r', encoding='utf-8') as file:
+                metadata = json.load(file)
+                config.PROJECT_METADATA = metadata
+                print(f"加载项目元数据: {config.PROJECT_METADATA}")
+                # 同步配置信息
+                config.SAMPLE_GROUP = metadata.get('sample_group')
+                config.MODEL_GROUP = metadata.get('model_group')
+                config.MODEL_PARAMS = metadata.get('model_params')
+                config.DETECT_SAMPLE_GROUP = metadata.get('detect_sample_group')
+                # 加载阈值设置
+                if 'defect_threshold' in metadata:
+                    config.DEFECT_THRESHOLD = metadata.get('defect_threshold')
+                    print(f"加载缺陷检测阈值: {config.DEFECT_THRESHOLD}")
+        except Exception as e:
+            print(f"加载元数据失败: {str(e)}")
+            config.PROJECT_METADATA = None
+    else:
+        print(f"元数据文件不存在: {config.PROJECT_METADATA_PATH}")
+        config.PROJECT_METADATA = None
 
 class FloatingTimer(QWidget):
     """悬浮计时器，显示应用运行时间"""

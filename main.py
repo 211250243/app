@@ -8,7 +8,7 @@ import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler
-from utils import FloatingTimer, join_path, show_message_box
+from utils import FloatingTimer, join_path, show_message_box, load_metadata
 from http_server import HttpServer, is_sample_group_uploaded
 
 
@@ -21,6 +21,8 @@ class MainWindow(QMainWindow):
         config.SAMPLE_PATH = join_path(config.PROJECT_METADATA['project_path'], config.SAMPLE_FOLDER)
         config.MODEL_PATH = join_path(config.PROJECT_METADATA['project_path'], config.MODEL_FOLDER)
         config.DETECT_PATH = join_path(config.PROJECT_METADATA['project_path'], config.DETECT_FOLDER)
+        # # 加载元数据，包括阈值设置
+        # load_metadata()
 
         # 处理悬浮计时器
         if floating_timer:

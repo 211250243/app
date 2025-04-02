@@ -35,6 +35,10 @@ MODEL_INFO_FILE = 'model.json'
 DETECT_FOLDER = 'detect'
 DETECT_PATH = None
 DETECT_SAMPLE_GROUP = None
+DETECT_LIST = None
+
+# 检测阈值设置
+DEFECT_THRESHOLD = 0.5  # 默认阈值为0.5，高于此值判断为异常
 
 # 参数配置
 TEST_RATIO = 0.1
