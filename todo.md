@@ -1,3 +1,21 @@
+## 大模型对接
+
+1. anomaly_gpt_infer(img_list, question, normal_img_list, history)
+
+```python
+@app.post("/anomaly_gpt_infer")
+def anomaly_gpt_infer(input :AnomalyGPT_Input,db: Session = Depends(get_db)):
+    print(input)
+    full_path_img_list = [os.path.join(os.path.join(data_path,'images'), _) for _ in input.img_list]
+    normal_img_list = [os.path.join(os.path.join(data_path,'images'), _) for _ in input.normal_img_list]
+    ans = []
+    for full_path in full_path_img_list:
+        response= predict(input.question,full_path,normal_img_list,input.history,os.path.join(data_path,'images'))
+        print(response)
+        ans.append(response)
+    return ans
+```
+
 ## 模型操作
 
 1. add_model(model) // 添加模型

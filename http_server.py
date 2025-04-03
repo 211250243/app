@@ -10,6 +10,35 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QPixmap, QPainter, QFont
 
 class HttpServer:        
+    # -------------------- 大模型操作 --------------------
+    def anomaly_gpt_infer(self, img_list, question = "", normal_img_list = [], history = []):
+        """
+        使用大模型进行推理
+
+        Args:
+            img_list: 待推理图像列表（必填）
+            question: 问题（选填）
+            normal_img_list: 正常图像列表（选填）
+            history: 历史记录（选填）[ 1号图对话记录[[question1, answer11], [question2,answer21],...], 2号图对话记录[[question1, answer12], [question2,answer22],...], ...]
+
+        Returns:
+            返回推理结果，同时生成结果图像，后缀是 __1.png （俩下划线）
+            结果格式: [
+                'The image shows a bottle of mineral water.',
+                ...
+            ]
+        """
+        url = f"http://{config.HOSTNAME}:{config.PORT}/anomaly_gpt_infer"
+        try:
+            response = requests.post(url, json={"img_list": img_list, "question": question, "normal_img_list": normal_img_list, "history": history})
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise Exception(f"大模型推理失败: HTTP错误: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"大模型推理失败: {str(e)}")
+            raise
+
     # -------------------- 模型操作 --------------------
     def add_model(self, model):
         """
@@ -1292,9 +1321,9 @@ class HttpDetectSamples:
 
 if __name__ == "__main__":
     # test_sample_api()
-    test_model_api()
+    # test_model_api()
 
-    # server = HttpServer()
+    server = HttpServer()
 
     # print(server.list_model())
     # group_name = f"测试组-{int(time.time())}"
@@ -1310,8 +1339,8 @@ if __name__ == "__main__":
     # print(f"样本列表: {samples}")
     
     # 下载样本组
-    # download_dir = "B:/Development/GraduationDesign/app/test/downloads"
-    # server.save_downloaded_sample('36592fc0-af3e-42cd-9c28-a3ebdd7708cb-001.png', download_dir)
+    download_dir = "B:/Development/GraduationDesign/app/test/downloads"
+    server.save_downloaded_sample('000__1.png', download_dir)
 
     # 删除样本组
     # server.clear_group(1)

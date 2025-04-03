@@ -3,3 +3,5 @@ opencv-python==4.10.0.84
 numpy==2.2.1
 paramiko==3.5.0
 requests==2.31.0
+scikit-learn==1.4.2
+matplotlib==3.8.4

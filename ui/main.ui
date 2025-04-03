@@ -2808,37 +2808,7 @@ QGroupBox::title {
           <property name="title">
            <string>AI检测</string>
           </property>
-          <widget class="QPushButton" name="importFileButton_3">
-           <property name="geometry">
-            <rect>
-             <x>125</x>
-             <y>30</y>
-             <width>91</width>
-             <height>30</height>
-            </rect>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QPushButton {
-    background-color: #e6f7ff;
-    border: 1px solid #91d5ff;
-    border-radius: 4px;
-    padding: 4px 8px;
-    color: #1890ff;
-    font-weight: bold;
-}
-QPushButton:hover {
-    background-color: #bae7ff;
-    border: 1px solid #69c0ff;
-}
-QPushButton:pressed {
-    background-color: #91d5ff;
-}</string>
-           </property>
-           <property name="text">
-            <string>AI判别</string>
-           </property>
-          </widget>
-          <widget class="QPushButton" name="importFileButton_2">
+          <widget class="QPushButton" name="AIButton">
            <property name="geometry">
             <rect>
              <x>15</x>
@@ -2866,6 +2836,39 @@ QPushButton:pressed {
            </property>
            <property name="text">
             <string>AI智能助手</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="AIInferButton">
+           <property name="geometry">
+            <rect>
+             <x>125</x>
+             <y>30</y>
+             <width>91</width>
+             <height>30</height>
+            </rect>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QPushButton {
+    background-color: #3498db;
+    color: white;
+    border-radius: 5px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-size: 10pt;
+    padding: 5px;
+}
+QPushButton:hover {
+    background-color: #2980b9;
+}
+QPushButton:pressed {
+    background-color: #1c6ea4;
+}</string>
+           </property>
+           <property name="text">
+            <string>AI分析</string>
+           </property>
+           <property name="icon">
+            <iconset>
+             <normaloff>ui/icon/ai.svg</normaloff>ui/icon/ai.svg</iconset>
            </property>
           </widget>
          </widget>

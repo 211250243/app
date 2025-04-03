@@ -6,7 +6,7 @@ from PySide6.QtCore import QTimer, Qt, QEvent, QObject
 from PySide6.QtGui import QPixmap
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QWidget, QDialog, QMessageBox, QFileDialog, 
-                             QAbstractItemView)
+                             QAbstractItemView, QInputDialog)
 
 import config
 from sample_handler import CustomListWidgetItem, SampleGroupDialog, NewSampleGroupDialog, LoadImages
@@ -39,6 +39,8 @@ class DetectHandler(QObject):
         self.init_detect_list()
         # 初始化检测组件
         self.init_detect_group()
+        # 初始化 AI 判别功能
+        self.init_ai_infer()
         
 
     def init_detect_group(self):
@@ -61,6 +63,47 @@ class DetectHandler(QObject):
         if config.DETECT_SAMPLE_GROUP and os.path.exists(detect_list_path):
             config.DETECT_LIST = json.load(open(detect_list_path))
     
+    def init_ai_infer(self):
+        """初始化 AI 判别功能"""
+        # 连接按钮信号
+        self.ui.AIInferButton.clicked.connect(self.on_ai_infer_clicked)
+    
+    def on_ai_infer_clicked(self):
+        """处理 AI 判别按钮点击事件"""
+        # 检查是否有当前选中的图像
+        if not hasattr(self, 'current_original_path') or not self.current_original_path:
+            show_message_box("提示", "请先选择一张已检测的图像", QMessageBox.Information)
+            return
+        
+        # 检查是否有检测结果
+        if not hasattr(self, 'has_result') or not self.has_result:
+            show_message_box("提示", "请先对图像进行检测", QMessageBox.Information)
+            return
+        
+        # 获取当前图像信息
+        origin_name = os.path.basename(self.current_original_path)
+        
+        # 查找当前图像对应的检测结果信息
+        current_image_info = None
+        for img_info in config.DETECT_LIST:
+            if img_info.get('origin_name') == origin_name:
+                current_image_info = img_info
+                break
+        
+        if not current_image_info:
+            show_message_box("错误", "未找到该图像的检测结果信息", QMessageBox.Critical)
+            return
+            
+        # 导入AI聊天对话框
+        from ai_chat_dialog import AIChatDialog
+        
+        # 创建并显示对话框
+        dialog = AIChatDialog(
+            parent=self.ui,
+            image_info=current_image_info
+        )
+        dialog.exec()
+
     def on_threshold_changed(self, value):
         """阈值变化时更新显示"""
         threshold = value / 100.0
