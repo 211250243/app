@@ -70,47 +70,223 @@
      <property name="text">
       <string>未选择图像</string>
      </property>
+     <property name="alignment">
+      <set>Qt::AlignmentFlag::AlignCenter</set>
+     </property>
     </widget>
    </item>
    <item>
-    <widget class="QScrollArea" name="imageScrollArea">
+    <widget class="QFrame" name="imageGalleryFrame">
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>120</height>
+       <height>180</height>
       </size>
      </property>
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>150</height>
-      </size>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
      </property>
-     <property name="widgetResizable">
-      <bool>true</bool>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
      </property>
-     <widget class="QWidget" name="scrollAreaWidgetContents">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>570</width>
-        <height>148</height>
-       </rect>
+     <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <property name="spacing">
+       <number>8</number>
       </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_2">
-       <item>
-        <widget class="QLabel" name="imageLabel">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignmentFlag::AlignCenter</set>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QPushButton" name="prevImageButton">
+        <property name="minimumSize">
+         <size>
+          <width>36</width>
+          <height>36</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    background-color: rgba(224, 224, 224, 180);
+    color: #333333;
+    border: none;
+    border-radius: 18px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-weight: bold;
+    padding: 5px;
+}
+QPushButton:hover {
+    background-color: rgba(208, 208, 208, 200);
+}
+QPushButton:pressed {
+    background-color: rgba(192, 192, 192, 220);
+}</string>
+        </property>
+        <property name="text">
+         <string>◀</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="leftImageLabel">
+        <property name="minimumSize">
+         <size>
+          <width>100</width>
+          <height>100</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QLabel {
+    background-color: rgba(240, 240, 240, 80);
+    border: 1px solid rgba(200, 200, 200, 100);
+    border-radius: 5px;
+}</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_3">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>10</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="centerImageLabel">
+        <property name="minimumSize">
+         <size>
+          <width>200</width>
+          <height>160</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QLabel {
+    background-color: rgba(255, 255, 255, 255);
+    border: 2px solid #9B59B6;
+    border-radius: 5px;
+}</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_4">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>10</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="rightImageLabel">
+        <property name="minimumSize">
+         <size>
+          <width>100</width>
+          <height>100</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QLabel {
+    background-color: rgba(240, 240, 240, 80);
+    border: 1px solid rgba(200, 200, 200, 100);
+    border-radius: 5px;
+}</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_5">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="nextImageButton">
+        <property name="minimumSize">
+         <size>
+          <width>36</width>
+          <height>36</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+    background-color: rgba(224, 224, 224, 180);
+    color: #333333;
+    border: none;
+    border-radius: 18px;
+    font-family: &quot;Microsoft YaHei UI&quot;;
+    font-weight: bold;
+    padding: 5px;
+}
+QPushButton:hover {
+    background-color: rgba(208, 208, 208, 200);
+}
+QPushButton:pressed {
+    background-color: rgba(192, 192, 192, 220);
+}</string>
+        </property>
+        <property name="text">
+         <string>▶</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
@@ -201,58 +377,9 @@ QPushButton:pressed {
      </item>
     </layout>
    </item>
-   <item>
-    <layout class="QHBoxLayout" name="buttonLayout">
-     <property name="spacing">
-      <number>10</number>
-     </property>
-     <item>
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="closeButton">
-       <property name="minimumSize">
-        <size>
-         <width>100</width>
-         <height>36</height>
-        </size>
-       </property>
-       <property name="styleSheet">
-        <string notr="true">QPushButton {
-    background-color: #E0E0E0;
-    color: #333333;
-    border: none;
-    border-radius: 5px;
-    font-family: &quot;Microsoft YaHei UI&quot;;
-    font-weight: bold;
-    padding: 5px;
-}
-QPushButton:hover {
-    background-color: #D0D0D0;
-}
-QPushButton:pressed {
-    background-color: #C0C0C0;
-}</string>
-       </property>
-       <property name="text">
-        <string>关闭对话</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
+
   </layout>
  </widget>
  <resources/>
  <connections/>
-</ui> 
+</ui>

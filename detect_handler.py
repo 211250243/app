@@ -2,18 +2,18 @@ import json
 import os
 import shutil
 
-from PySide6.QtCore import QTimer, Qt, QEvent, QObject
+from PySide6.QtCore import Qt, QEvent, QObject
 from PySide6.QtGui import QPixmap
-from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QWidget, QDialog, QMessageBox, QFileDialog, 
-                             QAbstractItemView, QInputDialog)
+                             QAbstractItemView)
 
 import config
-from sample_handler import CustomListWidgetItem, SampleGroupDialog, NewSampleGroupDialog, LoadImages
+from sample_handler import SampleGroupDialog, NewSampleGroupDialog, LoadImages
 from http_server import HttpServer, HttpDetectSamples, UploadSampleGroup_HTTP
 from ssh_server import SSHServer, DefectSamples
-from utils import ProgressDialog, check_detect_sample_group, check_sample_group, show_message_box, join_path, is_image, update_metadata, copy_image
+from utils import LoadingAnimation, ProgressDialog, check_detect_sample_group, show_message_box, join_path, is_image, update_metadata, copy_image
 from model_handler import ModelGroupDialog
+from ai_chat_dialog import AIChatDialog
 
 
 class DetectHandler(QObject):
@@ -69,38 +69,52 @@ class DetectHandler(QObject):
         self.ui.AIInferButton.clicked.connect(self.on_ai_infer_clicked)
     
     def on_ai_infer_clicked(self):
-        """处理 AI 判别按钮点击事件"""
-        # 检查是否有当前选中的图像
-        if not hasattr(self, 'current_original_path') or not self.current_original_path:
-            show_message_box("提示", "请先选择一张已检测的图像", QMessageBox.Information)
-            return
-        
+        """处理 AI 判别按钮点击事件，支持多图像分析"""
         # 检查是否有检测结果
-        if not hasattr(self, 'has_result') or not self.has_result:
-            show_message_box("提示", "请先对图像进行检测", QMessageBox.Information)
+        if not config.DETECT_LIST:
+            show_message_box("提示", "请先进行图像检测", QMessageBox.Information)
             return
         
-        # 获取当前图像信息
-        origin_name = os.path.basename(self.current_original_path)
+        # 显示加载动画
+        loading_animation = LoadingAnimation(self.ui)
+        loading_animation.set_text("正在准备AI分析...")
+        loading_animation.show()
         
-        # 查找当前图像对应的检测结果信息
-        current_image_info = None
-        for img_info in config.DETECT_LIST:
-            if img_info.get('origin_name') == origin_name:
-                current_image_info = img_info
-                break
+        # 获取选中的图像列表
+        selected_items = self.ui.detectList.selectedItems()
         
-        if not current_image_info:
-            show_message_box("错误", "未找到该图像的检测结果信息", QMessageBox.Critical)
-            return
+        # 如果没有选中的项目，使用当前显示的图像
+        if not selected_items:
+            if not hasattr(self, 'current_original_path') or not self.current_original_path:
+                show_message_box("提示", "请先选择一张或多张已检测的图像", QMessageBox.Information)
+                return
             
-        # 导入AI聊天对话框
-        from ai_chat_dialog import AIChatDialog
+            # 将当前图像作为唯一选择
+            origin_name = os.path.basename(self.current_original_path)
+            image_info_list = [info for info in config.DETECT_LIST if info.get('origin_name') == origin_name]
+            if not image_info_list:
+                show_message_box("错误", "未找到当前图像的检测结果信息", QMessageBox.Critical)
+                return
+        else:
+            # 从选中的图像项中提取图像信息
+            image_info_list = []
+            for item in selected_items:
+                origin_name = os.path.basename(item.image_path)
+                for info in config.DETECT_LIST:
+                    if info.get('origin_name') == origin_name:
+                        image_info_list.append(info)
+                        break
+            
+            if not image_info_list:
+                show_message_box("错误", "未找到选中图像的检测结果信息", QMessageBox.Critical)
+                return
         
+        # 关闭加载动画
+        loading_animation.close_animation()
         # 创建并显示对话框
         dialog = AIChatDialog(
             parent=self.ui,
-            image_info=current_image_info
+            image_info_list=image_info_list
         )
         dialog.exec()
 
@@ -534,13 +548,13 @@ class DetectHandler(QObject):
             
         # 缩放图片以适应显示区域
         scaled_pixmap = QPixmap(pixmap_path).scaled(
-            self.ui.resultLabel.size(),
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation
-        )
+                self.ui.resultLabel.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
         self.ui.resultLabel.setPixmap(scaled_pixmap)
         self.ui.resultLabel.setToolTip("点击图片切换显示原图和结果图" if self.has_result else "等待检测...")
-        
+            
         # 在结果浏览器中显示详细信息
         self.ui.resultBrowser.clear()
         if not self.has_result:

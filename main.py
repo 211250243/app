@@ -8,8 +8,8 @@ import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler
-from utils import FloatingTimer, join_path, show_message_box, load_metadata
-from http_server import HttpServer, is_sample_group_uploaded
+from utils import FloatingTimer, join_path
+from http_server import is_sample_group_uploaded
 
 
 class MainWindow(QMainWindow):
