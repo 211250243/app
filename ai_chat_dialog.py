@@ -353,16 +353,10 @@ class AIChatDialog(QDialog):
             # 更新对话历史
             if is_followup:
                 # 追问：在对应图像的对话记录中追加
-                self.ai_conversation_history[idx].append([
-                    question,
-                    result
-                ])
+                self.ai_conversation_history[idx].append([question, result])
             else:
                 # 首次对话：初始化对话历史
-                self.ai_conversation_history.append([[
-                    question,
-                    result
-                ]])
+                self.ai_conversation_history.append([[question, result]])
                 # 下载推理结果图片
                 img_name = self.img_list[idx]
                 file_name = f"{os.path.splitext(img_name)[0]}__1.png"

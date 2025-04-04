@@ -2811,7 +2811,7 @@ QGroupBox::title {
           <widget class="QPushButton" name="AIButton">
            <property name="geometry">
             <rect>
-             <x>15</x>
+             <x>120</x>
              <y>30</y>
              <width>91</width>
              <height>30</height>
@@ -2841,7 +2841,7 @@ QPushButton:pressed {
           <widget class="QPushButton" name="AIInferButton">
            <property name="geometry">
             <rect>
-             <x>125</x>
+             <x>20</x>
              <y>30</y>
              <width>91</width>
              <height>30</height>
@@ -3048,7 +3048,7 @@ QGroupBox::title {
             <rect>
              <x>20</x>
              <y>28</y>
-             <width>90</width>
+             <width>91</width>
              <height>36</height>
             </rect>
            </property>
@@ -3077,9 +3077,9 @@ QPushButton:pressed {
            <property name="geometry">
             <rect>
              <x>120</x>
-             <y>28</y>
+             <y>31</y>
              <width>91</width>
-             <height>36</height>
+             <height>30</height>
             </rect>
            </property>
            <property name="styleSheet">
