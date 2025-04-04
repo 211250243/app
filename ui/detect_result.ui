@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>900</width>
+    <height>650</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -21,36 +21,163 @@ QDialog {
     background-color: #f8f9fa;
 }
 QLabel {
-    color: #212529;
+    color: #333333;
+    font-size: 9pt;
 }
 QPushButton {
-    background-color: #007bff;
+    background-color: #1e88e5;
     color: white;
     border: none;
     border-radius: 4px;
-    padding: 6px 12px;
+    padding: 8px 16px;
     font-weight: bold;
+    font-size: 10pt;
+    min-height: 30px;
 }
 QPushButton:hover {
-    background-color: #0069d9;
+    background-color: #1976d2;
 }
 QPushButton:pressed {
-    background-color: #0062cc;
+    background-color: #1565c0;
+}
+QPushButton:disabled {
+    background-color: #bbdefb;
+    color: #90caf9;
 }
 QGroupBox {
     font-weight: bold;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
-    margin-top: 14px;
-    padding-top: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-top: 16px;
+    padding-top: 10px;
+    background-color: rgba(255, 255, 255, 0.7);
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     left: 10px;
-    padding: 0 5px;
-}</string>
+    padding: 0 8px;
+    color: #1976d2;
+    font-size: 10pt;
+}
+QTabWidget::pane {
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    background-color: white;
+}
+QTabBar::tab {
+    background-color: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding: 6px 12px;
+    margin-right: 2px;
+    color: #757575;
+}
+QTabBar::tab:selected {
+    background-color: white;
+    color: #1976d2;
+    font-weight: bold;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #e3f2fd;
+}
+QComboBox {
+    border: 1px solid #bdbdbd;
+    border-radius: 4px;
+    padding: 5px;
+    background-color: white;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+QComboBox::down-arrow {
+    image: url(ui/icon/dropdown.png);
+    width: 12px;
+    height: 12px;
+}
+QSlider {
+    min-height: 22px;
+}
+QSlider::groove:horizontal {
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+}
+QSlider::handle:horizontal {
+    background: #1976d2;
+    border: none;
+    width: 16px;
+    margin-top: -4px;
+    margin-bottom: -4px;
+    border-radius: 8px;
+}
+QSlider::handle:horizontal:hover {
+    background: #1565c0;
+}
+QDoubleSpinBox, QSpinBox {
+    border: 1px solid #bdbdbd;
+    border-radius: 4px;
+    padding: 4px;
+    background-color: white;
+}
+QTextBrowser {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: white;
+    font-family: &quot;Consolas&quot;, monospace;
+    padding: 10px;
+    selection-background-color: #bbdefb;
+}
+QTreeWidget {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: white;
+    selection-background-color: #e3f2fd;
+    selection-color: #212121;
+}
+QTreeWidget::item {
+    padding: 4px;
+}
+QTreeWidget::branch:selected {
+    background-color: #e3f2fd;
+}
+QTreeWidget::item:selected {
+    background-color: #e3f2fd;
+    color: #212121;
+}
+QProgressBar {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background-color: #f5f5f5;
+    text-align: center;
+    padding: 2px;
+    height: 20px;
+}
+QProgressBar::chunk {
+    background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, 
+                                  stop:0 #2196f3, stop:1 #03a9f4);
+    border-radius: 3px;
+}
+</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>12</number>
+   </property>
+   <property name="leftMargin">
+    <number>15</number>
+   </property>
+   <property name="topMargin">
+    <number>15</number>
+   </property>
+   <property name="rightMargin">
+    <number>15</number>
+   </property>
+   <property name="bottomMargin">
+    <number>15</number>
+   </property>
    <item>
     <widget class="QLabel" name="titleLabel">
      <property name="sizePolicy">
@@ -62,40 +189,46 @@ QGroupBox::title {
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>40</height>
+       <height>50</height>
       </size>
      </property>
      <property name="font">
       <font>
        <family>Microsoft YaHei UI</family>
-       <pointsize>14</pointsize>
+       <pointsize>9</pointsize>
        <bold>true</bold>
       </font>
      </property>
      <property name="styleSheet">
-      <string notr="true">color: #1a5fb4;</string>
+      <string notr="true">color: #1565c0;
+background-color: rgba(225, 245, 254, 0.5);
+border-radius: 8px;
+padding: 5px;</string>
      </property>
      <property name="text">
       <string>缺陷纹理分析</string>
      </property>
      <property name="alignment">
-      <set>Qt::AlignCenter</set>
+      <set>Qt::AlignmentFlag::AlignCenter</set>
      </property>
     </widget>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="spacing">
+      <number>15</number>
+     </property>
      <item>
       <widget class="QGroupBox" name="configGroupBox">
        <property name="minimumSize">
         <size>
-         <width>200</width>
+         <width>240</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>250</width>
+         <width>280</width>
          <height>16777215</height>
         </size>
        </property>
@@ -103,18 +236,54 @@ QGroupBox::title {
         <string>分析配置</string>
        </property>
        <layout class="QVBoxLayout" name="verticalLayout_2">
+        <property name="spacing">
+         <number>12</number>
+        </property>
+        <property name="leftMargin">
+         <number>15</number>
+        </property>
+        <property name="topMargin">
+         <number>20</number>
+        </property>
+        <property name="rightMargin">
+         <number>15</number>
+        </property>
+        <property name="bottomMargin">
+         <number>15</number>
+        </property>
         <item>
          <widget class="QLabel" name="groupLabel">
+          <property name="font">
+           <font>
+            <family>Microsoft YaHei UI</family>
+            <pointsize>9</pointsize>
+            <bold>true</bold>
+           </font>
+          </property>
           <property name="text">
            <string>选择检测样本组：</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QComboBox" name="sampleGroupComboBox"/>
+         <widget class="QComboBox" name="sampleGroupComboBox">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>32</height>
+           </size>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="thresholdLabel">
+          <property name="font">
+           <font>
+            <family>Microsoft YaHei UI</family>
+            <pointsize>9</pointsize>
+            <bold>true</bold>
+           </font>
+          </property>
           <property name="text">
            <string>缺陷阈值：</string>
           </property>
@@ -129,10 +298,13 @@ QGroupBox::title {
            <number>50</number>
           </property>
           <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+           <enum>Qt::Orientation::Horizontal</enum>
           </property>
           <property name="tickPosition">
-           <enum>QSlider::TicksBelow</enum>
+           <enum>QSlider::TickPosition::TicksBelow</enum>
+          </property>
+          <property name="tickInterval">
+           <number>10</number>
           </property>
          </widget>
         </item>
@@ -142,21 +314,53 @@ QGroupBox::title {
            <string>阈值: 0.50</string>
           </property>
           <property name="alignment">
-           <set>Qt::AlignCenter</set>
+           <set>Qt::AlignmentFlag::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="clusterLabel">
+          <property name="font">
+           <font>
+            <family>Microsoft YaHei UI</family>
+            <pointsize>9</pointsize>
+            <bold>true</bold>
+           </font>
+          </property>
           <property name="text">
-           <string>聚类参数：</string>
+           <string>聚类参数设置</string>
           </property>
          </widget>
         </item>
         <item>
          <layout class="QFormLayout" name="formLayout">
+          <property name="labelAlignment">
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+          </property>
+          <property name="formAlignment">
+           <set>Qt::AlignmentFlag::AlignHCenter|Qt::AlignmentFlag::AlignTop</set>
+          </property>
+          <property name="horizontalSpacing">
+           <number>10</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>10</number>
+          </property>
           <item row="0" column="0">
            <widget class="QLabel" name="epsLabel">
+            <property name="font">
+             <font>
+              <family>Microsoft YaHei UI</family>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>邻域半径：</string>
             </property>
@@ -164,6 +368,12 @@ QGroupBox::title {
           </item>
           <item row="0" column="1">
            <widget class="QDoubleSpinBox" name="epsSpinBox">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>28</height>
+             </size>
+            </property>
             <property name="minimum">
              <double>0.010000000000000</double>
             </property>
@@ -180,6 +390,12 @@ QGroupBox::title {
           </item>
           <item row="1" column="0">
            <widget class="QLabel" name="minSamplesLabel">
+            <property name="font">
+             <font>
+              <family>Microsoft YaHei UI</family>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>最小样本数：</string>
             </property>
@@ -187,6 +403,12 @@ QGroupBox::title {
           </item>
           <item row="1" column="1">
            <widget class="QSpinBox" name="minSamplesSpinBox">
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>28</height>
+             </size>
+            </property>
             <property name="minimum">
              <number>1</number>
             </property>
@@ -203,7 +425,7 @@ QGroupBox::title {
         <item>
          <spacer name="verticalSpacer">
           <property name="orientation">
-           <enum>Qt::Vertical</enum>
+           <enum>Qt::Orientation::Vertical</enum>
           </property>
           <property name="sizeHint" stdset="0">
            <size>
@@ -218,18 +440,38 @@ QGroupBox::title {
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>40</height>
+            <height>46</height>
            </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">background-color: #2196F3;</string>
           </property>
           <property name="text">
            <string>开始分析</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>ui/icon/analyze.png</normaloff>ui/icon/analyze.png</iconset>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="exportButton">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>46</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">background-color: #4CAF50;</string>
+          </property>
           <property name="text">
            <string>导出报告</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>ui/icon/export.png</normaloff>ui/icon/export.png</iconset>
           </property>
          </widget>
         </item>
@@ -246,6 +488,21 @@ QGroupBox::title {
          <string>可视化分析</string>
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_3">
+         <property name="spacing">
+          <number>10</number>
+         </property>
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>10</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>10</number>
+         </property>
          <item>
           <widget class="QLabel" name="visualLabel">
            <property name="sizePolicy">
@@ -254,11 +511,24 @@ QGroupBox::title {
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="font">
+            <font>
+             <family>Microsoft YaHei UI</family>
+             <pointsize>9</pointsize>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">color: #1976D2;
+background-color: #E3F2FD;
+padding: 6px;
+border-radius: 4px;</string>
+           </property>
            <property name="text">
             <string>缺陷分布可视化</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignCenter</set>
+            <set>Qt::AlignmentFlag::AlignCenter</set>
            </property>
           </widget>
          </item>
@@ -271,14 +541,15 @@ QGroupBox::title {
             </sizepolicy>
            </property>
            <property name="styleSheet">
-            <string notr="true">border: 1px dashed #dee2e6;
-background-color: #ffffff;</string>
+            <string notr="true">border: 2px dashed #BBDEFB;
+background-color: #FFFFFF;
+border-radius: 6px;</string>
            </property>
            <property name="text">
             <string/>
            </property>
            <property name="alignment">
-            <set>Qt::AlignCenter</set>
+            <set>Qt::AlignmentFlag::AlignCenter</set>
            </property>
           </widget>
          </item>
@@ -289,11 +560,27 @@ background-color: #ffffff;</string>
          <string>统计数据</string>
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_4">
+         <property name="spacing">
+          <number>10</number>
+         </property>
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>10</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>10</number>
+         </property>
          <item>
           <widget class="QTextBrowser" name="statisticsBrowser">
            <property name="styleSheet">
-            <string notr="true">font-family: &quot;Consolas&quot;, monospace;
-padding: 10px;</string>
+            <string notr="true">font-family: &quot;Consolas&quot;, &quot;Microsoft YaHei UI&quot;, monospace;
+padding: 15px;
+line-height: 150%;</string>
            </property>
           </widget>
          </item>
@@ -304,8 +591,41 @@ padding: 10px;</string>
          <string>详细信息</string>
         </attribute>
         <layout class="QVBoxLayout" name="verticalLayout_5">
+         <property name="spacing">
+          <number>10</number>
+         </property>
+         <property name="leftMargin">
+          <number>10</number>
+         </property>
+         <property name="topMargin">
+          <number>10</number>
+         </property>
+         <property name="rightMargin">
+          <number>10</number>
+         </property>
+         <property name="bottomMargin">
+          <number>10</number>
+         </property>
          <item>
           <widget class="QTreeWidget" name="detailTreeWidget">
+           <property name="styleSheet">
+            <string notr="true">QTreeWidget::item {
+    padding: 5px;
+}
+QTreeWidget::item:selected {
+    background-color: #E3F2FD;
+    color: #1565C0;
+}</string>
+           </property>
+           <property name="alternatingRowColors">
+            <bool>true</bool>
+           </property>
+           <property name="indentation">
+            <number>20</number>
+           </property>
+           <property name="animated">
+            <bool>true</bool>
+           </property>
            <column>
             <property name="text">
              <string>项目</string>
@@ -324,15 +644,8 @@ padding: 10px;</string>
      </item>
     </layout>
    </item>
-   <item>
-    <widget class="QProgressBar" name="progressBar">
-     <property name="value">
-      <number>0</number>
-     </property>
-    </widget>
-   </item>
   </layout>
  </widget>
  <resources/>
  <connections/>
-</ui> 
+</ui>

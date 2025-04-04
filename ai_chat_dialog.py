@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QPixmap, QPainter, QColor
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtUiTools import QUiLoader
-
+from PySide6.QtCore import QTimer
 import config
 from http_server import HttpServer
 from utils import LoadingAnimation, join_path, show_message_box
@@ -15,8 +15,7 @@ class AIChatDialog(QDialog):
         super().__init__(parent)
         
         # 加载UI
-        loader = QUiLoader()
-        self.ui = loader.load('ui/ai_chat.ui')
+        self.ui = QUiLoader().load('ui/ai_chat.ui')
         
         # 设置窗口标题和图标
         self.setWindowTitle(self.ui.windowTitle())
@@ -313,7 +312,8 @@ class AIChatDialog(QDialog):
                 history=self.ai_conversation_history if is_followup else []
             )
             # 关闭加载动画
-            loading_animation.close_animation()
+            QTimer.singleShot(2000, loading_animation.close_animation)
+            # loading_animation.close_animation()
             
             # 处理结果
             if not results or len(results) == 0:
