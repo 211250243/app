@@ -1,5 +1,5 @@
 import os
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QThread, Signal
 from PySide6.QtGui import QPixmap, QPainter, QColor
 from PySide6.QtWidgets import QDialog, QMessageBox
 from PySide6.QtUiTools import QUiLoader
@@ -7,6 +7,33 @@ from PySide6.QtCore import QTimer
 import config
 from http_server import HttpServer
 from utils import LoadingAnimation, join_path, show_message_box
+
+# 添加推理线程类
+class InferenceThread(QThread):
+    result_ready = Signal(list)  # 结果信号
+    error_occurred = Signal(Exception)  # 错误信号
+    
+    def __init__(self, img_list, question, normal_img_list, history):
+        super().__init__()
+        self.img_list = img_list
+        self.question = question
+        self.normal_img_list = normal_img_list
+        self.history = history
+        
+    def run(self):
+        try:
+            print(f"img_list: {self.img_list}\nquestion: {self.question}\nnormal_img_list: {self.normal_img_list}\nhistory: {self.history}")
+            results = HttpServer().anomaly_gpt_infer(
+                img_list=self.img_list,
+                question=self.question,
+                normal_img_list=self.normal_img_list,
+                history=self.history
+            )
+            if not results or len(results) == 0:
+                raise Exception("AI返回结果为空")
+            self.result_ready.emit(results)
+        except Exception as e:
+            self.error_occurred.emit(e)
 
 class AIChatDialog(QDialog):
     """AI 聊天对话框，用于与大模型交互分析图像异常"""
@@ -282,86 +309,97 @@ class AIChatDialog(QDialog):
         self.ui.chatTextBrowser.append(f"<div style='color:#1E3A8A; font-weight:bold;'>你:</div><div style='margin-left:10px;'>{question}</div><br>")
         
         # 禁用发送按钮，避免重复发送
-        self.ui.sendButton.setEnabled(False)
-        self.ui.questionEdit.setEnabled(False)
+        self.reset_button_status(False)
         
         # 显示加载动画
-        loading_animation = LoadingAnimation(self)
-        loading_animation.set_text("AI分析中，请稍候...")
-        loading_animation.show()
+        self.loading_animation = LoadingAnimation(self)
+        self.loading_animation.set_text("AI分析中，请稍候...")
+        self.loading_animation.show()
         
-        try:
-            # 准备所有图像的文件名列表
-            img_list = []
-            for info in self.image_info_list:
-                img_list.append(info.get('file_name'))
-            # 如果没有图像可分析，显示错误
-            if not img_list:
-                raise Exception("没有有效的图像可供分析")
-            
-            # 是否为追问（历史记录是否已存在）
-            is_followup = len(self.ai_conversation_history) > 0
-            
-            # 调用大模型推理
-            http_server = HttpServer()
-            print(f"img_list: {img_list}\nquestion: {question}\nnormal_img_list: {[]}\nhistory: {self.ai_conversation_history if is_followup else []}")
-            results = http_server.anomaly_gpt_infer(
-                img_list=img_list,
-                question=question,
-                normal_img_list=[],
-                history=self.ai_conversation_history if is_followup else []
-            )
-            # 关闭加载动画
-            QTimer.singleShot(2000, loading_animation.close_animation)
-            # loading_animation.close_animation()
-            
-            # 处理结果
-            if not results or len(results) == 0:
-                raise Exception("AI返回结果为空")
-                
-            # 清除对话窗口已有内容，仅显示当前图像的回复
-            self.ui.chatTextBrowser.clear()
-            
-            # 先记录所有图像的回复
-            for idx, result in enumerate(results):
-                # 更新对话历史
-                if is_followup:
-                    # 追问：在对应图像的对话记录中追加
-                    self.ai_conversation_history[idx].append([
-                        question,
-                        result
-                    ])
-                else:
-                    # 首次对话：初始化对话历史
-                    self.ai_conversation_history.append([[
-                        question,
-                        result
-                    ]])
-                    # 下载推理结果图片
-                    img_name = img_list[idx]
-                    file_name = f"{os.path.splitext(img_name)[0]}__1.png"
-                    path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP)
-                    http_server.save_downloaded_sample(file_name, path)
-                    print(f"下载推理结果图片成功: {path}/{file_name}")
-                    
-                    # 如果当前显示的是该图像，刷新图像显示
-                    if idx == self.current_image_idx:
-                        self.update_image_gallery()
-            
-            # 显示当前图像的对话历史
-            self.update_chat_display()
-                
-        except Exception as e:
-            # 确保加载动画已关闭
-            loading_animation.close_animation()
-            show_message_box("错误", f"AI分析失败: {str(e)}", QMessageBox.Critical)
-            print(f"AI分析失败: {str(e)}")
+        # 准备所有图像的文件名列表
+        self.img_list = []
+        for info in self.image_info_list:
+            self.img_list.append(info.get('file_name'))
+        # 如果没有图像可分析，显示错误
+        if not self.img_list:
+            raise Exception("没有有效的图像可供分析")
         
-        # 恢复按钮状态
-        self.ui.sendButton.setEnabled(True)
-        self.ui.questionEdit.setEnabled(True)
-        self.ui.questionEdit.setFocus()
+        # 是否为追问（历史记录是否已存在）
+        is_followup = len(self.ai_conversation_history) > 0
+        
+        # 使用线程执行推理请求
+        self.inference_thread = InferenceThread(
+            img_list=self.img_list,
+            question=question,
+            normal_img_list=[],
+            history=self.ai_conversation_history if is_followup else []
+        )
+        # 连接信号
+        self.inference_thread.result_ready.connect(lambda results: self.handle_inference_results(results, question, is_followup))
+        self.inference_thread.error_occurred.connect(self.handle_inference_error)
+        # 启动线程
+        self.inference_thread.start()
     
+    def handle_inference_results(self, results, question, is_followup):
+        """处理推理结果"""
+        # 请求已完成，关闭加载动画
+        self.loading_animation.close_animation()
+        
+        # 清除对话窗口已有内容，仅显示当前图像的回复
+        self.ui.chatTextBrowser.clear()
+        
+        # 先记录所有图像的回复
+        for idx, result in enumerate(results):
+            # 更新对话历史
+            if is_followup:
+                # 追问：在对应图像的对话记录中追加
+                self.ai_conversation_history[idx].append([
+                    question,
+                    result
+                ])
+            else:
+                # 首次对话：初始化对话历史
+                self.ai_conversation_history.append([[
+                    question,
+                    result
+                ]])
+                # 下载推理结果图片
+                img_name = self.img_list[idx]
+                file_name = f"{os.path.splitext(img_name)[0]}__1.png"
+                path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP)
+                try:
+                    HttpServer().save_downloaded_sample(file_name, path)
+                    print(f"下载推理结果图片成功: {path}/{file_name}")
+                except Exception as e:
+                    print(f"下载推理结果图片失败: {str(e)}")
+                # 如果当前显示的是该图像，刷新图像显示
+                if idx == self.current_image_idx:
+                    self.update_image_gallery()
+        
+        # 显示当前图像的对话历史
+        self.update_chat_display()
+        # 恢复按钮状态
+        self.reset_button_status(True)
+    
+    def handle_inference_error(self, e):
+        """处理推理错误"""
+        # 确保加载动画已关闭
+        self.loading_animation.close_animation()
+        show_message_box("错误", f"AI分析失败: {str(e)}", QMessageBox.Critical)
+        print(f"AI分析失败: {str(e)}")
+        # 恢复按钮状态
+        self.reset_button_status(True)
+
+    def reset_button_status(self, is_enable=True):
+        """重置按钮状态"""
+        if is_enable:
+            self.ui.sendButton.setEnabled(True)
+            self.ui.questionEdit.setEnabled(True)
+            self.ui.questionEdit.setFocus()
+        else:
+            self.ui.sendButton.setEnabled(False)
+            self.ui.questionEdit.setEnabled(False)
+        
     def on_send_clicked(self):
         """处理发送按钮点击事件"""
         question = self.ui.questionEdit.text().strip()
