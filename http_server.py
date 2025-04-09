@@ -5,7 +5,7 @@ import requests
 import config
 from typing import Optional
 from PySide6.QtWidgets import QMessageBox, QWidget, QHBoxLayout, QVBoxLayout, QLabel
-from utils import ProgressDialog, check_detect_sample_group, check_model_group, is_image, join_path, show_message_box
+from utils import LoadingAnimation, ProgressDialog, check_detect_sample_group, check_model_group, is_image, join_path, show_message_box
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QPixmap, QPainter, QFont
 
@@ -1065,6 +1065,13 @@ class HttpDetectSamples:
                 return
         # 获取模型ID
         try:
+            # 加载动画
+            self.loading_animation = LoadingAnimation(self.ui)
+            self.loading_animation.set_text("正在获取模型ID...")
+            self.loading_animation.show()
+            self.has_infer_process = False
+            
+            # 获取模型组ID
             self.model_id = self.http_server.get_model_id(config.MODEL_GROUP)
             if not self.model_id:
                 show_message_box("错误", f"未找到模型：{config.MODEL_GROUP}", QMessageBox.Critical)
@@ -1108,9 +1115,12 @@ class HttpDetectSamples:
             # 获取推理实时信息
             infer_process = self.http_server.infer_process(self.model_id)
             print(f"infer_process: {infer_process}")
-            if not infer_process or 'have_infer_img_list' not in infer_process:
+            if not infer_process:
                 return
-                
+            # 首次获取到推理信息，关闭加载动画
+            if not self.has_infer_process:
+                self.loading_animation.close()
+                self.has_infer_process = True
             # 获取已推理的图像列表
             self.image_list = infer_process.get('have_infer_img_list', [])
             
@@ -1155,8 +1165,6 @@ class HttpDetectSamples:
                         status_color = "red" if is_defect else "green"
                         self.ui.resultBrowser.append(f"<b>检测状态:</b> <font color='{status_color}'>{status_text}</font>")
                         self.ui.resultBrowser.append(f"<b>保存位置:</b> {self.save_path}")
-                        
-                        print(f"显示结果: 原图、检测结果图和热力图")
                     else:
                         print(f"结果图 {result_path} 不存在")
                     
