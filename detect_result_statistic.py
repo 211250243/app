@@ -8,6 +8,9 @@ from sklearn.cluster import DBSCAN
 from datetime import datetime
 import traceback
 
+import config
+from utils import join_path
+
 
 class DefectTextureAnalyzer:
     """
@@ -29,14 +32,14 @@ class DefectTextureAnalyzer:
             raise ValueError("未指定检测样本组")
             
         # 设置路径
-        self.detect_path = os.path.join(detect_path, self.detect_group)
+        self.detect_path = join_path(detect_path, self.detect_group)
         
         # 如果直接指定了result_path，则使用它，否则使用默认路径
         if result_path:
             self.result_path = result_path
         else:
             # 兼容两种路径模式：带results子目录或直接是图片目录
-            possible_result_path = os.path.join(self.detect_path, 'results')
+            possible_result_path = join_path(self.detect_path, 'results')
             if os.path.exists(possible_result_path) and os.path.isdir(possible_result_path):
                 self.result_path = possible_result_path
             else:
@@ -44,7 +47,7 @@ class DefectTextureAnalyzer:
                 self.result_path = self.detect_path
                 
         # 报告路径
-        self.report_path = report_path or os.path.join(self.detect_path, 'reports')
+        self.report_path = report_path or join_path(self.detect_path, 'reports')
         
         # 显示路径信息进行调试
         print(f"检测路径: {self.detect_path}")
@@ -61,6 +64,9 @@ class DefectTextureAnalyzer:
         self.texture_features = []  # 存储纹理特征
         self.defect_positions = []  # 存储缺陷位置
         self.cluster_results = None  # 聚类结果
+        self.best_sample = None  # 最佳样本（得分最高的图片）
+        self.best_sample_path = None  # 最佳样本原图路径
+        self.patch_statistics = None  # Patch统计特征
         
         # 进度回调函数
         self.progress_callback = None
@@ -109,9 +115,9 @@ class DefectTextureAnalyzer:
                 image_files = []
                 for f in os.listdir(self.result_path):
                     try:
-                        if os.path.isfile(os.path.join(self.result_path, f)):
+                        if os.path.isfile(join_path(self.result_path, f)):
                             # 尝试读取文件看是否为图像
-                            img = cv2.imread(os.path.join(self.result_path, f), cv2.IMREAD_UNCHANGED)
+                            img = cv2.imread(join_path(self.result_path, f), cv2.IMREAD_UNCHANGED)
                             if img is not None:
                                 image_files.append(f)
                     except Exception as e:
@@ -124,9 +130,42 @@ class DefectTextureAnalyzer:
                 self.update_progress(30, "未找到图像文件")
                 return 0
             
+            # 尝试加载detect_list.json获取得分信息
+            detect_list_path = join_path(self.detect_path, 'detect_list.json')
+            detect_list = []
+            if os.path.exists(detect_list_path):
+                try:
+                    detect_list = json.load(open(detect_list_path))
+                    print(f"加载了 {len(detect_list)} 个检测结果记录")
+                except Exception as e:
+                    print(f"读取detect_list.json出错: {str(e)}")
+            
+            # 找出得分最高的样本
+            best_score = -1
+            self.best_sample = None
+            for item in detect_list:
+                score = item.get('score')
+                if isinstance(score, str):
+                    try:
+                        score = float(score)
+                    except:
+                        score = 0
+                
+                if score > best_score:
+                    best_score = score
+                    self.best_sample = item.get('origin_name')
+            
+            if self.best_sample:
+                print(f"得分最高的样本是: {self.best_sample}, 得分: {best_score}")
+                # 尝试找到样本原图路径
+                potential_path = join_path(config.SAMPLE_PATH, self.detect_group, self.best_sample)
+                if os.path.exists(potential_path):
+                    self.best_sample_path = potential_path
+                    print(f"找到最佳样本原图路径: {self.best_sample_path}")
+            
             # 处理每个图像
             for i, image_file in enumerate(image_files):
-                image_path = os.path.join(self.result_path, image_file)
+                image_path = join_path(self.result_path, image_file)
                 print(f"处理图像: {image_path}")
                 
                 # 检查文件是否存在且可读
@@ -164,9 +203,12 @@ class DefectTextureAnalyzer:
             self.update_progress(30, f"加载图像出错: {str(e)}")
             raise RuntimeError(error_msg)
     
-    def extract_defect_features(self):
+    def extract_defect_features(self, grid_size=8):
         """
-        从热图中提取缺陷特征和位置
+        从热图中提取缺陷特征和位置，同时进行图像网格统计分析
+        
+        Args:
+            grid_size: 网格划分数量，将图像均匀划分为grid_size×grid_size个区域，默认为8×8网格
         """
         try:
             self.update_progress(30, "开始提取缺陷特征...")
@@ -174,7 +216,12 @@ class DefectTextureAnalyzer:
             self.defect_positions = []
             self.texture_features = []
             
-            for i, img_info in enumerate(self.defect_images):
+            # 初始化网格统计数组
+            grid_means = []
+            grid_variances = []
+            grid_edges = []  # 存储边缘检测结果
+            
+            for img_idx, img_info in enumerate(self.defect_images):
                 # 读取热图
                 heatmap_path = img_info['heatmap_path']
                 print(f"读取图像: {heatmap_path}")
@@ -189,6 +236,16 @@ class DefectTextureAnalyzer:
                 
                 # 转换为灰度图
                 heatmap_gray = cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY)
+                
+                # 计算Sobel边缘
+                sobel_x = cv2.Sobel(heatmap_gray, cv2.CV_64F, 1, 0, ksize=3)
+                sobel_y = cv2.Sobel(heatmap_gray, cv2.CV_64F, 0, 1, ksize=3)
+                # 计算梯度幅度
+                sobel_mag = cv2.magnitude(sobel_x, sobel_y)
+                # 归一化到0-255范围
+                sobel_mag = cv2.normalize(sobel_mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                # 应用阈值获取边缘掩码
+                _, edge_mask = cv2.threshold(sobel_mag, 50, 1, cv2.THRESH_BINARY)
                 
                 # 归一化灰度值
                 heatmap_norm = heatmap_gray / 255.0
@@ -271,11 +328,78 @@ class DefectTextureAnalyzer:
                     'heatmap': heatmap_norm
                 })
                 
+                # 分析图像网格
+                try:
+                    # 获取图像尺寸
+                    height, width = heatmap_gray.shape
+                    
+                    # 计算每个网格区域的大小
+                    cell_height = height // grid_size
+                    cell_width = width // grid_size
+                    
+                    # 如果网格太小，调整网格数量
+                    if cell_height < 4 or cell_width < 4:
+                        adjusted_grid_size = min(8, min(height // 4, width // 4))
+                        cell_height = height // adjusted_grid_size
+                        cell_width = width // adjusted_grid_size
+                        print(f"网格太小，调整为{adjusted_grid_size}×{adjusted_grid_size}网格，每个区域大小为{cell_height}×{cell_width}像素")
+                        grid_size = adjusted_grid_size
+                    
+                    # 分析每个网格区域
+                    for row in range(grid_size):
+                        for col in range(grid_size):
+                            # 确保不越界
+                            if row*cell_height >= height or col*cell_width >= width:
+                                continue
+                                
+                            # 提取当前网格区域
+                            y_start = row * cell_height
+                            y_end = min((row+1) * cell_height, height)
+                            x_start = col * cell_width
+                            x_end = min((col+1) * cell_width, width)
+                            
+                            cell = heatmap_gray[y_start:y_end, x_start:x_end]
+                            edge_cell = edge_mask[y_start:y_end, x_start:x_end]
+                            
+                            # 计算均值和方差
+                            cell_mean = np.mean(cell)
+                            cell_variance = np.var(cell)
+                            
+                            # 计算边缘密度（边缘像素占比）
+                            edge_density = np.sum(edge_cell) / edge_cell.size
+                            
+                            # 存储结果
+                            grid_means.append(cell_mean)
+                            grid_variances.append(cell_variance)
+                            grid_edges.append(edge_density)
+                except Exception as e:
+                    print(f"处理图像 {img_info['name']} 的网格区域时出错: {str(e)}")
+                
                 # 更新进度
-                progress = 30 + int((i + 1) / len(self.defect_images) * 30)  # 30%-60%的进度用于特征提取
-                self.update_progress(progress, f"提取缺陷特征 {i+1}/{len(self.defect_images)}...")
+                progress = 30 + int((img_idx + 1) / len(self.defect_images) * 30)  # 30%-60%的进度用于特征提取
+                self.update_progress(progress, f"提取缺陷特征 {img_idx+1}/{len(self.defect_images)}...")
             
-            self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个")
+            # 生成网格统计结果
+            self.patch_statistics = {
+                'patch_size': grid_size,  # 保持字段名兼容，实际表示网格划分数量
+                'mean': grid_means,
+                'variance': grid_variances,
+                'edges': grid_edges,  # 添加边缘密度数据
+                'mean_bins': 20,  # 直方图bin数
+                'variance_bins': 20,
+                'edges_bins': 20,
+                'mean_histogram': np.histogram(grid_means, bins=20)[0].tolist() if grid_means else [],
+                'variance_histogram': np.histogram(grid_variances, bins=20)[0].tolist() if grid_variances else [],
+                'edges_histogram': np.histogram(grid_edges, bins=20)[0].tolist() if grid_edges else [],
+                'mean_bin_edges': np.histogram(grid_means, bins=20)[1].tolist() if grid_means else [],
+                'variance_bin_edges': np.histogram(grid_variances, bins=20)[1].tolist() if grid_variances else [],
+                'edges_bin_edges': np.histogram(grid_edges, bins=20)[1].tolist() if grid_edges else [],
+                'mean_avg': np.mean(grid_means) if grid_means else 0,
+                'variance_avg': np.mean(grid_variances) if grid_variances else 0,
+                'edges_avg': np.mean(grid_edges) if grid_edges else 0
+            }
+            
+            self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个，分析了{len(grid_means)}个网格区域")
             return len(self.defect_positions)
             
         except Exception as e:
@@ -453,11 +577,12 @@ class DefectTextureAnalyzer:
                 'defect_positions': len(self.defect_positions),
                 'position_clusters': self.cluster_results,
                 'texture_analysis': texture_analysis,
+                'patch_statistics': self.patch_statistics,
                 'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
             }
             
             # 保存报告
-            report_file = os.path.join(self.report_path, f"defect_analysis_{report['timestamp']}.json")
+            report_file = join_path(self.report_path, f"defect_analysis_{report['timestamp']}.json")
             with open(report_file, 'w', encoding='utf-8') as f:
                 json.dump(report, f, ensure_ascii=False, indent=2)
                 
@@ -493,12 +618,58 @@ class DefectTextureAnalyzer:
             plt.rcParams['font.family'] = 'sans-serif'  # 设置字体族
             
             # 创建图形
-            fig = plt.figure(figsize=(15, 12))
-            plt.suptitle(f"缺陷纹理分析报告 - {self.detect_group}", fontsize=16)
+            fig = plt.figure(figsize=(10, 10))
+            plt.suptitle(f"缺陷位置分析报告 - {self.detect_group}", fontsize=16)
             
-            # 1. 缺陷分布热图
-            ax1 = plt.subplot(2, 2, 1)
-            ax1.set_title("缺陷位置分布")
+            # 创建单个图表
+            ax = plt.subplot(1, 1, 1)
+            ax.set_title("缺陷位置分布热图")
+            
+            # 尝试加载最佳样本图片作为背景
+            background_loaded = False
+            background_width = 50  # 默认宽度
+            background_height = 50  # 默认高度
+            
+            if self.best_sample_path and os.path.exists(self.best_sample_path):
+                try:
+                    # 读取图像并转换为RGB
+                    background_img = cv2.imread(self.best_sample_path)
+                    background_img = cv2.cvtColor(background_img, cv2.COLOR_BGR2RGB)
+                    background_width = background_img.shape[1]
+                    background_height = background_img.shape[0]
+                    
+                    # 显示背景图像
+                    ax.imshow(background_img, aspect='auto')
+                    background_loaded = True
+                    print(f"成功加载背景图像: {self.best_sample_path}")
+                except Exception as e:
+                    print(f"加载背景图像失败: {str(e)}")
+            else:
+                print(f"未找到背景图像或路径无效: {self.best_sample_path}")
+                
+                # 尝试使用第一个热图作为背景
+                if self.defect_images:
+                    try:
+                        sample_path = self.defect_images[0].get('heatmap_path')
+                        if sample_path and os.path.exists(sample_path):
+                            background_img = cv2.imread(sample_path)
+                            background_img = cv2.cvtColor(background_img, cv2.COLOR_BGR2RGB)
+                            background_width = background_img.shape[1]
+                            background_height = background_img.shape[0]
+                            
+                            # 显示背景图像
+                            ax.imshow(background_img, aspect='auto')
+                            background_loaded = True
+                            print(f"使用第一个热图作为背景: {sample_path}")
+                    except Exception as e:
+                        print(f"加载替代背景图像失败: {str(e)}")
+            
+            # 如果背景加载失败，使用白色背景
+            if not background_loaded:
+                ax.set_facecolor('white')
+                ax.set_xlim(0, background_width)
+                ax.set_ylim(0, background_height)
+                print("使用白色背景")
             
             # 创建热力图
             heatmap = np.zeros((50, 50))
@@ -510,92 +681,31 @@ class DefectTextureAnalyzer:
             # 平滑热力图
             heatmap = cv2.GaussianBlur(heatmap, (5, 5), 0)
             
-            # 显示热力图
-            im = ax1.imshow(heatmap, cmap='hot', interpolation='nearest')
-            plt.colorbar(im, ax=ax1, label='缺陷频率')
-            ax1.set_xlabel('X坐标 (归一化)')
-            ax1.set_ylabel('Y坐标 (归一化)')
+            # 显示热力图，设置透明度
+            im = ax.imshow(heatmap, cmap='hot', interpolation='nearest', alpha=0.7, extent=[0, background_width, background_height, 0])
+            plt.colorbar(im, ax=ax, label='缺陷频率')
             
-            # 2. 缺陷聚类结果
-            ax2 = plt.subplot(2, 2, 2)
-            ax2.set_title("缺陷聚类分析")
-            ax2.set_xlim(0, 1)
-            ax2.set_ylim(0, 1)
-            
-            # 绘制所有缺陷点
-            positions = np.array([[d['center_x'], d['center_y']] for d in self.defect_positions])
-            ax2.scatter(positions[:, 0], positions[:, 1], c='gray', alpha=0.5, s=10)
-            
-            # 绘制聚类结果
+            # 在图上标注缺陷聚类中心
             for i, cluster in enumerate(report['position_clusters']['clusters']):
                 center = cluster['center']
-                radius = cluster['radius']
                 count = cluster['count']
                 
-                # 绘制聚类中心和范围
-                circle = plt.Circle(center, radius, alpha=0.3)
-                ax2.add_patch(circle)
-                ax2.annotate(f"C{i+1}: {count}个", 
-                             xy=center, 
-                             xytext=(center[0], center[1] + 0.05),
-                             ha='center')
+                # 计算实际坐标
+                x = center[0] * background_width
+                y = center[1] * background_height
                 
-            ax2.set_xlabel('X坐标 (归一化)')
-            ax2.set_ylabel('Y坐标 (归一化)')
-            ax2.grid(True, linestyle='--', alpha=0.7)
-            
-            # 3. 纹理类型分布
-            ax3 = plt.subplot(2, 2, 3)
-            texture_counts = report['texture_analysis']['texture_counts']
-            categories = list(texture_counts.keys())
-            counts = list(texture_counts.values())
-            
-            # 使用英文标签避免字体问题
-            english_categories = []
-            for cat in categories:
-                if cat == '平滑':
-                    english_categories.append('Smooth')
-                elif cat == '轻微纹理':
-                    english_categories.append('Light')
-                elif cat == '中等纹理':
-                    english_categories.append('Medium')
-                elif cat == '强烈纹理':
-                    english_categories.append('Strong')
-                else:
-                    english_categories.append(cat)
-            
-            ax3.bar(english_categories, counts, color=['green', 'yellow', 'orange', 'red'])
-            ax3.set_title("Texture Type Distribution")  # 使用英文标题
-            ax3.set_xlabel("Texture Type")
-            ax3.set_ylabel("Count")
-            for i, count in enumerate(counts):
-                ax3.text(i, count + 0.5, str(count), ha='center')
-                
-            # 4. 统计信息 - 使用英文以避免中文字体问题
-            ax4 = plt.subplot(2, 2, 4)
-            ax4.axis('off')
-            
-            info_text = f"""
-            Group: {self.detect_group}
-            Total Images: {report['total_images']}
-            Defect Images: {report['defect_images']}
-            Defect Positions: {report['defect_positions']}
-            
-            Cluster Analysis:
-            - Clusters: {len(report['position_clusters']['clusters'])}
-            - Max Cluster: {report['position_clusters']['clusters'][0]['count'] if report['position_clusters']['clusters'] else 0} defects
-            - Noise: {report['position_clusters']['noise']}
-            
-            Texture Analysis:
-            - Main Type: {max(texture_counts.items(), key=lambda x: x[1])[0] if texture_counts else "None"}
-            - Grid Positions: {len(report['texture_analysis']['dominant_position_textures'])}
-            """
-            
-            ax4.text(0.05, 0.95, info_text, va='top', fontsize=12)
+                # 绘制聚类中心
+                ax.plot(x, y, 'go', markersize=10, alpha=0.7)
+                ax.annotate(f"C{i+1}: {count}个", 
+                            xy=(x, y), 
+                            xytext=(x+10, y+10),
+                            color='white',
+                            fontweight='bold',
+                            bbox=dict(facecolor='black', alpha=0.5))
             
             # 保存图形
             plt.tight_layout(rect=[0, 0, 1, 0.95])
-            fig_path = os.path.join(self.report_path, f"defect_analysis_{timestamp}.png")
+            fig_path = join_path(self.report_path, f"defect_analysis_{timestamp}.png")
             plt.savefig(fig_path, dpi=150)
             plt.close()
             
@@ -609,13 +719,13 @@ class DefectTextureAnalyzer:
             ax.text(0.5, 0.5, f"Error generating report: {str(e)}", 
                    ha='center', va='center', fontsize=12)
             ax.axis('off')
-            fig_path = os.path.join(self.report_path, f"defect_analysis_error_{timestamp}.png")
+            fig_path = join_path(self.report_path, f"defect_analysis_error_{timestamp}.png")
             plt.savefig(fig_path, dpi=100)
             plt.close()
             return fig_path
 
 
-def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, min_samples=3, progress_callback=None):
+def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, min_samples=3, grid_size=8, progress_callback=None):
     """
     分析缺陷纹理并生成报告
     
@@ -625,6 +735,7 @@ def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, m
         threshold: 缺陷阈值(已不再使用，保留参数兼容性)
         eps: DBSCAN聚类的邻域半径参数
         min_samples: DBSCAN聚类的最小样本数参数
+        grid_size: 网格划分数量，将图像均匀划分为grid_size×grid_size个区域
         progress_callback: 进度回调函数，接收进度值(0-100)和进度消息
     
     Returns:
@@ -635,7 +746,7 @@ def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, m
     matplotlib.use('Agg')  # 使用非交互式后端
     
     try:
-        print(f"开始分析: 路径={detect_path}, 组={detect_group}")
+        print(f"开始分析: 路径={detect_path}, 组={detect_group}, 网格划分={grid_size}×{grid_size}")
         
         # 创建分析器
         analyzer = DefectTextureAnalyzer(detect_path, detect_group)
@@ -654,7 +765,7 @@ def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, m
             return None
             
         # 提取缺陷特征
-        feature_count = analyzer.extract_defect_features()
+        feature_count = analyzer.extract_defect_features(grid_size)
         if feature_count == 0:
             error_msg = "未能提取到有效的缺陷特征"
             print(error_msg)

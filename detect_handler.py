@@ -2,6 +2,8 @@ import json
 import os
 import shutil
 import traceback
+import matplotlib.pyplot as plt
+import time
 
 from PySide6.QtCore import Qt, QEvent, QObject, QThread, Signal
 from PySide6.QtGui import QPixmap
@@ -642,13 +644,14 @@ class AnalysisWorker(QThread):
     finished_signal = Signal(dict)
     error_signal = Signal(str)
     
-    def __init__(self, detect_path, detect_group, threshold, eps, min_samples):
+    def __init__(self, detect_path, detect_group, threshold, eps, min_samples, grid_size):
         super().__init__()
         self.detect_path = detect_path
         self.detect_group = detect_group
         self.threshold = threshold
         self.eps = eps
         self.min_samples = min_samples
+        self.grid_size = grid_size
     
     def run(self):
         try:
@@ -659,6 +662,7 @@ class AnalysisWorker(QThread):
                 self.threshold,
                 self.eps,
                 self.min_samples,
+                self.grid_size,
                 self.update_progress
             )
             
@@ -716,11 +720,25 @@ class TextureAnalysisDialog(QDialog):
         self.ui.thresholdSlider.setValue(int(config.DEFECT_THRESHOLD * 100))
         self.ui.thresholdValueLabel.setText(f"阈值: {config.DEFECT_THRESHOLD:.2f}")
         
+        # 连接eps滑块
+        self.ui.epsSlider.valueChanged.connect(self.update_eps_label)
+        self.update_eps_label(self.ui.epsSlider.value())
+        
+        # 连接网格划分滑块
+        self.ui.gridSizeSlider.valueChanged.connect(self.update_grid_size_label)
+        self.update_grid_size_label(self.ui.gridSizeSlider.value())
+        
         # 加载样本组
         self.load_sample_groups()
         
         # 禁用导出按钮，直到分析完成
         self.ui.exportButton.setEnabled(False)
+        
+        # 设置详情树控件的列宽
+        header = self.ui.detailTreeWidget.header()
+        header.setSectionResizeMode(0, header.ResizeMode.Interactive)
+        header.setSectionResizeMode(1, header.ResizeMode.Stretch)
+        header.resizeSection(0, 250)  # 设置第一列宽度为250像素
     
     def load_sample_groups(self):
         """
@@ -743,12 +761,22 @@ class TextureAnalysisDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载样本组失败: {str(e)}")
     
+    def update_grid_size_label(self, value):
+        """更新网格划分标签"""
+        total_cells = value * value
+        self.ui.gridSizeValueLabel.setText(f"{value}×{value} ({total_cells}个区域)")
+    
     def update_threshold_label(self, value):
         """
         更新阈值标签
         """
         threshold = value / 100.0
         self.ui.thresholdValueLabel.setText(f"阈值: {threshold:.2f}")
+    
+    def update_eps_label(self, value):
+        """更新邻域半径标签"""
+        eps_value = value / 100.0
+        self.ui.epsValueLabel.setText(f"数值: {eps_value:.2f}")
     
     def start_analysis(self):
         """
@@ -761,8 +789,9 @@ class TextureAnalysisDialog(QDialog):
             return
         
         threshold = self.ui.thresholdSlider.value() / 100.0
-        eps = self.ui.epsSpinBox.value()
+        eps = self.ui.epsSlider.value() / 100.0
         min_samples = self.ui.minSamplesSpinBox.value()
+        grid_size = self.ui.gridSizeSlider.value()  # 获取网格划分数量
         
         # 禁用分析按钮
         self.ui.analyzeButton.setEnabled(False)
@@ -781,7 +810,8 @@ class TextureAnalysisDialog(QDialog):
             detect_group, 
             threshold, 
             eps, 
-            min_samples
+            min_samples,
+            grid_size  # 传递网格划分数量参数
         )
         
         # 连接信号
@@ -890,6 +920,87 @@ class TextureAnalysisDialog(QDialog):
             browser.append("</ul>")
         
         browser.append(f"<p>噪声点数量: <b>{report_data['position_clusters']['noise']}</b></p>")
+        
+        # 网格统计信息
+        if 'patch_statistics' in report_data and report_data['patch_statistics']:
+            try:
+                # 获取统计数据
+                patch_stats = report_data['patch_statistics']
+                grid_size = patch_stats.get('patch_size', 8)
+                
+                # 在浏览器中显示统计信息
+                browser.append("<h3>图像网格统计分析</h3>")
+                browser.append(f"<p>网格划分: <b>{grid_size}×{grid_size}</b>（图像被均匀划分为{grid_size*grid_size}个区域）</p>")
+                browser.append(f"<p>统计区域总数: <b>{len(patch_stats.get('mean', []))}</b></p>")
+                browser.append(f"<p>区域均值的平均值: <b>{patch_stats.get('mean_avg', 0):.2f}</b>（图像整体亮度水平）</p>")
+                browser.append(f"<p>区域方差的平均值: <b>{patch_stats.get('variance_avg', 0):.2f}</b>（图像整体纹理复杂度）</p>")
+                browser.append(f"<p>区域边缘密度平均值: <b>{patch_stats.get('edges_avg', 0):.4f}</b>（图像整体边缘特征强度）</p>")
+                
+                # 创建一个临时的图像文件存储直方图
+                plt.figure(figsize=(8, 10))
+                
+                # 绘制均值分布直方图
+                plt.subplot(3, 1, 1)
+                plt.title('区域亮度分布')
+                mean_bins = patch_stats.get('mean_bin_edges', [])
+                if len(mean_bins) >= 2:
+                    bin_centers = [(mean_bins[i] + mean_bins[i+1])/2 for i in range(len(mean_bins)-1)]
+                    plt.bar(bin_centers, patch_stats.get('mean_histogram', []), width=(mean_bins[1]-mean_bins[0])*0.8)
+                else:
+                    plt.text(0.5, 0.5, '无均值数据', ha='center', va='center')
+                
+                plt.grid(True, alpha=0.3)
+                plt.xlabel('均值（亮度）')
+                plt.ylabel('区域数量')
+                
+                # 绘制方差分布直方图
+                plt.subplot(3, 1, 2)
+                plt.title('区域纹理复杂度分布')
+                var_bins = patch_stats.get('variance_bin_edges', [])
+                if len(var_bins) >= 2:
+                    bin_centers = [(var_bins[i] + var_bins[i+1])/2 for i in range(len(var_bins)-1)]
+                    plt.bar(bin_centers, patch_stats.get('variance_histogram', []), width=(var_bins[1]-var_bins[0])*0.8)
+                else:
+                    plt.text(0.5, 0.5, '无方差数据', ha='center', va='center')
+                
+                plt.grid(True, alpha=0.3)
+                plt.xlabel('方差（纹理复杂度）')
+                plt.ylabel('区域数量')
+                
+                # 绘制边缘密度直方图
+                plt.subplot(3, 1, 3)
+                plt.title('区域边缘密度分布（Sobel算子）')
+                edge_bins = patch_stats.get('edges_bin_edges', [])
+                if len(edge_bins) >= 2:
+                    bin_centers = [(edge_bins[i] + edge_bins[i+1])/2 for i in range(len(edge_bins)-1)]
+                    plt.bar(bin_centers, patch_stats.get('edges_histogram', []), width=(edge_bins[1]-edge_bins[0])*0.8, color='orange')
+                else:
+                    plt.text(0.5, 0.5, '无边缘密度数据', ha='center', va='center')
+                
+                plt.grid(True, alpha=0.3)
+                plt.xlabel('边缘密度（边缘像素占比）')
+                plt.ylabel('区域数量')
+                
+                plt.tight_layout()
+                
+                # 保存临时文件
+                temp_dir = join_path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+                histogram_path = join_path(temp_dir, f"grid_histogram_{int(time.time())}.png")
+                plt.savefig(histogram_path)
+                plt.close()
+                
+                # 显示直方图图像
+                browser.append("<p>图像区域特征分布:</p>")
+                browser.append(f'<img src="{histogram_path}" width="500"/>')
+                
+                # 解释直方图意义
+                browser.append("<p><small><i>均值分布表示图像不同区域的亮度分布情况，可识别出暗区和亮区的比例。</i></small></p>")
+                browser.append("<p><small><i>方差分布表示图像不同区域的纹理复杂度，高方差区域通常包含复杂纹理。</i></small></p>")
+                browser.append("<p><small><i>边缘密度分布（Sobel算子）表示图像不同区域的边缘特征占比，高值区域通常包含明显的缺陷边界。</i></small></p>")
+                
+            except Exception as e:
+                browser.append(f"<p>生成网格统计图表时出错: {str(e)}</p>")
         
         # 纹理分析
         browser.append("<h3>纹理分析</h3>")
