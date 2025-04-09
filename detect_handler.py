@@ -466,11 +466,26 @@ class DetectHandler(QObject):
         """
         selected_items = self.ui.detectList.selectedItems()
         for item in selected_items:
-            print(f"删除图片: {item.image_path}")
+            print(f"删除原图: {item.image_path}")
             image_path = item.image_path
             if os.path.exists(image_path):
                 os.remove(image_path)  # 删除文件
-            # self.ui.detectList.takeItem(self.ui.detectList.row(item))  # 从列表中移除项
+            # 如果有进行过检测，删除相关图片（可通过是否存在DETECT_LIST判断）
+            if config.DETECT_LIST:
+                # 获取原图文件名（不含扩展名）
+                origin_name = os.path.basename(image_path)
+                base_name = os.path.splitext(origin_name)[0] + '_'
+                detect_group_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP)  
+                # 查找并删除所有以该图片名开头的结果图片
+                for result_file in os.listdir(detect_group_path):
+                    if result_file.startswith(base_name):
+                        result_file_path = join_path(detect_group_path, result_file)
+                        print(f"删除检测图: {result_file_path}")
+                        os.remove(result_file_path)
+                config.DETECT_LIST = [info for info in config.DETECT_LIST if info.get('origin_name') != origin_name]
+                # 更新detect_list.json文件
+                with open(join_path(detect_group_path, 'detect_list.json'), 'w') as f:
+                    json.dump(config.DETECT_LIST, f, ensure_ascii=False, indent=4)
         LoadImages(self.ui, self.group_path, 'detectList').load_with_animation()  # 重新加载图片列表
         self.clear_detail_frame()  # 清除detailFrame
         # 删除完图片后，重置选择模式为禁用状态
