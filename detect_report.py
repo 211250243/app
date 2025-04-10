@@ -239,15 +239,15 @@ class DefectTextureAnalyzer:
             for img_idx, img_info in enumerate(self.defect_images):
                 # 读取热图
                 heatmap_path = img_info['heatmap_path']
-                print(f"读取图像: {heatmap_path}")
+                print(f"读取热图: {heatmap_path}")
                 
                 heatmap = cv2.imread(heatmap_path)
                 if heatmap is None:
-                    print(f"无法读取图像: {heatmap_path}")
+                    print(f"无法读取热图: {heatmap_path}")
                     continue
                     
                 # 输出图像形状以进行调试
-                print(f"图像形状: {heatmap.shape}")
+                print(f"热图形状: {heatmap.shape}")
                 
                 # 转换为灰度图
                 heatmap_gray = cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY)
@@ -343,10 +343,81 @@ class DefectTextureAnalyzer:
                     'heatmap': heatmap_norm
                 })
                 
-                # 分析图像网格
+                # 查找原始图像路径的基本路径
+                original_sample_path = join_path(config.SAMPLE_PATH, self.detect_group)
+            
+                # 尝试找到检测热图对应的原始图像（热图文件名格式通常为 original_name_X.jpg）
+                original_image = None
+                image_name = img_info['name']
+                original_name = None
+                name_parts = image_name.split('_')
+
+                # 移除最后一个组件，因为它可能是热图类型指示器
+                possible_name = '_'.join(name_parts[:-1])
+                
+                # 尝试查找原始样本中是否有这个名称的图像
+                for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+                    full_name = possible_name + ext
+                    original_path = join_path(original_sample_path, full_name)
+                    if os.path.exists(original_path):
+                        original_name = full_name
+                        break
+                
+                # 如果找到了原始图像名称，尝试加载它
+                if original_name:
+                    print(f"尝试读取原始图像: {original_path}")
+                    if os.path.exists(original_path):
+                        original_image = cv2.imread(original_path)
+                        if original_image is not None:
+                            print(f"成功加载原始图像: {original_path}")
+                        else:
+                            print(f"无法读取原始图像: {original_path}")
+                else:
+                    print(f"未找到热图 {image_name} 对应的原始图像")
+                
+                # 分析网格 - 现在优先使用原始图像进行分析
                 try:
+                    # 新逻辑：必须使用原始图像进行分析，热图仅用于确定异常区域
+                    if original_image is None:
+                        print(f"警告：无法找到热图 {image_name} 对应的原始图像，跳过此图像的分析")
+                        continue
+                    
+                    # 使用原始图像进行分析
+                    analyze_image = original_image
+                    
+                    # 如果图像是彩色的，转换为灰度图
+                    if len(analyze_image.shape) == 3:
+                        analyze_gray = cv2.cvtColor(analyze_image, cv2.COLOR_BGR2GRAY)
+                    else:
+                        analyze_gray = analyze_image
+                    
+                    # 计算Sobel边缘(针对原始图像)
+                    analyze_sobel_x = cv2.Sobel(analyze_gray, cv2.CV_64F, 1, 0, ksize=3)
+                    analyze_sobel_y = cv2.Sobel(analyze_gray, cv2.CV_64F, 0, 1, ksize=3)
+                    analyze_sobel_mag = cv2.magnitude(analyze_sobel_x, analyze_sobel_y)
+                    analyze_sobel_mag = cv2.normalize(analyze_sobel_mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                    _, analyze_edge_mask = cv2.threshold(analyze_sobel_mag, 50, 1, cv2.THRESH_BINARY)
+                    
                     # 获取图像尺寸
-                    height, width = heatmap_gray.shape
+                    height, width = analyze_gray.shape
+                    
+                    # 创建一个掩码来表示异常区域（从热图获取）
+                    # 将热图二值化以获取异常区域掩码
+                    _, anomaly_mask = cv2.threshold(heatmap_gray, 
+                                                  int(np.mean(heatmap_gray) + 0.5 * np.std(heatmap_gray)), 
+                                                  255, cv2.THRESH_BINARY)
+                    
+                    # 调整掩码大小以匹配原始图像
+                    if anomaly_mask.shape != analyze_gray.shape:
+                        anomaly_mask = cv2.resize(anomaly_mask, (width, height), 
+                                                interpolation=cv2.INTER_NEAREST)
+                    
+                    # 确保掩码是二值的
+                    _, anomaly_mask = cv2.threshold(anomaly_mask, 127, 1, cv2.THRESH_BINARY)
+                    
+                    # 使用形态学操作扩大异常区域，确保完全覆盖
+                    kernel = np.ones((5, 5), np.uint8)
+                    anomaly_mask = cv2.dilate(anomaly_mask, kernel, iterations=1)
                     
                     # 计算每个网格区域的大小
                     cell_height = height // grid_size
@@ -360,6 +431,15 @@ class DefectTextureAnalyzer:
                         print(f"网格太小，调整为{adjusted_grid_size}×{adjusted_grid_size}网格，每个区域大小为{cell_height}×{cell_width}像素")
                         grid_size = adjusted_grid_size
                     
+                    # 创建两个列表分别存储异常区域和正常区域的特征
+                    normal_grid_means = []
+                    normal_grid_variances = []
+                    normal_grid_edges = []
+                    
+                    anomaly_grid_means = []
+                    anomaly_grid_variances = []
+                    anomaly_grid_edges = []
+                    
                     # 分析每个网格区域
                     for row in range(grid_size):
                         for col in range(grid_size):
@@ -367,26 +447,41 @@ class DefectTextureAnalyzer:
                             if row*cell_height >= height or col*cell_width >= width:
                                 continue
                                 
-                            # 提取当前网格区域
-                            y_start = row * cell_height
-                            y_end = min((row+1) * cell_height, height)
-                            x_start = col * cell_width
-                            x_end = min((col+1) * cell_width, width)
+                            # 计算区域坐标
+                            y1 = row * cell_height
+                            y2 = min((row + 1) * cell_height, height)
+                            x1 = col * cell_width
+                            x2 = min((col + 1) * cell_width, width)
                             
-                            cell = heatmap_gray[y_start:y_end, x_start:x_end]
-                            edge_cell = edge_mask[y_start:y_end, x_start:x_end]
+                            # 提取原始图像区域和对应的掩码区域
+                            cell_img = analyze_gray[y1:y2, x1:x2]
+                            cell_mask = anomaly_mask[y1:y2, x1:x2]
+                            cell_edge = analyze_edge_mask[y1:y2, x1:x2]
                             
-                            # 计算均值和方差
-                            cell_mean = np.mean(cell)
-                            cell_variance = np.var(cell)
-                            
-                            # 计算边缘密度（边缘像素占比）
-                            edge_density = np.sum(edge_cell) / edge_cell.size
-                            
-                            # 存储结果
-                            grid_means.append(cell_mean)
-                            grid_variances.append(cell_variance)
-                            grid_edges.append(edge_density)
+                            # 计算区域内异常像素的比例
+                            region_size = (y2-y1) * (x2-x1)
+                            if region_size > 0:
+                                anomaly_count = np.sum(cell_mask)
+                                anomaly_ratio = anomaly_count / region_size
+                                
+                                # 计算区域统计特征
+                                mean_val = np.mean(cell_img)
+                                std_val = np.std(cell_img)
+                                edge_density = np.sum(cell_edge) / region_size
+                                
+                                # 判断是否为异常区域（当异常像素比例超过阈值时）
+                                is_anomaly = anomaly_ratio > 0.3  # 异常比例阈值可调整
+                                
+                                # 根据异常标签分类特征
+                                if is_anomaly:
+                                    anomaly_grid_means.append(mean_val)
+                                    anomaly_grid_variances.append(std_val**2)  # 方差是标准差的平方
+                                    anomaly_grid_edges.append(edge_density)
+                                else:
+                                    normal_grid_means.append(mean_val)
+                                    normal_grid_variances.append(std_val**2)
+                                    normal_grid_edges.append(edge_density)
+                
                 except Exception as e:
                     print(f"处理图像 {img_info['name']} 的网格区域时出错: {str(e)}")
                 
@@ -394,24 +489,77 @@ class DefectTextureAnalyzer:
                 progress = 30 + int((img_idx + 1) / len(self.defect_images) * 30)  # 30%-60%的进度用于特征提取
                 self.update_progress(progress, f"提取缺陷特征 {img_idx+1}/{len(self.defect_images)}...")
             
-            # 生成网格统计结果
+            # 为了便于后续使用，我们计算一些统计量
+            if normal_grid_means:
+                normal_mean_avg = np.mean(normal_grid_means)
+                normal_variance_avg = np.mean(normal_grid_variances)
+                normal_edge_avg = np.mean(normal_grid_edges)
+            else:
+                normal_mean_avg = 0
+                normal_variance_avg = 0
+                normal_edge_avg = 0
+                
+            if anomaly_grid_means:
+                anomaly_mean_avg = np.mean(anomaly_grid_means)
+                anomaly_variance_avg = np.mean(anomaly_grid_variances)
+                anomaly_edge_avg = np.mean(anomaly_grid_edges)
+            else:
+                anomaly_mean_avg = 0
+                anomaly_variance_avg = 0
+                anomaly_edge_avg = 0
+                
+            # 计算整体平均值
+            all_means = normal_grid_means + anomaly_grid_means
+            all_variances = normal_grid_variances + anomaly_grid_variances
+            all_edges = normal_grid_edges + anomaly_grid_edges
+            
+            mean_avg = np.mean(all_means) if all_means else 0
+            variance_avg = np.mean(all_variances) if all_variances else 0
+            edges_avg = np.mean(all_edges) if all_edges else 0
+            
+            # 创建直方图数据
+            mean_hist, mean_bins = np.histogram(all_means, bins=20) if all_means else ([], [])
+            variance_hist, variance_bins = np.histogram(all_variances, bins=20) if all_variances else ([], [])
+            edges_hist, edges_bins = np.histogram(all_edges, bins=20) if all_edges else ([], [])
+            
+            # 保存网格区域统计
             self.patch_statistics = {
-                'patch_size': grid_size,  # 保持字段名兼容，实际表示网格划分数量
-                'mean': grid_means,
-                'variance': grid_variances,
-                'edges': grid_edges,  # 添加边缘密度数据
-                'mean_bins': 20,  # 直方图bin数
-                'variance_bins': 20,
-                'edges_bins': 20,
-                'mean_histogram': np.histogram(grid_means, bins=20)[0].tolist() if grid_means else [],
-                'variance_histogram': np.histogram(grid_variances, bins=20)[0].tolist() if grid_variances else [],
-                'edges_histogram': np.histogram(grid_edges, bins=20)[0].tolist() if grid_edges else [],
-                'mean_bin_edges': np.histogram(grid_means, bins=20)[1].tolist() if grid_means else [],
-                'variance_bin_edges': np.histogram(grid_variances, bins=20)[1].tolist() if grid_variances else [],
-                'edges_bin_edges': np.histogram(grid_edges, bins=20)[1].tolist() if grid_edges else [],
-                'mean_avg': np.mean(grid_means) if grid_means else 0,
-                'variance_avg': np.mean(grid_variances) if grid_variances else 0,
-                'edges_avg': np.mean(grid_edges) if grid_edges else 0
+                'patch_size': grid_size,
+                'mean_avg': mean_avg,
+                'variance_avg': variance_avg,
+                'edges_avg': edges_avg,
+                'mean_histogram': mean_hist.tolist() if isinstance(mean_hist, np.ndarray) else mean_hist,
+                'mean_bin_edges': mean_bins.tolist() if isinstance(mean_bins, np.ndarray) else mean_bins,
+                'variance_histogram': variance_hist.tolist() if isinstance(variance_hist, np.ndarray) else variance_hist,
+                'variance_bin_edges': variance_bins.tolist() if isinstance(variance_bins, np.ndarray) else variance_bins,
+                'edges_histogram': edges_hist.tolist() if isinstance(edges_hist, np.ndarray) else edges_hist,
+                'edges_bin_edges': edges_bins.tolist() if isinstance(edges_bins, np.ndarray) else edges_bins,
+                # 添加分类后的数据
+                'normal_means': normal_grid_means,
+                'normal_variances': normal_grid_variances,
+                'normal_edges': normal_grid_edges,
+                'anomaly_means': anomaly_grid_means,
+                'anomaly_variances': anomaly_grid_variances,
+                'anomaly_edges': anomaly_grid_edges,
+                'normal_mean_avg': normal_mean_avg,
+                'anomaly_mean_avg': anomaly_mean_avg,
+                'normal_variance_avg': normal_variance_avg,
+                'anomaly_variance_avg': anomaly_variance_avg,
+                'normal_edge_avg': normal_edge_avg,
+                'anomaly_edge_avg': anomaly_edge_avg,
+                # 添加原来格式的统计数据，以保持兼容性
+                'normal_regions': {
+                    'count': len(normal_grid_means),
+                    'mean_avg': normal_mean_avg,
+                    'variance_avg': normal_variance_avg,
+                    'edges_avg': normal_edge_avg
+                },
+                'anomaly_regions': {
+                    'count': len(anomaly_grid_means),
+                    'mean_avg': anomaly_mean_avg,
+                    'variance_avg': anomaly_variance_avg,
+                    'edges_avg': anomaly_edge_avg
+                }
             }
             
             self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个，分析了{len(grid_means)}个网格区域")
@@ -849,48 +997,154 @@ def generate_statistical_charts(report_data, report_path):
                 # 创建一个临时的图像文件存储直方图
                 plt.figure(figsize=(8, 10))
                 
-                # 绘制均值分布直方图
+                # 设置阈值，用于区分正常和异常区域
+                # 这些阈值是基于统计分析的估计值，实际上正常和异常区域往往有重叠
+                mean_threshold = patch_stats.get('mean_avg', 0) * 1.2  # 亮度阈值
+                variance_threshold = patch_stats.get('variance_avg', 0) * 1.5  # 纹理复杂度阈值
+                edges_threshold = patch_stats.get('edges_avg', 0) * 1.3  # 边缘密度阈值
+                
+                # 绘制区域亮度直方图（使用均值：方差丢失了亮度的绝对水平信息，相同方差的区域可能一个是亮区一个是暗区）
                 plt.subplot(3, 1, 1)
                 plt.title('区域亮度分布')
                 mean_bins = patch_stats.get('mean_bin_edges', [])
-                if len(mean_bins) >= 2:
+                normal_means = patch_stats.get('normal_means', [])
+                anomaly_means = patch_stats.get('anomaly_means', [])
+                
+                if normal_means or anomaly_means:
+                    # 使用相同的bin设置来保证正常和异常区域的直方图可比较
+                    bin_count = 20
+                    min_val = min(normal_means + anomaly_means) if normal_means + anomaly_means else 0
+                    max_val = max(normal_means + anomaly_means) if normal_means + anomaly_means else 1
+                    bin_range = (min_val, max_val)
+                    
+                    # 分别绘制正常和异常区域的直方图
+                    if normal_means:
+                        plt.hist(normal_means, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
+                                density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                    
+                    if anomaly_means:
+                        plt.hist(anomaly_means, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
+                                density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                    
+                    plt.legend()
+                elif len(mean_bins) >= 2:
+                    # 如果没有按正常/异常分类的数据，则使用总体数据
                     bin_centers = [(mean_bins[i] + mean_bins[i+1])/2 for i in range(len(mean_bins)-1)]
-                    plt.bar(bin_centers, patch_stats.get('mean_histogram', []), width=(mean_bins[1]-mean_bins[0])*0.8)
+                    hist_values = patch_stats.get('mean_histogram', [])
+                    
+                    # 将直方图数据转换为出现频率
+                    total_regions = sum(hist_values)
+                    if total_regions > 0:
+                        frequency = [count / total_regions for count in hist_values]
+                    else:
+                        frequency = hist_values
+                    
+                    # 区分正常和异常区域，显示实际分布的叠加效果而非完全分离
+                    plt.bar(bin_centers, frequency, width=(mean_bins[1]-mean_bins[0])*0.8, 
+                           color='lightgray', alpha=0.7, label='总体分布')
+                    plt.legend()
                 else:
                     plt.text(0.5, 0.5, '无均值数据', ha='center', va='center')
                 
                 plt.grid(True, alpha=0.3)
-                plt.xlabel('均值（亮度）')
-                plt.ylabel('区域数量')
+                plt.xlabel('亮度值')
+                plt.ylabel('出现频率')
                 
-                # 绘制方差分布直方图
+                # 绘制区域纹理复杂度直方图（使用方差：不同纹理复杂度的区域可能有相同的均值，无法区分平滑区域和复杂但亮度平衡的纹理区域）
                 plt.subplot(3, 1, 2)
                 plt.title('区域纹理复杂度分布')
                 var_bins = patch_stats.get('variance_bin_edges', [])
-                if len(var_bins) >= 2:
+                normal_variances = patch_stats.get('normal_variances', [])
+                anomaly_variances = patch_stats.get('anomaly_variances', [])
+                
+                if normal_variances or anomaly_variances:
+                    # 使用相同的bin设置来保证正常和异常区域的直方图可比较
+                    bin_count = 20
+                    min_val = min(normal_variances + anomaly_variances) if normal_variances + anomaly_variances else 0
+                    max_val = max(normal_variances + anomaly_variances) if normal_variances + anomaly_variances else 1
+                    bin_range = (min_val, max_val)
+                    
+                    # 分别绘制正常和异常区域的直方图
+                    if normal_variances:
+                        plt.hist(normal_variances, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
+                                density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                    
+                    if anomaly_variances:
+                        plt.hist(anomaly_variances, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
+                                density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                    
+                    plt.legend()
+                elif len(var_bins) >= 2:
+                    # 如果没有按正常/异常分类的数据，则使用总体数据
                     bin_centers = [(var_bins[i] + var_bins[i+1])/2 for i in range(len(var_bins)-1)]
-                    plt.bar(bin_centers, patch_stats.get('variance_histogram', []), width=(var_bins[1]-var_bins[0])*0.8)
+                    hist_values = patch_stats.get('variance_histogram', [])
+                    
+                    # 将直方图数据转换为出现频率
+                    total_regions = sum(hist_values)
+                    if total_regions > 0:
+                        frequency = [count / total_regions for count in hist_values]
+                    else:
+                        frequency = hist_values
+                    
+                    # 显示总体分布而非完全分离的正常/异常区域
+                    plt.bar(bin_centers, frequency, width=(var_bins[1]-var_bins[0])*0.8, 
+                           color='lightgray', alpha=0.7, label='总体分布')
+                    plt.legend()
                 else:
                     plt.text(0.5, 0.5, '无方差数据', ha='center', va='center')
                 
                 plt.grid(True, alpha=0.3)
-                plt.xlabel('方差（纹理复杂度）')
-                plt.ylabel('区域数量')
+                plt.xlabel('纹理复杂度值')
+                plt.ylabel('出现频率')
                 
-                # 绘制边缘密度直方图
+                # 绘制区域边缘密度直方图（使用Sobel边缘检测算子计算边缘密度）
                 plt.subplot(3, 1, 3)
-                plt.title('区域边缘密度分布（Sobel算子）')
+                plt.title('区域边缘密度分布')
                 edge_bins = patch_stats.get('edges_bin_edges', [])
-                if len(edge_bins) >= 2:
+                normal_edges = patch_stats.get('normal_edges', [])
+                anomaly_edges = patch_stats.get('anomaly_edges', [])
+                
+                if normal_edges or anomaly_edges:
+                    # 使用相同的bin设置来保证正常和异常区域的直方图可比较
+                    bin_count = 20
+                    min_val = min(normal_edges + anomaly_edges) if normal_edges + anomaly_edges else 0
+                    max_val = max(normal_edges + anomaly_edges) if normal_edges + anomaly_edges else 1
+                    bin_range = (min_val, max_val)
+                    
+                    # 分别绘制正常和异常区域的直方图
+                    if normal_edges:
+                        plt.hist(normal_edges, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
+                                density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                    
+                    if anomaly_edges:
+                        plt.hist(anomaly_edges, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
+                                density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                    
+                    plt.legend()
+                elif len(edge_bins) >= 2:
+                    # 如果没有按正常/异常分类的数据，则使用总体数据
                     bin_centers = [(edge_bins[i] + edge_bins[i+1])/2 for i in range(len(edge_bins)-1)]
-                    plt.bar(bin_centers, patch_stats.get('edges_histogram', []), width=(edge_bins[1]-edge_bins[0])*0.8, color='orange')
+                    hist_values = patch_stats.get('edges_histogram', [])
+                    
+                    # 将直方图数据转换为出现频率
+                    total_regions = sum(hist_values)
+                    if total_regions > 0:
+                        frequency = [count / total_regions for count in hist_values]
+                    else:
+                        frequency = hist_values
+                    
+                    # 显示总体分布
+                    plt.bar(bin_centers, frequency, width=(edge_bins[1]-edge_bins[0])*0.8, 
+                           color='lightgray', alpha=0.7, label='总体分布')
+                    plt.legend()
                 else:
                     plt.text(0.5, 0.5, '无边缘密度数据', ha='center', va='center')
                 
                 plt.grid(True, alpha=0.3)
-                plt.xlabel('边缘密度（边缘像素占比）')
-                plt.ylabel('区域数量')
+                plt.xlabel('边缘密度值')
+                plt.ylabel('出现频率')
                 
+                # 保存直方图文件之前设置tight_layout
                 plt.tight_layout()
                 
                 # 保存直方图文件
@@ -991,7 +1245,8 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
             name='ReportHeading2',  # 改为ReportHeading2避免与Heading2冲突
             fontName=cn_font_name,
             fontSize=14,
-            spaceAfter=8
+            spaceAfter=12,  # 增加底部间距
+            spaceBefore=12  # 增加顶部间距
         ))
         styles.add(ParagraphStyle(
             name='ReportNormal',  # 改为ReportNormal避免与Normal冲突
@@ -1007,6 +1262,23 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
             alignment=1,  # 居中
             spaceAfter=20,  # 增加更多的底部间距
             textColor=colors.gray
+        ))
+        # 添加斜体样式
+        styles.add(ParagraphStyle(
+            name='ReportItalic',
+            fontName=cn_font_name,
+            fontSize=10,
+            leading=14,
+            italic=True,  # 斜体
+            textColor=colors.darkgrey
+        ))
+        # 添加粗体样式
+        styles.add(ParagraphStyle(
+            name='ReportBold',
+            fontName=cn_font_name,
+            fontSize=12,
+            leading=16,
+            fontWeight='bold'  # 粗体
         ))
         
         # 确保报告目录存在
@@ -1187,34 +1459,136 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
             ))
             content.append(Paragraph(f"统计区域总数: {len(patch_stats.get('mean', []))}", styles['ReportNormal']))
             content.append(Paragraph(
-                f"区域均值的平均值: {patch_stats.get('mean_avg', 0):.2f}（图像整体亮度水平）",
+                f"各区域亮度均值的平均值: {patch_stats.get('mean_avg', 0):.2f}（图像整体亮度水平）",
                 styles['ReportNormal']
             ))
             content.append(Paragraph(
-                f"区域方差的平均值: {patch_stats.get('variance_avg', 0):.2f}（图像整体纹理复杂度）",
+                f"各区域纹理复杂度方差的平均值: {patch_stats.get('variance_avg', 0):.2f}（图像整体纹理复杂度）",
                 styles['ReportNormal']
             ))
             content.append(Paragraph(
-                f"区域边缘密度平均值: {patch_stats.get('edges_avg', 0):.4f}（图像整体边缘特征强度）",
+                f"各区域边缘密度的平均值: {patch_stats.get('edges_avg', 0):.4f}（图像整体边缘特征强度）",
                 styles['ReportNormal']
             ))
             
             content.append(Spacer(1, 0.3*cm))
             
-            # 添加区域特征直方图
-            if histogram_chart and os.path.exists(histogram_chart):
-                try:
-                    img = Image(histogram_chart, width=15*cm, height=15*cm)
-                    content.append(img)
-                    content.append(Paragraph("图2. 区域特征直方图（显示图像不同区域的亮度、纹理复杂度和边缘密度分布）", styles['ImageCaption']))
+            # 添加异常区域与正常区域对比分析
+            if 'patch_statistics' in report_data and report_data['patch_statistics']:
+                patch_stats = report_data['patch_statistics']
+                if 'anomaly_regions' in patch_stats and 'normal_regions' in patch_stats:
+                    anomaly_regions = patch_stats['anomaly_regions']
+                    normal_regions = patch_stats['normal_regions']
                     
-                    content.append(Paragraph("直方图解释:", styles['ReportNormal']))
-                    content.append(Paragraph("1. 均值分布表示图像不同区域的亮度分布情况，可识别出暗区和亮区的比例", styles['ReportNormal']))
-                    content.append(Paragraph("2. 方差分布表示图像不同区域的纹理复杂度，高方差区域通常包含复杂纹理", styles['ReportNormal']))
-                    content.append(Paragraph("3. 边缘密度分布表示图像不同区域的边缘特征占比，高值区域通常包含明显的缺陷边界", styles['ReportNormal']))
+                    # 总区域数据
+                    total_regions = anomaly_regions.get('count', 0) + normal_regions.get('count', 0)
+                    anomaly_percent = (anomaly_regions.get('count', 0) / total_regions * 100) if total_regions > 0 else 0
                     
-                except Exception as e:
-                    content.append(Paragraph(f"加载区域特征直方图失败: {str(e)}", styles['ReportNormal']))
+                    content.append(Paragraph("3.1 原图纹理异常分析", styles['ReportHeading2']))
+                    content.append(Paragraph("(基于热图选择异常区域，在原图上进行纹理特征分析)", styles['ReportItalic']))
+                    content.append(Spacer(1, 0.3*cm))
+                    
+                    # 创建表格比较异常区域和正常区域
+                    comparison_data = [
+                        ["特征", "异常区域", "正常区域", "差异率"],
+                        ["区域数量", f"{anomaly_regions.get('count', 0)} ({anomaly_percent:.1f}%)", 
+                         f"{normal_regions.get('count', 0)} ({100-anomaly_percent:.1f}%)", "-"]
+                    ]
+                    
+                    # 亮度均值
+                    anomaly_mean = anomaly_regions.get('mean_avg', 0)
+                    normal_mean = normal_regions.get('mean_avg', 0)
+                    mean_diff = ((anomaly_mean - normal_mean) / normal_mean * 100) if normal_mean > 0 else 0
+                    comparison_data.append(["亮度均值", f"{anomaly_mean:.2f}", f"{normal_mean:.2f}", f"{mean_diff:+.1f}%"])
+                    
+                    # 纹理复杂度（方差）
+                    anomaly_var = anomaly_regions.get('variance_avg', 0)
+                    normal_var = normal_regions.get('variance_avg', 0)
+                    var_diff = ((anomaly_var - normal_var) / normal_var * 100) if normal_var > 0 else 0
+                    comparison_data.append(["纹理复杂度方差", f"{anomaly_var:.2f}", f"{normal_var:.2f}", f"{var_diff:+.1f}%"])
+                    
+                    # 边缘密度
+                    anomaly_edge = anomaly_regions.get('edges_avg', 0)
+                    normal_edge = normal_regions.get('edges_avg', 0)
+                    edge_diff = ((anomaly_edge - normal_edge) / normal_edge * 100) if normal_edge > 0 else 0
+                    comparison_data.append(["边缘密度", f"{anomaly_edge:.4f}", f"{normal_edge:.4f}", f"{edge_diff:+.1f}%"])
+                    
+                    # 创建表格
+                    comparison_table = Table(comparison_data, colWidths=[4*cm, 4*cm, 4*cm, 4*cm])
+                    comparison_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('FONTNAME', (0, 0), (-1, -1), cn_font_name),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('PADDING', (0, 0), (-1, -1), 6),
+                    ]))
+                    
+                    content.append(comparison_table)
+                    content.append(Spacer(1, 0.5*cm))
+                    
+                    # 添加异常区域特征解读
+                    content.append(Paragraph("3.2 异常区域特征解读:", styles['ReportHeading2']))
+                    content.append(Spacer(1, 0.3*cm))
+                    
+                    # 亮度差异解读
+                    if abs(mean_diff) > 15:
+                        brightness_desc = f"异常区域亮度{'明显高于' if mean_diff > 0 else '明显低于'}正常区域（差异{abs(mean_diff):.1f}%），表明{'存在高亮异常' if mean_diff > 0 else '可能有暗区缺陷'}。"
+                    elif abs(mean_diff) > 5:
+                        brightness_desc = f"异常区域亮度{'略高于' if mean_diff > 0 else '略低于'}正常区域（差异{abs(mean_diff):.1f}%）。"
+                    else:
+                        brightness_desc = "异常区域与正常区域亮度相近，缺陷可能不表现为亮度变化。"
+                    
+                    # 纹理复杂度解读
+                    if abs(var_diff) > 30:
+                        texture_desc = f"异常区域纹理复杂度{'明显高于' if var_diff > 0 else '明显低于'}正常区域（差异{abs(var_diff):.1f}%），表明{'存在纹理断裂或杂乱' if var_diff > 0 else '可能有纹理缺失或平滑区域'}。"
+                    elif abs(var_diff) > 10:
+                        texture_desc = f"异常区域纹理复杂度{'略高于' if var_diff > 0 else '略低于'}正常区域（差异{abs(var_diff):.1f}%）。"
+                    else:
+                        texture_desc = "异常区域与正常区域纹理复杂度相近。"
+                    
+                    # 边缘密度解读
+                    if abs(edge_diff) > 40:
+                        edge_desc = f"异常区域边缘密度{'明显高于' if edge_diff > 0 else '明显低于'}正常区域（差异{abs(edge_diff):.1f}%），表明{'存在明显边缘或轮廓特征' if edge_diff > 0 else '可能有边缘缺失或模糊'}。"
+                    elif abs(edge_diff) > 15:
+                        edge_desc = f"异常区域边缘密度{'略高于' if edge_diff > 0 else '略低于'}正常区域（差异{abs(edge_diff):.1f}%）。"
+                    else:
+                        edge_desc = "异常区域与正常区域边缘密度相近。"
+                    
+                    content.append(Paragraph(brightness_desc, styles['ReportNormal']))
+                    content.append(Paragraph(texture_desc, styles['ReportNormal']))
+                    content.append(Paragraph(edge_desc, styles['ReportNormal']))
+                    
+                    # 综合解释
+                    content.append(Paragraph("3.3 综合分析:", styles['ReportHeading2']))
+                    content.append(Spacer(1, 0.3*cm))
+                    
+                    if abs(mean_diff) > 15 or abs(var_diff) > 30 or abs(edge_diff) > 40:
+                        analysis = "异常区域与正常区域存在显著差异，很可能存在实际缺陷。"
+                    elif abs(mean_diff) > 5 or abs(var_diff) > 10 or abs(edge_diff) > 15:
+                        analysis = "异常区域与正常区域存在一定差异，可能存在轻微缺陷。"
+                    else:
+                        analysis = "异常区域与正常区域差异不明显，可能是热图误检或缺陷特征不明显。"
+                    content.append(Paragraph(analysis, styles['ReportNormal']))
+                    content.append(Spacer(1, 0.5*cm))
+                    
+                    # 添加区域特征直方图
+                    if histogram_chart and os.path.exists(histogram_chart):
+                        content.append(Paragraph("3.4 图像区域特征分布", styles['ReportHeading2']))
+                        content.append(Spacer(1, 0.3*cm))
+                        
+                        try:
+                            img = Image(histogram_chart, width=15*cm, height=15*cm)
+                            content.append(img)
+                            content.append(Paragraph("图2. 基于原始图像的区域特征直方图（显示不同区域的亮度、纹理复杂度和边缘密度分布）", styles['ImageCaption']))
+                        except Exception as e:
+                            content.append(Paragraph(f"加载区域特征直方图失败: {str(e)}", styles['ReportNormal']))
+                        
+                        content.append(Paragraph("直方图解释:", styles['ReportNormal']))
+                        content.append(Paragraph("1. 亮度分布直方图：用于区分亮度异常导致的缺陷，如过曝、过暗或局部高反差区域。其中绿色表示实际正常区域的亮度分布，红色表示实际异常区域的亮度分布", styles['ReportNormal']))
+                        content.append(Paragraph("2. 纹理复杂度分布直方图：用于区分纹理异常导致的缺陷，如纹理断裂、杂乱或缺失。其中绿色表示实际正常区域的纹理复杂度分布，红色表示实际异常区域的纹理复杂度分布", styles['ReportNormal']))
+                        content.append(Paragraph("3. 边缘密度分布直方图：用于识别边缘异常，如裂纹、划痕或轮廓缺失等几何特征缺陷。其中绿色表示实际正常区域的边缘特征分布，红色表示实际异常区域的边缘特征分布", styles['ReportNormal']))
+                        content.append(Paragraph("注：颜色划分是基于热图检测结果确定的，而非人工设定的阈值。横坐标表示特征值，纵坐标表示出现频率。", styles['ReportItalic']))
             
             content.append(Spacer(1, 0.5*cm))
         

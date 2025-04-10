@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import time
 from datetime import datetime
 import numpy as np
-
+import platform
 from PySide6.QtCore import Qt, QEvent, QObject, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QWidget, QDialog, QMessageBox, QFileDialog, 
@@ -996,19 +996,134 @@ class TextureAnalysisDialog(QDialog):
             html_content.append("<h3>区域特征统计分析</h3>")
             html_content.append(f"<p>区域划分: <b>{grid_size}×{grid_size}</b>（图像被均匀划分为{grid_size*grid_size}个区域）</p>")
             html_content.append(f"<p>统计区域总数: <b>{len(patch_stats.get('mean', []))}</b></p>")
-            html_content.append(f"<p>区域均值的平均值: <b>{patch_stats.get('mean_avg', 0):.2f}</b>（图像整体亮度水平）</p>")
-            html_content.append(f"<p>区域方差的平均值: <b>{patch_stats.get('variance_avg', 0):.2f}</b>（图像整体纹理复杂度）</p>")
-            html_content.append(f"<p>区域边缘密度平均值: <b>{patch_stats.get('edges_avg', 0):.4f}</b>（图像整体边缘特征强度）</p>")
+            html_content.append(f"<p>各区域亮度均值的平均值: <b>{patch_stats.get('mean_avg', 0):.2f}</b>（图像整体亮度水平）</p>")
+            html_content.append(f"<p>各区域纹理复杂度方差的平均值: <b>{patch_stats.get('variance_avg', 0):.2f}</b>（图像整体纹理复杂度）</p>")
+            html_content.append(f"<p>各区域边缘密度的平均值: <b>{patch_stats.get('edges_avg', 0):.4f}</b>（图像整体边缘特征强度）</p>")
+            
+            # 添加异常区域与正常区域对比分析
+            if 'anomaly_regions' in patch_stats and 'normal_regions' in patch_stats:
+                anomaly_regions = patch_stats['anomaly_regions']
+                normal_regions = patch_stats['normal_regions']
+                
+                # 总区域数据
+                total_regions = anomaly_regions.get('count', 0) + normal_regions.get('count', 0)
+                anomaly_percent = (anomaly_regions.get('count', 0) / total_regions * 100) if total_regions > 0 else 0
+                
+                html_content.append("<h4>3.1 原图纹理异常分析</h4>")
+                html_content.append("<p style='color:#444; font-style:italic; margin-bottom:15px;'>(基于热图选择异常区域，在原图上进行纹理特征分析)</p>")
+                
+                # 创建表格比较异常区域和正常区域
+                html_content.append("<table border='0' cellspacing='0' cellpadding='5' style='width:90%; margin:10px 0; border-collapse:collapse;'>")
+                
+                # 表头
+                html_content.append("<tr style='background-color:#f0f0f0;'>")
+                html_content.append("<th style='border-bottom:1px solid #ddd; text-align:left;'>特征</th>")
+                html_content.append("<th style='border-bottom:1px solid #ddd; text-align:center;'>异常区域</th>")
+                html_content.append("<th style='border-bottom:1px solid #ddd; text-align:center;'>正常区域</th>")
+                html_content.append("<th style='border-bottom:1px solid #ddd; text-align:center;'>差异率</th>")
+                html_content.append("</tr>")
+                
+                # 区域数量
+                html_content.append("<tr>")
+                html_content.append("<td style='border-bottom:1px solid #eee;'>区域数量</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{anomaly_regions.get('count', 0)} ({anomaly_percent:.1f}%)</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{normal_regions.get('count', 0)} ({100-anomaly_percent:.1f}%)</td>")
+                html_content.append("<td style='border-bottom:1px solid #eee; text-align:center;'>-</td>")
+                html_content.append("</tr>")
+                
+                # 亮度均值
+                anomaly_mean = anomaly_regions.get('mean_avg', 0)
+                normal_mean = normal_regions.get('mean_avg', 0)
+                mean_diff = ((anomaly_mean - normal_mean) / normal_mean * 100) if normal_mean > 0 else 0
+                mean_color = "red" if abs(mean_diff) > 15 else ("orange" if abs(mean_diff) > 5 else "green")
+                
+                html_content.append("<tr>")
+                html_content.append("<td style='border-bottom:1px solid #eee;'>亮度均值</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{anomaly_mean:.2f}</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{normal_mean:.2f}</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center; color:{mean_color};'>{mean_diff:+.1f}%</td>")
+                html_content.append("</tr>")
+                
+                # 纹理复杂度（方差）
+                anomaly_var = anomaly_regions.get('variance_avg', 0)
+                normal_var = normal_regions.get('variance_avg', 0)
+                var_diff = ((anomaly_var - normal_var) / normal_var * 100) if normal_var > 0 else 0
+                var_color = "red" if abs(var_diff) > 30 else ("orange" if abs(var_diff) > 10 else "green")
+                
+                html_content.append("<tr>")
+                html_content.append("<td style='border-bottom:1px solid #eee;'>纹理复杂度</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{anomaly_var:.2f}</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{normal_var:.2f}</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center; color:{var_color};'>{var_diff:+.1f}%</td>")
+                html_content.append("</tr>")
+                
+                # 边缘密度
+                anomaly_edge = anomaly_regions.get('edges_avg', 0)
+                normal_edge = normal_regions.get('edges_avg', 0)
+                edge_diff = ((anomaly_edge - normal_edge) / normal_edge * 100) if normal_edge > 0 else 0
+                edge_color = "red" if abs(edge_diff) > 40 else ("orange" if abs(edge_diff) > 15 else "green")
+                
+                html_content.append("<tr>")
+                html_content.append("<td style='border-bottom:1px solid #eee;'>边缘密度</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{anomaly_edge:.4f}</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center;'>{normal_edge:.4f}</td>")
+                html_content.append(f"<td style='border-bottom:1px solid #eee; text-align:center; color:{edge_color};'>{edge_diff:+.1f}%</td>")
+                html_content.append("</tr>")
+                
+                html_content.append("</table>")
+                
+                # 添加异常区域特征解读
+                html_content.append("<h4>3.2 异常区域特征解读:</h4>")
+                
+                # 亮度差异解读
+                if abs(mean_diff) > 15:
+                    brightness_desc = f"异常区域亮度{'明显高于' if mean_diff > 0 else '明显低于'}正常区域（差异{abs(mean_diff):.1f}%），表明{'存在高亮异常' if mean_diff > 0 else '可能有暗区缺陷'}。"
+                elif abs(mean_diff) > 5:
+                    brightness_desc = f"异常区域亮度{'略高于' if mean_diff > 0 else '略低于'}正常区域（差异{abs(mean_diff):.1f}%）。"
+                else:
+                    brightness_desc = "异常区域与正常区域亮度相近，缺陷可能不表现为亮度变化。"
+                
+                # 纹理复杂度解读
+                if abs(var_diff) > 30:
+                    texture_desc = f"异常区域纹理复杂度{'明显高于' if var_diff > 0 else '明显低于'}正常区域（差异{abs(var_diff):.1f}%），表明{'存在纹理断裂或杂乱' if var_diff > 0 else '可能有纹理缺失或平滑区域'}。"
+                elif abs(var_diff) > 10:
+                    texture_desc = f"异常区域纹理复杂度{'略高于' if var_diff > 0 else '略低于'}正常区域（差异{abs(var_diff):.1f}%）。"
+                else:
+                    texture_desc = "异常区域与正常区域纹理复杂度相近。"
+                
+                # 边缘密度解读
+                if abs(edge_diff) > 40:
+                    edge_desc = f"异常区域边缘密度{'明显高于' if edge_diff > 0 else '明显低于'}正常区域（差异{abs(edge_diff):.1f}%），表明{'存在明显边缘或轮廓特征' if edge_diff > 0 else '可能有边缘缺失或模糊'}。"
+                elif abs(edge_diff) > 15:
+                    edge_desc = f"异常区域边缘密度{'略高于' if edge_diff > 0 else '略低于'}正常区域（差异{abs(edge_diff):.1f}%）。"
+                else:
+                    edge_desc = "异常区域与正常区域边缘密度相近。"
+                
+                html_content.append(f"<p>{brightness_desc}</p>")
+                html_content.append(f"<p>{texture_desc}</p>")
+                html_content.append(f"<p>{edge_desc}</p>")
+                
+                # 综合解释
+                html_content.append("<h4>3.3 综合分析:</h4>")
+                if abs(mean_diff) > 15 or abs(var_diff) > 30 or abs(edge_diff) > 40:
+                    analysis = "异常区域与正常区域存在显著差异，很可能存在实际缺陷。"
+                elif abs(mean_diff) > 5 or abs(var_diff) > 10 or abs(edge_diff) > 15:
+                    analysis = "异常区域与正常区域存在一定差异，可能存在轻微缺陷。"
+                else:
+                    analysis = "异常区域与正常区域差异不明显，可能是热图误检或缺陷特征不明显。"
+                html_content.append(f"<p>{analysis}</p>")
             
             # 显示直方图图像（从报告中获取路径）
             if 'histogram_chart' in self.current_report and os.path.exists(self.current_report['histogram_chart']):
-                html_content.append("<p>图像区域特征分布:</p>")
+                html_content.append("<h4>3.4 图像区域特征分布:</h4>")
                 html_content.append(f'<p><img src="{self.current_report["histogram_chart"]}" width="500"/></p>')
                 
                 # 解释直方图意义
-                html_content.append("<p><small><i>均值分布表示图像不同区域的亮度分布情况，可识别出暗区和亮区的比例。</i></small></p>")
-                html_content.append("<p><small><i>方差分布表示图像不同区域的纹理复杂度，高方差区域通常包含复杂纹理。</i></small></p>")
-                html_content.append("<p><small><i>边缘密度分布（Sobel算子）表示图像不同区域的边缘特征占比，高值区域通常包含明显的缺陷边界。</i></small></p>")
+                html_content.append("<p>直方图显示了正常区域和异常区域的特征分布对比：</p>")
+                html_content.append("<p>1. 亮度分布直方图：用于区分亮度异常导致的缺陷，如过曝、过暗或局部高反差区域。其中绿色表示实际正常区域的亮度分布，红色表示实际异常区域的亮度分布</p>")
+                html_content.append("<p>2. 纹理复杂度分布直方图：用于区分纹理异常导致的缺陷，如纹理断裂、杂乱或缺失。其中绿色表示实际正常区域的纹理复杂度分布，红色表示实际异常区域的纹理复杂度分布</p>")
+                html_content.append("<p>3. 边缘密度分布直方图：用于识别边缘异常，如裂纹、划痕或轮廓缺失等几何特征缺陷。其中绿色表示实际正常区域的边缘特征分布，红色表示实际异常区域的边缘特征分布</p>")
+                html_content.append("<p><i>注：颜色划分是基于热图检测结果确定的，而非人工设定的阈值</i></p>")
             else:
                 html_content.append("<p>未生成区域特征分布图表</p>")
         
@@ -1225,7 +1340,30 @@ class TextureAnalysisDialog(QDialog):
             if pdf_file and os.path.exists(pdf_file):
                 # 保存PDF文件路径到current_report
                 self.current_report['pdf_report'] = pdf_file
-                QMessageBox.information(self, "成功", f"PDF报告已生成并保存到:\n{pdf_file}")
+                
+                # 弹出提示框询问用户是否要查看PDF
+                reply = QMessageBox.question(
+                    self, 
+                    "导出成功", 
+                    f"PDF报告已生成并保存到:\n{pdf_file}\n\n是否立即查看?",
+                    QMessageBox.Yes | QMessageBox.No, 
+                    QMessageBox.Yes
+                )
+                
+                # 如果用户选择查看，则打开PDF文件
+                if reply == QMessageBox.Yes:
+                    try:
+                        # 根据不同操作系统打开PDF文件
+                        if platform.system() == 'Windows':
+                            os.startfile(pdf_file)
+                        elif platform.system() == 'Darwin':  # macOS
+                            import subprocess
+                            subprocess.run(['open', pdf_file])
+                        else:  # Linux
+                            import subprocess
+                            subprocess.run(['xdg-open', pdf_file])
+                    except Exception as e:
+                        QMessageBox.warning(self, "警告", f"无法打开PDF文件: {str(e)}")
             else:
                 QMessageBox.warning(self, "警告", "PDF报告生成失败")
             
