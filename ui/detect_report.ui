@@ -610,10 +610,6 @@ padding: 5px;</string>
           <property name="text">
            <string>开始分析</string>
           </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/analyze.png</normaloff>ui/icon/analyze.png</iconset>
-          </property>
          </widget>
         </item>
         <item>
@@ -629,10 +625,6 @@ padding: 5px;</string>
           </property>
           <property name="text">
            <string>导出报告</string>
-          </property>
-          <property name="icon">
-           <iconset>
-            <normaloff>ui/icon/export.png</normaloff>ui/icon/export.png</iconset>
           </property>
          </widget>
         </item>
@@ -694,6 +686,20 @@ border-radius: 4px;</string>
           </widget>
          </item>
          <item>
+          <widget class="QLabel" name="label">
+           <property name="font">
+            <font>
+             <family>Microsoft YaHei UI</family>
+             <pointsize>9</pointsize>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>缺陷位置分布热图显示了所有检测到的缺陷位置，颜色越亮表示缺陷出现频率越高：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QLabel" name="imageLabel">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
@@ -711,6 +717,20 @@ border-radius: 6px;</string>
            </property>
            <property name="alignment">
             <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_2">
+           <property name="font">
+            <font>
+             <family>Microsoft YaHei UI</family>
+             <pointsize>9</pointsize>
+             <italic>true</italic>
+            </font>
+           </property>
+           <property name="text">
+            <string>热图中绿色圆点表示缺陷聚类中心，数字表示该聚类包含的缺陷数量。</string>
            </property>
           </widget>
          </item>

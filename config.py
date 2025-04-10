@@ -6,8 +6,19 @@ SERVER_PASSWORD = 'NAec19216800.'
 SERVER_SAMPLE_PATH = 'data/sample_groups'
 SERVER_DOWNLOAD_PATH = 'patchcore/evaluated_results/2025_1_9'
 
+# http服务器配置
 HOSTNAME = '10.160.22.114'
 PORT = 20060
+
+# 大语言模型配置
+DEEPSEEK_API_KEY = "sk-601af6a4ca70417ebfa9c0cb3ca1b818"
+BASE_URL = "https://api.deepseek.com"
+DEFAULT_MODEL = "deepseek-chat"
+MODEL_V3 = "deepseek-chat"
+MODEL_R1 = "deepseek-reasoner"
+DEFAULT_TEMPORATURE = 1.0
+DEFAULT_PROMPT = "You are a helpful assistant about visual based defect detection in industry"
+HISTORY_LIMIT = 10
 
 # 项目配置
 """

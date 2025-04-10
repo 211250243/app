@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtUiTools import QUiLoader
 
-from detect_result_statistic import analyze_defect_textures
+from detect_report import analyze_defect_textures
 
 
 class AnalysisWorker(QThread):

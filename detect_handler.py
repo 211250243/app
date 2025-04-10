@@ -4,6 +4,8 @@ import shutil
 import traceback
 import matplotlib.pyplot as plt
 import time
+from datetime import datetime
+import numpy as np
 
 from PySide6.QtCore import Qt, QEvent, QObject, QThread, Signal
 from PySide6.QtGui import QPixmap
@@ -17,8 +19,8 @@ from http_server import HttpServer, HttpDetectSamples, UploadSampleGroup_HTTP
 from ssh_server import SSHServer, DefectSamples
 from utils import LoadingAnimation, ProgressDialog, check_detect_sample_group, show_message_box, join_path, is_image, update_metadata, copy_image
 from model_handler import ModelGroupDialog
-from ai_chat_dialog import AIChatDialog
-from detect_result_statistic import analyze_defect_textures
+from anomaly_gpt import AIChatDialog
+from detect_report import analyze_defect_textures, generate_pdf_report
 
 
 class DetectHandler(QObject):
@@ -692,7 +694,7 @@ class TextureAnalysisDialog(QDialog):
         self.detect_path = detect_path
         
         # 加载UI
-        self.ui = QUiLoader().load('ui/detect_result.ui')
+        self.ui = QUiLoader().load('ui/detect_report.ui')
         # 设置窗口属性
         self.setWindowTitle(self.ui.windowTitle())
         self.setMinimumSize(self.ui.size())        
@@ -899,125 +901,141 @@ class TextureAnalysisDialog(QDialog):
         browser = self.ui.statisticsBrowser
         browser.clear()
         
+        # 创建HTML内容
+        html_content = []
+        html_content.append("<html><body style='font-family: Arial, sans-serif; font-size: 10pt;'>")
+        
         # 基本信息
-        browser.append("<h3>基本信息</h3>")
-        browser.append(f"<p>检测组: <b>{report_data['detect_group']}</b></p>")
-        browser.append(f"<p>总图像数: <b>{report_data['total_images']}</b></p>")
-        browser.append(f"<p>缺陷图像数: <b>{report_data['defect_images']}</b></p>")
-        browser.append(f"<p>缺陷位置总数: <b>{report_data['defect_positions']}</b></p>")
+        html_content.append("<h3>基本信息</h3>")
+        html_content.append(f"<p>检测组: <b>{report_data['detect_group']}</b></p>")
+        html_content.append(f"<p>总图像数: <b>{report_data['total_images']}</b></p>")
+        html_content.append(f"<p>缺陷图像数: <b>{report_data['defect_images']}</b></p>")
+        html_content.append(f"<p>缺陷位置总数: <b>{report_data['defect_positions']}</b></p>")
+        
+        # 添加缺陷位置统计信息
+        html_content.append("<h3>缺陷位置统计</h3>")
+        
+        # 添加热图分布描述概括
+        clusters = report_data['position_clusters']['clusters']
+        noise_count = report_data['position_clusters']['noise']
+        total_defects = report_data['defect_positions']
+        
+        # 生成总体分布描述
+        if clusters:
+            if len(clusters) == 1:
+                distribution_pattern = "缺陷高度集中在一个区域"
+            elif len(clusters) <= 3:
+                distribution_pattern = f"缺陷主要集中在{len(clusters)}个区域"
+            else:
+                distribution_pattern = f"缺陷分布在{len(clusters)}个不同区域"
+            
+            # 计算聚类包含的缺陷比例
+            clustered_defects = sum([c['count'] for c in clusters])
+            clustered_ratio = clustered_defects / total_defects if total_defects > 0 else 0
+            
+            if clustered_ratio > 0.8:
+                concentration = "非常集中"
+            elif clustered_ratio > 0.6:
+                concentration = "较为集中"
+            elif clustered_ratio > 0.4:
+                concentration = "分布均匀"
+            else:
+                concentration = "较为分散"
+            
+            # 生成描述文本
+            html_content.append(f"<p><b>分布概况：</b>{distribution_pattern}，整体分布{concentration}。</p>")
+            
+            # 描述主要聚类
+            if clusters:
+                max_cluster = clusters[0]  # 已按大小排序
+                center_x, center_y = max_cluster['center']
+                html_content.append(f"<p><b>主要聚类：</b>最大的聚类区域位于坐标({center_x:.3f}, {center_y:.3f})附近，包含{max_cluster['count']}个缺陷点，占总缺陷的{(max_cluster['count']/total_defects*100):.1f}%。</p>")
+            
+            # 描述噪声点情况
+            if noise_count > 0:
+                noise_ratio = noise_count / total_defects if total_defects > 0 else 0
+                if noise_ratio > 0.3:
+                    noise_desc = "大量"
+                elif noise_ratio > 0.1:
+                    noise_desc = "部分"
+                else:
+                    noise_desc = "少量"
+                html_content.append(f"<p><b>离散缺陷：</b>存在{noise_desc}离散缺陷点（{noise_count}个，占比{noise_ratio*100:.1f}%），这些点未形成明显聚类。</p>")
+        
+        # 显示缺陷位置热图
+        if 'chart_file' in self.current_report and os.path.exists(self.current_report['chart_file']):
+            html_content.append("<p>缺陷位置分布热图显示了所有检测到的缺陷位置，颜色越亮表示缺陷出现频率越高：</p>")
+            html_content.append(f'<p><img src="{self.current_report["chart_file"]}" width="500"/></p>')
+            html_content.append("<p><small><i>热图中绿色圆点表示缺陷聚类中心，数字表示该聚类包含的缺陷数量。</i></small></p>")
         
         # 聚类分析
-        browser.append("<h3>聚类分析</h3>")
+        html_content.append("<h3>聚类分析</h3>")
         clusters = report_data['position_clusters']['clusters']
-        browser.append(f"<p>聚类数量: <b>{len(clusters)}</b></p>")
+        html_content.append(f"<p>聚类数量: <b>{len(clusters)}</b></p>")
         if clusters:
-            browser.append(f"<p>最大聚类包含: <b>{clusters[0]['count']}</b>个缺陷</p>")
-            browser.append("<p>前3个聚类:</p>")
-            browser.append("<ul>")
-            for i, cluster in enumerate(clusters[:3]):
-                browser.append(f"<li>聚类 {i+1}: 中心位置({cluster['center'][0]:.2f}, {cluster['center'][1]:.2f}), " 
-                             f"半径: {cluster['radius']:.3f}, 包含: {cluster['count']}个缺陷</li>")
-            browser.append("</ul>")
+            html_content.append(f"<p>最大聚类包含: <b>{clusters[0]['count']}</b>个缺陷</p>")
+            html_content.append("<p>前3个聚类:</p>")
+            
+            # 创建有序列表
+            if len(clusters) > 0:
+                html_content.append("<ul style='margin-top: 5px; margin-bottom: 10px;'>")
+                for i, cluster in enumerate(clusters[:3]):
+                    html_content.append(f"<li>聚类 {i+1}: 中心位置({cluster['center'][0]:.2f}, {cluster['center'][1]:.2f}), " 
+                                f"半径: {cluster['radius']:.3f}, 包含: {cluster['count']}个缺陷</li>")
+                html_content.append("</ul>")
         
-        browser.append(f"<p>噪声点数量: <b>{report_data['position_clusters']['noise']}</b></p>")
+        html_content.append(f"<p>噪声点数量: <b>{report_data['position_clusters']['noise']}</b></p>")
         
-        # 网格统计信息
+        # 区域统计信息
         if 'patch_statistics' in report_data and report_data['patch_statistics']:
-            try:
-                # 获取统计数据
-                patch_stats = report_data['patch_statistics']
-                grid_size = patch_stats.get('patch_size', 8)
-                
-                # 在浏览器中显示统计信息
-                browser.append("<h3>图像网格统计分析</h3>")
-                browser.append(f"<p>网格划分: <b>{grid_size}×{grid_size}</b>（图像被均匀划分为{grid_size*grid_size}个区域）</p>")
-                browser.append(f"<p>统计区域总数: <b>{len(patch_stats.get('mean', []))}</b></p>")
-                browser.append(f"<p>区域均值的平均值: <b>{patch_stats.get('mean_avg', 0):.2f}</b>（图像整体亮度水平）</p>")
-                browser.append(f"<p>区域方差的平均值: <b>{patch_stats.get('variance_avg', 0):.2f}</b>（图像整体纹理复杂度）</p>")
-                browser.append(f"<p>区域边缘密度平均值: <b>{patch_stats.get('edges_avg', 0):.4f}</b>（图像整体边缘特征强度）</p>")
-                
-                # 创建一个临时的图像文件存储直方图
-                plt.figure(figsize=(8, 10))
-                
-                # 绘制均值分布直方图
-                plt.subplot(3, 1, 1)
-                plt.title('区域亮度分布')
-                mean_bins = patch_stats.get('mean_bin_edges', [])
-                if len(mean_bins) >= 2:
-                    bin_centers = [(mean_bins[i] + mean_bins[i+1])/2 for i in range(len(mean_bins)-1)]
-                    plt.bar(bin_centers, patch_stats.get('mean_histogram', []), width=(mean_bins[1]-mean_bins[0])*0.8)
-                else:
-                    plt.text(0.5, 0.5, '无均值数据', ha='center', va='center')
-                
-                plt.grid(True, alpha=0.3)
-                plt.xlabel('均值（亮度）')
-                plt.ylabel('区域数量')
-                
-                # 绘制方差分布直方图
-                plt.subplot(3, 1, 2)
-                plt.title('区域纹理复杂度分布')
-                var_bins = patch_stats.get('variance_bin_edges', [])
-                if len(var_bins) >= 2:
-                    bin_centers = [(var_bins[i] + var_bins[i+1])/2 for i in range(len(var_bins)-1)]
-                    plt.bar(bin_centers, patch_stats.get('variance_histogram', []), width=(var_bins[1]-var_bins[0])*0.8)
-                else:
-                    plt.text(0.5, 0.5, '无方差数据', ha='center', va='center')
-                
-                plt.grid(True, alpha=0.3)
-                plt.xlabel('方差（纹理复杂度）')
-                plt.ylabel('区域数量')
-                
-                # 绘制边缘密度直方图
-                plt.subplot(3, 1, 3)
-                plt.title('区域边缘密度分布（Sobel算子）')
-                edge_bins = patch_stats.get('edges_bin_edges', [])
-                if len(edge_bins) >= 2:
-                    bin_centers = [(edge_bins[i] + edge_bins[i+1])/2 for i in range(len(edge_bins)-1)]
-                    plt.bar(bin_centers, patch_stats.get('edges_histogram', []), width=(edge_bins[1]-edge_bins[0])*0.8, color='orange')
-                else:
-                    plt.text(0.5, 0.5, '无边缘密度数据', ha='center', va='center')
-                
-                plt.grid(True, alpha=0.3)
-                plt.xlabel('边缘密度（边缘像素占比）')
-                plt.ylabel('区域数量')
-                
-                plt.tight_layout()
-                
-                # 保存临时文件
-                temp_dir = join_path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'temp')
-                os.makedirs(temp_dir, exist_ok=True)
-                histogram_path = join_path(temp_dir, f"grid_histogram_{int(time.time())}.png")
-                plt.savefig(histogram_path)
-                plt.close()
-                
-                # 显示直方图图像
-                browser.append("<p>图像区域特征分布:</p>")
-                browser.append(f'<img src="{histogram_path}" width="500"/>')
+            # 获取统计数据
+            patch_stats = report_data['patch_statistics']
+            grid_size = patch_stats.get('patch_size', 8)
+            
+            # 在浏览器中显示统计信息
+            html_content.append("<h3>区域特征统计分析</h3>")
+            html_content.append(f"<p>区域划分: <b>{grid_size}×{grid_size}</b>（图像被均匀划分为{grid_size*grid_size}个区域）</p>")
+            html_content.append(f"<p>统计区域总数: <b>{len(patch_stats.get('mean', []))}</b></p>")
+            html_content.append(f"<p>区域均值的平均值: <b>{patch_stats.get('mean_avg', 0):.2f}</b>（图像整体亮度水平）</p>")
+            html_content.append(f"<p>区域方差的平均值: <b>{patch_stats.get('variance_avg', 0):.2f}</b>（图像整体纹理复杂度）</p>")
+            html_content.append(f"<p>区域边缘密度平均值: <b>{patch_stats.get('edges_avg', 0):.4f}</b>（图像整体边缘特征强度）</p>")
+            
+            # 显示直方图图像（从报告中获取路径）
+            if 'histogram_chart' in self.current_report and os.path.exists(self.current_report['histogram_chart']):
+                html_content.append("<p>图像区域特征分布:</p>")
+                html_content.append(f'<p><img src="{self.current_report["histogram_chart"]}" width="500"/></p>')
                 
                 # 解释直方图意义
-                browser.append("<p><small><i>均值分布表示图像不同区域的亮度分布情况，可识别出暗区和亮区的比例。</i></small></p>")
-                browser.append("<p><small><i>方差分布表示图像不同区域的纹理复杂度，高方差区域通常包含复杂纹理。</i></small></p>")
-                browser.append("<p><small><i>边缘密度分布（Sobel算子）表示图像不同区域的边缘特征占比，高值区域通常包含明显的缺陷边界。</i></small></p>")
-                
-            except Exception as e:
-                browser.append(f"<p>生成网格统计图表时出错: {str(e)}</p>")
+                html_content.append("<p><small><i>均值分布表示图像不同区域的亮度分布情况，可识别出暗区和亮区的比例。</i></small></p>")
+                html_content.append("<p><small><i>方差分布表示图像不同区域的纹理复杂度，高方差区域通常包含复杂纹理。</i></small></p>")
+                html_content.append("<p><small><i>边缘密度分布（Sobel算子）表示图像不同区域的边缘特征占比，高值区域通常包含明显的缺陷边界。</i></small></p>")
+            else:
+                html_content.append("<p>未生成区域特征分布图表</p>")
         
         # 纹理分析
-        browser.append("<h3>纹理分析</h3>")
+        html_content.append("<h3>纹理分析</h3>")
         texture_counts = report_data['texture_analysis']['texture_counts']
         if texture_counts:
-            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
-            browser.append(f"<p>主要纹理类型: <b>{main_texture}</b></p>")
+            # 显示饼图（从报告中获取路径）
+            if 'pie_chart' in self.current_report and os.path.exists(self.current_report['pie_chart']):
+                html_content.append('<div style="margin:15px 0;">')
+                html_content.append(f'<img src="{self.current_report["pie_chart"]}" width="450" style="max-width:100%; border-radius:6px;"/>')
+                html_content.append('</div>')
             
-            browser.append("<p>纹理类型分布:</p>")
-            browser.append("<ul>")
+            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
+            html_content.append(f"<p>主要纹理类型: <b>{main_texture}</b></p>")
+            
+            html_content.append("<p>纹理类型分布:</p>")
+            html_content.append("<ul style='margin-top: 5px; margin-bottom: 10px;'>")
             for texture, count in texture_counts.items():
-                browser.append(f"<li>{texture}: {count}个</li>")
-            browser.append("</ul>")
+                html_content.append(f"<li>{texture}: {count}个</li>")
+            html_content.append("</ul>")
         
-        # 网格位置分析
-        dominant_textures = report_data['texture_analysis']['dominant_position_textures']
-        browser.append(f"<p>网格位置数量: <b>{len(dominant_textures)}</b></p>")
+        # 结束HTML文档
+        html_content.append("</body></html>")
+        
+        # 设置HTML内容到浏览器
+        browser.setHtml("".join(html_content))
     
     def show_details(self, report_data):
         """
@@ -1035,18 +1053,47 @@ class TextureAnalysisDialog(QDialog):
         basic_info = QTreeWidgetItem(root)
         basic_info.setText(0, "基本信息")
         
+        # 格式化时间戳为正规日期格式
+        timestamp_str = report_data['timestamp']
+        try:
+            # 尝试将时间戳转换为正规日期格式
+            datetime_obj = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+            formatted_date = datetime_obj.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            formatted_date = timestamp_str  # 如果转换失败，保持原格式
+        
         items = [
             ("检测组", report_data['detect_group']),
             ("总图像数", str(report_data['total_images'])),
             ("缺陷图像数", str(report_data['defect_images'])),
             ("缺陷位置数", str(report_data['defect_positions'])),
-            ("时间戳", report_data['timestamp'])
+            ("分析时间", formatted_date)
         ]
         
         for name, value in items:
             item = QTreeWidgetItem(basic_info)
             item.setText(0, name)
             item.setText(1, value)
+        
+        # 添加缺陷图像列表 (使用config.DETECT_LIST)
+        if config.DETECT_LIST:
+            images_item = QTreeWidgetItem(basic_info)
+            images_item.setText(0, "缺陷图像列表")
+            images_item.setText(1, f"{len(config.DETECT_LIST)}个图像")
+            
+            for img_info in config.DETECT_LIST:
+                img_item = QTreeWidgetItem(images_item)
+                img_item.setText(0, img_info.get('origin_name', '未知'))
+                score = img_info.get('score', 'N/A')
+                if isinstance(score, str):
+                    try:
+                        score = float(score)
+                        score_text = f"{score:.4f}"
+                    except:
+                        score_text = score
+                else:
+                    score_text = f"{score:.4f}"
+                img_item.setText(1, f"得分: {score_text}")
         
         # 添加聚类信息
         clusters_info = QTreeWidgetItem(root)
@@ -1058,10 +1105,27 @@ class TextureAnalysisDialog(QDialog):
             cluster_item.setText(0, f"聚类 {i+1}")
             cluster_item.setText(1, f"{cluster['count']}个缺陷")
             
-            for attr in ["center", "radius", "count"]:
+            # 基本属性 (使用中文)
+            attr_map = {
+                "center": "中心坐标",
+                "radius": "半径",
+                "count": "缺陷数量"
+            }
+            
+            for attr, chinese_name in attr_map.items():
                 attr_item = QTreeWidgetItem(cluster_item)
-                attr_item.setText(0, attr)
+                attr_item.setText(0, chinese_name)
                 attr_item.setText(1, str(cluster[attr]))
+            
+            # 添加位置范围信息
+            if 'points' in cluster and cluster['points']:
+                points = np.array(cluster['points'])
+                min_x, min_y = np.min(points, axis=0)
+                max_x, max_y = np.max(points, axis=0)
+                
+                range_item = QTreeWidgetItem(cluster_item)
+                range_item.setText(0, "位置范围")
+                range_item.setText(1, f"X: {min_x:.3f}-{max_x:.3f}, Y: {min_y:.3f}-{max_y:.3f}")
         
         # 添加纹理信息
         texture_info = QTreeWidgetItem(root)
@@ -1071,47 +1135,103 @@ class TextureAnalysisDialog(QDialog):
         texture_counts = QTreeWidgetItem(texture_info)
         texture_counts.setText(0, "纹理统计")
         
+        # 为每种纹理类型计算每个图像中该纹理的数量
+        texture_images_count = {}
+        if 'texture_details' in report_data['texture_analysis']:
+            for texture_detail in report_data['texture_analysis']['texture_details']:
+                texture_type = texture_detail['texture_type']
+                image_name = texture_detail['image']
+                
+                if texture_type not in texture_images_count:
+                    texture_images_count[texture_type] = {}
+                
+                if image_name not in texture_images_count[texture_type]:
+                    texture_images_count[texture_type][image_name] = 0
+                
+                texture_images_count[texture_type][image_name] += 1
+        
         for texture, count in report_data['texture_analysis']['texture_counts'].items():
             texture_item = QTreeWidgetItem(texture_counts)
             texture_item.setText(0, texture)
             texture_item.setText(1, str(count))
+            
+            # 添加该纹理类型对应的图像列表 (左侧为文件名，右侧为纹理数量)
+            if texture in texture_images_count:
+                # 按照图像名称排序
+                sorted_images = sorted(texture_images_count[texture].items(), key=lambda x: x[0])
+                for img_name, texture_count in sorted_images:
+                    img_item = QTreeWidgetItem(texture_item)
+                    img_item.setText(0, img_name)
+                    img_item.setText(1, f"{texture_count}个")
         
         # 展开根节点
         tree.expandItem(root)
     
     def export_report(self):
         """
-        导出报告
+        导出PDF报告
         """
         if not self.current_report:
             QMessageBox.warning(self, "警告", "没有可导出的报告")
             return
             
-        # 选择导出目录
-        directory = QFileDialog.getExistingDirectory(self, "选择导出目录")
-        if not directory:
-            return
-            
         try:
-            # 复制报告文件
+            # 让用户选择保存路径
+            save_dialog = QFileDialog()
+            save_dialog.setAcceptMode(QFileDialog.AcceptSave)
+            save_dialog.setNameFilter("PDF文件 (*.pdf)")
+            save_dialog.setDefaultSuffix("pdf")
+            
+            # 设置默认文件名（使用报告的时间戳）
+            timestamp = self.current_report['report_data']['timestamp']
+            default_filename = f"defect_analysis_report_{timestamp}.pdf"
+            save_dialog.selectFile(default_filename)
+            
+            if not save_dialog.exec():
+                return  # 用户取消了保存对话框
+                
+            # 获取用户选择的文件路径
+            user_selected_path = save_dialog.selectedFiles()[0]
+            
+            # 创建进度对话框
+            progress_dialog = ProgressDialog(self, {
+                "title": "生成PDF报告",
+                "text": "正在生成PDF报告..."
+            })
+            progress_dialog.show()
+            QApplication.processEvents()  # 确保对话框显示
+            
+            # 获取报告和图表文件路径
             report_file = self.current_report['report_file']
-            chart_file = self.current_report['chart_file']
+            chart_file = self.current_report.get('chart_file')
+            histogram_chart = self.current_report.get('histogram_chart')
+            pie_chart = self.current_report.get('pie_chart')
             
-            report_basename = os.path.basename(report_file)
-            chart_basename = os.path.basename(chart_file)
+            # 生成PDF报告直接到用户选择的路径
+            report_path = os.path.dirname(report_file)
+            pdf_file = generate_pdf_report(
+                self.current_report['report_data'], 
+                report_path,
+                chart_file,
+                histogram_chart,
+                pie_chart,
+                output_filename=user_selected_path  # 传递用户选择的路径
+            )
             
-            target_report = os.path.join(directory, report_basename)
-            target_chart = os.path.join(directory, chart_basename)
+            # 关闭进度对话框
+            progress_dialog.close()
             
-            # 复制文件
-            import shutil
-            shutil.copy2(report_file, target_report)
-            shutil.copy2(chart_file, target_chart)
-            
-            QMessageBox.information(self, "成功", f"报告已导出至:\n{directory}")
+            # 如果生成成功，显示成功信息
+            if pdf_file and os.path.exists(pdf_file):
+                # 保存PDF文件路径到current_report
+                self.current_report['pdf_report'] = pdf_file
+                QMessageBox.information(self, "成功", f"PDF报告已生成并保存到:\n{pdf_file}")
+            else:
+                QMessageBox.warning(self, "警告", "PDF报告生成失败")
             
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"导出报告失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"生成PDF报告失败: {str(e)}")
+            print(f"生成PDF报告失败: {str(e)}")
 
 
 

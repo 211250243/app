@@ -11,6 +11,21 @@ import traceback
 import config
 from utils import join_path
 
+# 添加必要的导入
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch, cm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
+    print("警告: 未安装reportlab库，PDF报告功能不可用")
+
 
 class DefectTextureAnalyzer:
     """
@@ -130,20 +145,20 @@ class DefectTextureAnalyzer:
                 self.update_progress(30, "未找到图像文件")
                 return 0
             
-            # 尝试加载detect_list.json获取得分信息
-            detect_list_path = join_path(self.detect_path, 'detect_list.json')
-            detect_list = []
-            if os.path.exists(detect_list_path):
-                try:
-                    detect_list = json.load(open(detect_list_path))
-                    print(f"加载了 {len(detect_list)} 个检测结果记录")
-                except Exception as e:
-                    print(f"读取detect_list.json出错: {str(e)}")
+            if not config.DETECT_LIST:
+                # 尝试加载detect_list.json获取得分信息
+                detect_list_path = join_path(self.detect_path, 'detect_list.json')
+                if os.path.exists(detect_list_path):
+                    try:
+                        config.DETECT_LIST = json.load(open(detect_list_path))
+                        print(f"加载了 {len(config.DETECT_LIST)} 个检测结果记录")
+                    except Exception as e:
+                        print(f"读取detect_list.json出错: {str(e)}")
             
             # 找出得分最高的样本
             best_score = -1
             self.best_sample = None
-            for item in detect_list:
+            for item in config.DETECT_LIST:
                 score = item.get('score')
                 if isinstance(score, str):
                     try:
@@ -779,6 +794,16 @@ def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, m
         # 生成报告
         report_info = analyzer.generate_report()
         
+        # 生成统计图表
+        if report_info:
+            chart_paths = generate_statistical_charts(report_info['report_data'], analyzer.report_path)
+            if chart_paths:
+                report_info.update(chart_paths)
+                
+            # 更新进度到100%
+            if progress_callback:
+                progress_callback(100, "分析完成")
+        
         return report_info
         
     except Exception as e:
@@ -789,9 +814,503 @@ def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, m
         raise
 
 
+def generate_statistical_charts(report_data, report_path):
+    """
+    生成统计图表并保存到指定路径
+    
+    Args:
+        report_data: 报告数据字典
+        report_path: 报告保存路径
+    
+    Returns:
+        包含图表文件路径的字典
+    """
+    try:
+        import time
+        import matplotlib.pyplot as plt
+        import os
+        
+        # 设置matplotlib中文字体支持
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS']  # 中文字体
+        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+        plt.rcParams['font.family'] = 'sans-serif'  # 设置字体族
+        
+        # 使用与其他报告图表相同的时间戳格式
+        timestamp = report_data['timestamp']
+        chart_paths = {}
+        
+        # 1. 生成网格区域特征统计直方图
+        if 'patch_statistics' in report_data and report_data['patch_statistics']:
+            try:
+                # 获取统计数据
+                patch_stats = report_data['patch_statistics']
+                grid_size = patch_stats.get('patch_size', 8)
+                
+                # 创建一个临时的图像文件存储直方图
+                plt.figure(figsize=(8, 10))
+                
+                # 绘制均值分布直方图
+                plt.subplot(3, 1, 1)
+                plt.title('区域亮度分布')
+                mean_bins = patch_stats.get('mean_bin_edges', [])
+                if len(mean_bins) >= 2:
+                    bin_centers = [(mean_bins[i] + mean_bins[i+1])/2 for i in range(len(mean_bins)-1)]
+                    plt.bar(bin_centers, patch_stats.get('mean_histogram', []), width=(mean_bins[1]-mean_bins[0])*0.8)
+                else:
+                    plt.text(0.5, 0.5, '无均值数据', ha='center', va='center')
+                
+                plt.grid(True, alpha=0.3)
+                plt.xlabel('均值（亮度）')
+                plt.ylabel('区域数量')
+                
+                # 绘制方差分布直方图
+                plt.subplot(3, 1, 2)
+                plt.title('区域纹理复杂度分布')
+                var_bins = patch_stats.get('variance_bin_edges', [])
+                if len(var_bins) >= 2:
+                    bin_centers = [(var_bins[i] + var_bins[i+1])/2 for i in range(len(var_bins)-1)]
+                    plt.bar(bin_centers, patch_stats.get('variance_histogram', []), width=(var_bins[1]-var_bins[0])*0.8)
+                else:
+                    plt.text(0.5, 0.5, '无方差数据', ha='center', va='center')
+                
+                plt.grid(True, alpha=0.3)
+                plt.xlabel('方差（纹理复杂度）')
+                plt.ylabel('区域数量')
+                
+                # 绘制边缘密度直方图
+                plt.subplot(3, 1, 3)
+                plt.title('区域边缘密度分布（Sobel算子）')
+                edge_bins = patch_stats.get('edges_bin_edges', [])
+                if len(edge_bins) >= 2:
+                    bin_centers = [(edge_bins[i] + edge_bins[i+1])/2 for i in range(len(edge_bins)-1)]
+                    plt.bar(bin_centers, patch_stats.get('edges_histogram', []), width=(edge_bins[1]-edge_bins[0])*0.8, color='orange')
+                else:
+                    plt.text(0.5, 0.5, '无边缘密度数据', ha='center', va='center')
+                
+                plt.grid(True, alpha=0.3)
+                plt.xlabel('边缘密度（边缘像素占比）')
+                plt.ylabel('区域数量')
+                
+                plt.tight_layout()
+                
+                # 保存直方图文件
+                os.makedirs(report_path, exist_ok=True)
+                histogram_path = os.path.join(report_path, f"grid_histogram_{timestamp}.png")
+                plt.savefig(histogram_path)
+                plt.close()
+                
+                chart_paths['histogram_chart'] = histogram_path
+                print(f"区域特征直方图已保存: {histogram_path}")
+                
+            except Exception as e:
+                print(f"生成区域统计图表时出错: {str(e)}")
+        
+        # 2. 生成纹理类型分布饼图
+        texture_counts = report_data['texture_analysis']['texture_counts']
+        if texture_counts:
+            try:
+                # 创建纹理类型分布的饼图
+                plt.figure(figsize=(7, 5))
+                labels = list(texture_counts.keys())
+                sizes = list(texture_counts.values())
+                colors = ['#1976D2', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FFEB3B'][:len(labels)]
+                
+                plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', 
+                        shadow=False, startangle=90, textprops={'fontsize': 10})
+                plt.axis('equal')
+                plt.title('纹理类型分布', fontsize=12)
+                
+                # 保存饼图文件
+                os.makedirs(report_path, exist_ok=True)
+                pie_chart_path = os.path.join(report_path, f"texture_pie_{timestamp}.png")
+                plt.savefig(pie_chart_path, dpi=120, bbox_inches='tight')
+                plt.close()
+                
+                chart_paths['pie_chart'] = pie_chart_path
+                print(f"纹理类型饼图已保存: {pie_chart_path}")
+                
+            except Exception as e:
+                print(f"生成纹理类型饼图时出错: {str(e)}")
+        
+        return chart_paths
+        
+    except Exception as e:
+        print(f"生成统计图表时出错: {str(e)}")
+        return {}
+
+
+def generate_pdf_report(report_data, report_path, chart_file=None, histogram_chart=None, pie_chart=None, output_filename=None):
+    """
+    生成PDF格式的缺陷分析报告
+    
+    Args:
+        report_data: 报告数据字典
+        report_path: 报告保存路径
+        chart_file: 缺陷位置分布图路径
+        histogram_chart: 网格特征直方图路径
+        pie_chart: 纹理分布饼图路径
+        output_filename: 指定的输出文件路径，如果提供则直接使用该路径
+    
+    Returns:
+        PDF报告文件路径，如果生成失败则返回None
+    """
+    if not HAS_REPORTLAB:
+        print("未安装reportlab库，无法生成PDF报告")
+        return None
+        
+    try:
+        # 创建中文支持
+        try:
+            # 尝试注册中文字体
+            pdfmetrics.registerFont(TTFont('SimSun', 'simsun.ttc'))
+            pdfmetrics.registerFont(TTFont('SimHei', 'simhei.ttf'))
+            cn_font_name = 'SimSun'
+        except:
+            # 如果中文字体注册失败，使用默认字体
+            cn_font_name = 'Helvetica'
+            print("未找到中文字体，使用默认字体")
+            
+        # 创建自定义样式
+        styles = getSampleStyleSheet()
+        
+        # 修改样式名称，避免冲突
+        styles.add(ParagraphStyle(
+            name='ReportTitle',  # 改为ReportTitle避免与Title冲突
+            fontName=cn_font_name,
+            fontSize=18,
+            alignment=1,  # 居中
+            spaceAfter=12
+        ))
+        styles.add(ParagraphStyle(
+            name='ReportHeading1',  # 改为ReportHeading1避免与Heading1冲突
+            fontName=cn_font_name,
+            fontSize=16,
+            spaceAfter=10
+        ))
+        styles.add(ParagraphStyle(
+            name='ReportHeading2',  # 改为ReportHeading2避免与Heading2冲突
+            fontName=cn_font_name,
+            fontSize=14,
+            spaceAfter=8
+        ))
+        styles.add(ParagraphStyle(
+            name='ReportNormal',  # 改为ReportNormal避免与Normal冲突
+            fontName=cn_font_name,
+            fontSize=12,
+            leading=16
+        ))
+        # 添加图片说明样式
+        styles.add(ParagraphStyle(
+            name='ImageCaption',
+            fontName=cn_font_name,
+            fontSize=10,  # 较小的字体
+            alignment=1,  # 居中
+            spaceAfter=20,  # 增加更多的底部间距
+            textColor=colors.gray
+        ))
+        
+        # 确保报告目录存在
+        os.makedirs(report_path, exist_ok=True)
+        timestamp = report_data['timestamp']
+        
+        # 确定PDF文件保存路径
+        if output_filename:
+            pdf_filename = output_filename
+        else:
+            pdf_filename = os.path.join(report_path, f"defect_analysis_report_{timestamp}.pdf")
+        
+        # 创建PDF文档
+        doc = SimpleDocTemplate(
+            pdf_filename,
+            pagesize=A4,
+            rightMargin=1*cm,
+            leftMargin=1*cm,
+            topMargin=2*cm,
+            bottomMargin=2*cm
+        )
+        
+        # 准备报告内容
+        content = []
+        
+        # 标题
+        content.append(Paragraph(f"缺陷分析报告 - {report_data['detect_group']}", styles['ReportTitle']))
+        content.append(Spacer(1, 0.5*cm))
+        
+        # 基本信息
+        content.append(Paragraph("1. 基本信息", styles['ReportHeading1']))
+        content.append(Spacer(1, 0.2*cm))
+        
+        # 格式化时间戳为正规日期格式
+        try:
+            date_obj = datetime.strptime(report_data['timestamp'], "%Y%m%d_%H%M%S")
+            time_str = date_obj.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            time_str = report_data['timestamp']
+            
+        # 基本信息表格
+        basic_data = [
+            ["检测组", report_data['detect_group']],
+            ["总图像数", str(report_data['total_images'])],
+            ["缺陷图像数", str(report_data['defect_images'])],
+            ["缺陷位置总数", str(report_data['defect_positions'])],
+            ["分析时间", time_str]
+        ]
+        
+        basic_table = Table(basic_data, colWidths=[4*cm, 10*cm])
+        basic_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, -1), cn_font_name),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        content.append(basic_table)
+        content.append(Spacer(1, 0.5*cm))
+        
+        # 缺陷位置分析
+        content.append(Paragraph("2. 缺陷位置分析", styles['ReportHeading1']))
+        content.append(Spacer(1, 0.2*cm))
+        
+        # 添加缺陷位置描述
+        clusters = report_data['position_clusters']['clusters']
+        noise_count = report_data['position_clusters']['noise']
+        total_defects = report_data['defect_positions']
+        
+        if clusters:
+            # 生成分布描述
+            if len(clusters) == 1:
+                distribution_pattern = "缺陷高度集中在一个区域"
+            elif len(clusters) <= 3:
+                distribution_pattern = f"缺陷主要集中在{len(clusters)}个区域"
+            else:
+                distribution_pattern = f"缺陷分布在{len(clusters)}个不同区域"
+                
+            # 计算聚类包含的缺陷比例
+            clustered_defects = sum([c['count'] for c in clusters])
+            clustered_ratio = clustered_defects / total_defects if total_defects > 0 else 0
+            
+            if clustered_ratio > 0.8:
+                concentration = "非常集中"
+            elif clustered_ratio > 0.6:
+                concentration = "较为集中"
+            elif clustered_ratio > 0.4:
+                concentration = "分布均匀"
+            else:
+                concentration = "较为分散"
+                
+            content.append(Paragraph(f"分布概况：{distribution_pattern}，整体分布{concentration}。", styles['ReportNormal']))
+            
+            # 描述主要聚类
+            if clusters:
+                max_cluster = clusters[0]  # 已按大小排序
+                center_x, center_y = max_cluster['center']
+                content.append(Paragraph(
+                    f"主要聚类：最大的聚类区域位于坐标({center_x:.3f}, {center_y:.3f})附近，包含{max_cluster['count']}个缺陷点，"
+                    f"占总缺陷的{(max_cluster['count']/total_defects*100):.1f}%。", 
+                    styles['ReportNormal']
+                ))
+                
+            # 描述噪声点情况
+            if noise_count > 0:
+                noise_ratio = noise_count / total_defects if total_defects > 0 else 0
+                if noise_ratio > 0.3:
+                    noise_desc = "大量"
+                elif noise_ratio > 0.1:
+                    noise_desc = "部分"
+                else:
+                    noise_desc = "少量"
+                    
+                content.append(Paragraph(
+                    f"离散缺陷：存在{noise_desc}离散缺陷点（{noise_count}个，占比{noise_ratio*100:.1f}%），这些点未形成明显聚类。",
+                    styles['ReportNormal']
+                ))
+        
+        content.append(Spacer(1, 0.3*cm))
+        
+        # 添加缺陷位置热图
+        if chart_file and os.path.exists(chart_file):
+            try:
+                img = Image(chart_file, width=15*cm, height=15*cm)
+                content.append(img)
+                content.append(Paragraph("图1. 缺陷位置分布热图（颜色越亮表示缺陷出现频率越高，绿色圆点表示聚类中心）", styles['ImageCaption']))
+            except Exception as e:
+                content.append(Paragraph(f"加载缺陷位置热图失败: {str(e)}", styles['ReportNormal']))
+        
+        # 聚类分析表格
+        content.append(Paragraph("2.1 聚类分析结果", styles['ReportHeading2']))
+        content.append(Spacer(1, 0.2*cm))
+        
+        content.append(Paragraph(f"聚类数量: {len(clusters)}", styles['ReportNormal']))
+        if clusters:
+            content.append(Paragraph(f"最大聚类包含: {clusters[0]['count']}个缺陷", styles['ReportNormal']))
+            content.append(Paragraph("前3个聚类:", styles['ReportNormal']))
+            
+            # 创建聚类表格
+            cluster_data = [["聚类ID", "中心位置", "半径", "缺陷数量"]]
+            for i, cluster in enumerate(clusters[:3]):
+                cluster_data.append([
+                    f"聚类 {i+1}",
+                    f"({cluster['center'][0]:.2f}, {cluster['center'][1]:.2f})",
+                    f"{cluster['radius']:.3f}",
+                    str(cluster['count'])
+                ])
+                
+            cluster_table = Table(cluster_data, colWidths=[3*cm, 5*cm, 3*cm, 3*cm])
+            cluster_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, -1), cn_font_name),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            
+            content.append(cluster_table)
+            content.append(Spacer(1, 0.3*cm))
+            
+        content.append(Spacer(1, 0.5*cm))
+        
+        # 区域特征统计分析
+        if 'patch_statistics' in report_data and report_data['patch_statistics']:
+            content.append(Paragraph("3. 区域特征统计分析", styles['ReportHeading1']))
+            content.append(Spacer(1, 0.2*cm))
+            
+            patch_stats = report_data['patch_statistics']
+            grid_size = patch_stats.get('patch_size', 8)
+            
+            content.append(Paragraph(
+                f"区域划分: {grid_size}×{grid_size}（图像被均匀划分为{grid_size*grid_size}个区域）",
+                styles['ReportNormal']
+            ))
+            content.append(Paragraph(f"统计区域总数: {len(patch_stats.get('mean', []))}", styles['ReportNormal']))
+            content.append(Paragraph(
+                f"区域均值的平均值: {patch_stats.get('mean_avg', 0):.2f}（图像整体亮度水平）",
+                styles['ReportNormal']
+            ))
+            content.append(Paragraph(
+                f"区域方差的平均值: {patch_stats.get('variance_avg', 0):.2f}（图像整体纹理复杂度）",
+                styles['ReportNormal']
+            ))
+            content.append(Paragraph(
+                f"区域边缘密度平均值: {patch_stats.get('edges_avg', 0):.4f}（图像整体边缘特征强度）",
+                styles['ReportNormal']
+            ))
+            
+            content.append(Spacer(1, 0.3*cm))
+            
+            # 添加区域特征直方图
+            if histogram_chart and os.path.exists(histogram_chart):
+                try:
+                    img = Image(histogram_chart, width=15*cm, height=15*cm)
+                    content.append(img)
+                    content.append(Paragraph("图2. 区域特征直方图（显示图像不同区域的亮度、纹理复杂度和边缘密度分布）", styles['ImageCaption']))
+                    
+                    content.append(Paragraph("直方图解释:", styles['ReportNormal']))
+                    content.append(Paragraph("1. 均值分布表示图像不同区域的亮度分布情况，可识别出暗区和亮区的比例", styles['ReportNormal']))
+                    content.append(Paragraph("2. 方差分布表示图像不同区域的纹理复杂度，高方差区域通常包含复杂纹理", styles['ReportNormal']))
+                    content.append(Paragraph("3. 边缘密度分布表示图像不同区域的边缘特征占比，高值区域通常包含明显的缺陷边界", styles['ReportNormal']))
+                    
+                except Exception as e:
+                    content.append(Paragraph(f"加载区域特征直方图失败: {str(e)}", styles['ReportNormal']))
+            
+            content.append(Spacer(1, 0.5*cm))
+        
+        # 纹理分析
+        content.append(Paragraph("4. 纹理分析", styles['ReportHeading1']))
+        content.append(Spacer(1, 0.2*cm))
+        
+        texture_counts = report_data['texture_analysis']['texture_counts']
+        if texture_counts:
+            # 添加纹理类型饼图
+            if pie_chart and os.path.exists(pie_chart):
+                try:
+                    img = Image(pie_chart, width=12*cm, height=10*cm)
+                    content.append(img)
+                    content.append(Paragraph("图3. 纹理类型分布饼图", styles['ImageCaption']))
+                except Exception as e:
+                    content.append(Paragraph(f"加载纹理类型饼图失败: {str(e)}", styles['ReportNormal']))
+            
+            # 获取主要纹理类型
+            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
+            content.append(Paragraph(f"主要纹理类型: {main_texture}", styles['ReportNormal']))
+            content.append(Spacer(1, 0.2*cm))
+            
+            # 创建纹理分布表格
+            content.append(Paragraph("纹理类型分布:", styles['ReportNormal']))
+            texture_data = [["纹理类型", "数量"]]
+            for texture, count in texture_counts.items():
+                texture_data.append([texture, str(count)])
+                
+            texture_table = Table(texture_data, colWidths=[8*cm, 6*cm])
+            texture_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, -1), cn_font_name),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+            ]))
+            
+            content.append(texture_table)
+            content.append(Spacer(1, 0.5*cm))
+        
+        # 结论部分
+        content.append(Paragraph("5. 分析结论", styles['ReportHeading1']))
+        content.append(Spacer(1, 0.2*cm))
+        
+        # 根据数据生成简单的结论
+        conclusions = []
+        
+        # 缺陷分布结论
+        if clusters:
+            if len(clusters) == 1:
+                conclusions.append("1. 缺陷高度集中，存在明显的单点问题区域，建议重点检查该区域的生产工艺")
+            elif len(clusters) <= 3:
+                conclusions.append(f"1. 缺陷集中在{len(clusters)}个区域，表明可能存在多个工艺缺陷点")
+            else:
+                conclusions.append(f"1. 缺陷分散在{len(clusters)}个不同区域，表明可能存在系统性的工艺问题")
+        
+        # 纹理分析结论
+        if texture_counts:
+            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
+            texture_ratio = max(texture_counts.values()) / sum(texture_counts.values())
+            
+            if texture_ratio > 0.7:
+                conclusions.append(f"2. 缺陷纹理以{main_texture}为主（占比{texture_ratio*100:.1f}%），表明存在特定类型的缺陷模式")
+            else:
+                conclusions.append(f"2. 缺陷纹理类型多样，但{main_texture}相对较多，建议进一步分析各类纹理的成因")
+        
+        # 区域特征结论
+        if 'patch_statistics' in report_data and report_data['patch_statistics']:
+            patch_stats = report_data['patch_statistics']
+            edge_avg = patch_stats.get('edges_avg', 0)
+            
+            if edge_avg > 0.3:
+                conclusions.append("3. 图像边缘密度较高，表明检测对象表面存在较多边缘特征，可能是划痕或裂纹类缺陷")
+            elif edge_avg > 0.1:
+                conclusions.append("3. 图像边缘密度适中，表明检测对象表面存在一定的边缘特征，可能是轻微的表面不规则")
+            else:
+                conclusions.append("3. 图像边缘密度较低，表明检测对象表面较为平滑，缺陷可能以颜色或亮度异常为主")
+        
+        # 添加结论
+        for conclusion in conclusions:
+            content.append(Paragraph(conclusion, styles['ReportNormal']))
+            content.append(Spacer(1, 0.2*cm))
+        
+        # 生成PDF
+        doc.build(content)
+        return pdf_filename
+        
+    except Exception as e:
+        error_msg = f"生成PDF报告时出错: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        return None
+
+
 if __name__ == "__main__":
-    # 从命令行运行时的示例用法
-    import sys
     
     # 示例路径和参数
     detect_path = "B:/Development/GraduationDesign/app/test/detect_result"
