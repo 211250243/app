@@ -858,12 +858,13 @@ class DefectTextureAnalyzer:
                 y = center[1] * background_height
                 
                 # 绘制聚类中心
-                ax.plot(x, y, 'go', markersize=10, alpha=0.7)
+                ax.plot(x, y, 'go', markersize=18, alpha=0.7)
                 ax.annotate(f"C{i+1}: {count}个", 
                             xy=(x, y), 
-                            xytext=(x+10, y+10),
+                            xytext=(x+30, y+30),
                             color='white',
                             fontweight='bold',
+                            fontsize=18,
                             bbox=dict(facecolor='black', alpha=0.5))
             
             # 保存图形
