@@ -4,7 +4,7 @@ import shutil
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QDateTime, QPoint, QSize
 from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
-from PySide6.QtWidgets import QMessageBox, QVBoxLayout, QLabel, QWidget, QApplication, QProgressDialog, QPushButton
+from PySide6.QtWidgets import QMessageBox, QVBoxLayout, QLabel, QWidget, QApplication, QProgressDialog, QPushButton, QFileDialog
 
 import config
 
@@ -499,3 +499,60 @@ class LoadingAnimation(QWidget):
         """停止动画并关闭窗口"""
         self.movie.stop()
         self.close()
+
+def create_file_dialog(title="选择文件", parent=None, is_folder=True, file_filter="", accept_mode=QFileDialog.AcceptOpen, file_mode=QFileDialog.AnyFile, default_filename=""):
+    """
+    创建一个居中显示的文件选择对话框
+    
+    Args:
+        title (str): 对话框标题
+        parent (QWidget): 父窗口，传入 None 则显示在系统屏幕中心
+        is_folder (bool): 是否选择文件夹
+        file_filter (str): 文件过滤器 如 "Images (*.png *.jpg *.jpeg)"
+        accept_mode (QFileDialog.AcceptMode): 接受模式
+        file_mode (QFileDialog.FileMode): 文件选择模式
+        default_filename (str): 默认文件名
+        
+    Returns:
+        str | list[str] | None: 选择的文件路径或文件夹路径，取消则返回 None
+    """
+    # 创建静态对话框选项
+    options = QFileDialog.Options()
+    options |= QFileDialog.DontUseNativeDialog  # 使用 Qt 的对话框，而不是系统原生对话框
+    
+    # 设置对话框模式和标题
+    if is_folder:
+        directory = QFileDialog.getExistingDirectory(
+            parent, 
+            title,
+            options=options
+        )
+        return directory
+    else:
+        if file_mode == QFileDialog.ExistingFiles:
+            files, _ = QFileDialog.getOpenFileNames(
+                parent,
+                title,
+                "",
+                file_filter,
+                options=options
+            )
+            return files
+        else:
+            if accept_mode == QFileDialog.AcceptOpen:
+                file, _ = QFileDialog.getOpenFileName(
+                    parent,
+                    title,
+                    "",
+                    file_filter,
+                    options=options
+                )
+            else:
+                file, _ = QFileDialog.getSaveFileName(
+                    parent,
+                    title,
+                    default_filename if default_filename else "",
+                    file_filter,
+                    options=options
+                )
+            return file

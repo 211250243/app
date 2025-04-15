@@ -8,7 +8,7 @@ from datetime import datetime
 
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import QWidget, QDialog, QMessageBox, QFileDialog, QVBoxLayout, QTreeWidgetItem, QListWidgetItem, QHBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox, QRadioButton
-from PySide6.QtGui import QIcon, QPainter
+from PySide6.QtGui import QIcon, QPainter, QShortcut, QKeySequence
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis, QDateTimeAxis
 
@@ -16,7 +16,7 @@ import config
 from http_server import HttpServer, PatchCoreParamMapper_Http, UploadSampleGroup_HTTP
 from sample_handler import GroupListItem, SampleGroupDialog
 from ssh_server import PatchCoreParamMapper_SSH
-from utils import LoadingAnimation, check_model_group, check_sample_group, copy_image, get_model_status, show_message_box, update_metadata, join_path, is_image
+from utils import LoadingAnimation, check_model_group, check_sample_group, copy_image, get_model_status, show_message_box, update_metadata, join_path, is_image, create_file_dialog
 
 
 
@@ -62,7 +62,7 @@ class ModelHandler:
         # 检查是否存在样本组
         if not check_sample_group():
             return
-        folder = QFileDialog.getExistingDirectory(self.ui, "选择图片文件夹")
+        folder = create_file_dialog(title="选择图片文件夹", is_folder=True)
         if folder:
             sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP)
             for file_name in os.listdir(folder):
@@ -84,8 +84,14 @@ class ModelHandler:
         # 检查是否存在样本组
         if not check_sample_group():
             return
-        # getOpenFileNames 返回一个元组，包含文件路径列表和文件类型过滤器。
-        files, _ = QFileDialog.getOpenFileNames(self.ui, "选择图片文件", "", "图片文件 (*.png *.jpg *.jpeg)")
+            
+        files = create_file_dialog(
+            title="选择图片文件",
+            is_folder=False,
+            file_filter="图片文件 (*.png *.jpg *.jpeg)",
+            file_mode=QFileDialog.ExistingFiles
+        )
+        
         if files:
             sample_group_path = join_path(config.SAMPLE_PATH, config.SAMPLE_GROUP)
             for file_path in files:
@@ -632,6 +638,12 @@ class NewModelGroupDialog(QDialog):
         self.ui.newButton.clicked.connect(self.ui.accept)
         self.ui.cancelButton.clicked.connect(self.ui.reject)
 
+        # 添加回车键确认功能
+        self.shortcut_return = QShortcut(QKeySequence(Qt.Key_Return), self)
+        self.shortcut_return.activated.connect(self.accept)
+        self.shortcut_enter = QShortcut(QKeySequence(Qt.Key_Enter), self)
+        self.shortcut_enter.activated.connect(self.accept)
+
     def get_model_group(self):
         """
         获取模型组名称
@@ -802,13 +814,11 @@ class TrainingProgressDialog(QDialog):
         self.loss_label = QLabel("损失值: 0.0")
         self.p_true_label = QLabel("真实样本概率: 0.0")
         self.p_fake_label = QLabel("生成样本概率: 0.0")
-        self.distance_loss_label = QLabel("距离损失: 0.0")
         
         left_info.addWidget(self.epoch_label)
         left_info.addWidget(self.loss_label)
         left_info.addWidget(self.p_true_label)
         left_info.addWidget(self.p_fake_label)
-        left_info.addWidget(self.distance_loss_label)
         
         # 右侧信息
         right_info = QVBoxLayout()
@@ -886,14 +896,10 @@ class TrainingProgressDialog(QDialog):
         self.p_fake_series = QLineSeries()
         self.p_fake_series.setName("生成样本概率")
         
-        self.distance_loss_series = QLineSeries()
-        self.distance_loss_series.setName("距离损失")
-        
         # 添加系列到图表
         self.chart.addSeries(self.loss_series)
         self.chart.addSeries(self.p_true_series)
         self.chart.addSeries(self.p_fake_series)
-        self.chart.addSeries(self.distance_loss_series)
         
         # 创建坐标轴
         self.axis_x = QValueAxis()
@@ -925,9 +931,6 @@ class TrainingProgressDialog(QDialog):
         self.p_fake_series.attachAxis(self.axis_x)
         self.p_fake_series.attachAxis(self.axis_y)
         
-        self.distance_loss_series.attachAxis(self.axis_x)
-        self.distance_loss_series.attachAxis(self.axis_y)
-        
         # 调整图表外观
         self.chart.setBackgroundVisible(False)
         self.chart.legend().setVisible(True)
@@ -952,7 +955,6 @@ class TrainingProgressDialog(QDialog):
             losses = train_process.get("loss", [])
             p_trues = train_process.get("p_true", [0])
             p_fakes = train_process.get("p_fake", [0])
-            distance_losses = train_process.get("distance_loss", [])
             begin_time = train_process.get("begin_time", "")
             end_time = train_process.get("end_time", "")
             
@@ -960,7 +962,6 @@ class TrainingProgressDialog(QDialog):
             self.loss_series.clear()
             self.p_true_series.clear()
             self.p_fake_series.clear()
-            self.distance_loss_series.clear()
             
             # 添加所有数据点
             for i, epoch in enumerate(epochs):
@@ -973,17 +974,12 @@ class TrainingProgressDialog(QDialog):
                 # loss数据（如果存在）
                 if i < len(losses):
                     self.loss_series.append(epoch, losses[i])
-                
-                # distance_loss数据（如果存在）
-                if i < len(distance_losses):
-                    self.distance_loss_series.append(epoch, distance_losses[i])
             
             # 获取最新的数据点用于显示
             latest_epoch = epochs[-1] if epochs else 0
             latest_loss = losses[-1] if losses else 0.0
             latest_p_true = p_trues[-1] if p_trues else 0.0
             latest_p_fake = p_fakes[-1] if p_fakes else 0.0
-            latest_distance_loss = distance_losses[-1] if distance_losses else 0.0
             
             # 调整X轴范围
             start_epoch = epochs[0] if epochs else 0
@@ -1021,8 +1017,6 @@ class TrainingProgressDialog(QDialog):
             all_values = p_trues + p_fakes
             if losses:
                 all_values += losses
-            if distance_losses:
-                all_values += distance_losses
                 
             max_y = max(all_values + [0.1]) if all_values else 0.1
             min_y = min(all_values + [0.0]) if all_values else 0.0
@@ -1050,7 +1044,6 @@ class TrainingProgressDialog(QDialog):
             self.loss_label.setText(f"损失值: {latest_loss:.4f}")
             self.p_true_label.setText(f"真实样本概率: {latest_p_true:.4f}")
             self.p_fake_label.setText(f"生成样本概率: {latest_p_fake:.4f}")
-            self.distance_loss_label.setText(f"距离损失: {latest_distance_loss:.4f}")
             
             # 更新时间信息
             current_time = time.time()

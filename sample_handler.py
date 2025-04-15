@@ -6,7 +6,7 @@ import numpy as np
 import json
 import threading
 from PySide6.QtCore import Qt, QRectF, QPointF, QRect, QTimer
-from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon, QFont, QFontMetrics, QBrush, QTransform
+from PySide6.QtGui import QPixmap, QColor, QPen, QPainter, QIcon, QFont, QFontMetrics, QBrush, QTransform, QImage, QShortcut, QKeySequence, QRegularExpressionValidator
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QCheckBox, QWidget, QListWidgetItem, \
     QGraphicsPixmapItem, QGraphicsBlurEffect, QGraphicsRectItem, QGraphicsScene, QGraphicsView, \
     QFileDialog, QAbstractItemView, QMessageBox, QDialog
@@ -15,7 +15,7 @@ from PySide6.QtUiTools import QUiLoader
 import config
 from http_server import HttpServer, UploadSampleGroup_HTTP
 from ssh_server import SSHServer, UploadSampleGroup_SSH
-from utils import LoadingAnimation, check_sample_group, copy_image, is_image, join_path, ProgressDialog, show_message_box, update_metadata
+from utils import LoadingAnimation, check_sample_group, copy_image, create_file_dialog, is_image, join_path, ProgressDialog, show_message_box, update_metadata
 
 
 
@@ -362,11 +362,11 @@ class SampleHandler:
         """
         从本地选择文件夹，导入其中的图片
         """
-        # 检查是否有样本组
+        # 检查是否存在样本组
         if not check_sample_group():
             return
         # 打开文件夹选择对话框
-        folder = QFileDialog.getExistingDirectory(self.ui, "选择图片文件夹")
+        folder = create_file_dialog(title="选择图片文件夹", is_folder=True)
         if folder:
             # 遍历文件夹中的所有图片文件
             for file_name in os.listdir(folder):
@@ -379,16 +379,19 @@ class SampleHandler:
         """
         从本地文件夹中选择图片导入
         """
-        # 检查是否有样本组
+        # 检查是否存在样本组
         if not check_sample_group():
             return
-        # 打开文件对话框选择图片
-        file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.ExistingFiles) # 设置文件对话框模式为选择多个文件
-        file_dialog.setNameFilters(["Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"]) # 设置文件过滤器
-        if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            for file_path in selected_files:
+            
+        files = create_file_dialog(
+            title="选择图片文件",
+            is_folder=False,
+            file_filter="图片文件 (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)",
+            file_mode=QFileDialog.ExistingFiles
+        )
+        
+        if files:
+            for file_path in files:
                 copy_image(file_path, self.group_path)
             LoadImages(self.ui, self.group_path, 'imageList').load_with_progress()  # 重新加载图片列表
 
@@ -657,6 +660,8 @@ class SampleHandler:
     def shrink_domain_exclude_background(self):
         """
         缩小域并排除背景
+        优化算法以更好地处理白色和其他浅色背景的情况
+        使用多种图像处理技术来提高边界检测的准确性
         """
         # 检查是否存在样本组和图片项
         if not self.check_before_operate():
@@ -667,21 +672,85 @@ class SampleHandler:
             # 读取图像
             image_path = item.image_path
             image = cv2.imread(image_path)
+            if image is None:
+                continue
+
+            # 转换到HSV颜色空间以更好地处理白色背景
+            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            # 提取饱和度通道 - 背景通常饱和度较低
+            saturation = hsv[:, :, 1]
+            
+            # 多种阈值处理方法
+            methods = []
+            
+            # 方法1: 使用饱和度通道进行阈值处理
+            _, sat_thresh = cv2.threshold(saturation, 10, 255, cv2.THRESH_BINARY)
+            methods.append(sat_thresh)
+            
+            # 方法2: 转灰度并使用Otsu阈值
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            _, otsu_thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+            methods.append(otsu_thresh)
+            
+            # 方法3: 边缘检测
+            edges = cv2.Canny(gray, 30, 100)
+            # 扩张边缘以形成封闭区域
+            dilated_edges = cv2.dilate(edges, np.ones((5, 5), np.uint8), iterations=1)
+            methods.append(dilated_edges)
+            
+            # 方法4: 使用颜色距离
+            # 计算每个像素到白色(255,255,255)的距离
+            b, g, r = cv2.split(image)
+            white_dist = np.sqrt((255-r)**2 + (255-g)**2 + (255-b)**2).astype(np.uint8)
+            _, color_thresh = cv2.threshold(white_dist, 30, 255, cv2.THRESH_BINARY)
+            methods.append(color_thresh)
+            
+            # 组合多种方法的结果
+            combined_mask = np.zeros_like(gray)
+            for method in methods:
+                combined_mask = cv2.bitwise_or(combined_mask, method)
+            
+            # 应用形态学操作清理mask
+            kernel = np.ones((5, 5), np.uint8)
+            mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            
             # 找到轮廓
-            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
             if contours:
-                # 获取最大轮廓的边界框
-                x, y, w, h = cv2.boundingRect(max(contours, key=cv2.contourArea))
-                # 裁剪图像
-                cropped_image = image[y:y + h, x:x + w]
-                # 保存裁剪后的图像
-                if self.ui.coverOption.isChecked(): # 覆盖原图
-                    cv2.imwrite(image_path, cropped_image)
-                elif self.ui.saveAsOption.isChecked(): # 另存为
-                    cropped_image_path = image_path.replace(".", "_cropped.")
-                    cv2.imwrite(cropped_image_path, cropped_image)
+                # 按面积排序并筛选比较大的轮廓（过滤小噪点）
+                valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > 100]
+                
+                if valid_contours:
+                    # 如果有多个有效轮廓，合并它们的边界框
+                    x_min, y_min = image.shape[1], image.shape[0]
+                    x_max, y_max = 0, 0
+                    
+                    for cnt in valid_contours:
+                        x, y, w, h = cv2.boundingRect(cnt)
+                        x_min = min(x_min, x)
+                        y_min = min(y_min, y)
+                        x_max = max(x_max, x + w)
+                        y_max = max(y_max, y + h)
+                    
+                    # 添加边界填充（可选）
+                    padding = 10
+                    x_min = max(0, x_min - padding)
+                    y_min = max(0, y_min - padding)
+                    x_max = min(image.shape[1], x_max + padding)
+                    y_max = min(image.shape[0], y_max + padding)
+                    
+                    # 裁剪图像
+                    cropped_image = image[y_min:y_max, x_min:x_max]
+                    
+                    # 保存裁剪后的图像
+                    if self.ui.coverOption.isChecked(): # 覆盖原图
+                        cv2.imwrite(image_path, cropped_image)
+                    elif self.ui.saveAsOption.isChecked(): # 另存为
+                        cropped_image_path = image_path.replace(".", "_cropped.")
+                        cv2.imwrite(cropped_image_path, cropped_image)
+        
         # 刷新（仅当选中一项且选择了覆盖原图时刷新单项，否则刷新全部）
         if len(selected_items) == 1 and self.ui.coverOption.isChecked():
             self.refresh_image_item()
@@ -691,6 +760,7 @@ class SampleHandler:
         # LoadImages(self.ui, self.group_path, 'imageList').run()
         # if len(selected_items) == 1:
         #     self.ui.imageList.setCurrentItem(selected_items[0]) # 移动到当前项
+        self.select_disabled()
 
 
     def augment(self):
@@ -728,6 +798,7 @@ class SampleHandler:
                 print(f"保存增强后的图像: {augmented_image_path}")
 
         LoadImages(self.ui, self.group_path, 'imageList').load_with_animation()  # 重新加载图片列表
+        self.select_disabled()
 
     def random_augmentation(self, image):
         """
@@ -2041,6 +2112,12 @@ class NewSampleGroupDialog(QDialog):
         # 连接信号
         self.ui.confirmButton.clicked.connect(self.accept)
         self.ui.cancelButton.clicked.connect(self.reject)
+        
+        # 添加回车键确认功能
+        self.shortcut_return = QShortcut(QKeySequence(Qt.Key_Return), self)
+        self.shortcut_return.activated.connect(self.accept)
+        self.shortcut_enter = QShortcut(QKeySequence(Qt.Key_Enter), self)
+        self.shortcut_enter.activated.connect(self.accept)
         
         # 设置焦点到输入框
         self.ui.inputField.setFocus()

@@ -4,35 +4,43 @@ from pathlib import Path  # 用于处理文件路径
 from PySide6.QtCore import QDateTime, Signal, Qt, QSize, QEvent
 from PySide6.QtGui import QKeySequence, QShortcut, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QDialog, QMessageBox, 
-                              QLabel, QListWidgetItem, QWidget, QHBoxLayout)
+                              QLabel, QListWidgetItem, QWidget, QHBoxLayout, QVBoxLayout)
 from PySide6.QtUiTools import QUiLoader
 
 import config
 from main import MainWindow
-from utils import join_path, show_message_box, check_and_create_path, FloatingTimer
+from utils import join_path, show_message_box, check_and_create_path, FloatingTimer, create_file_dialog
 
 
 class NewProjectDialog(QDialog):
-    # 创建一个信号，返回项目的元数据
-    project_info = Signal(str)
-
-    def __init__(self):
-        super().__init__()
-
+    """
+    新建项目对话框 - 使用UI文件加载
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
         # 加载UI文件
         self.ui = QUiLoader().load(r'ui/new_project.ui')
+        
+        # 设置主窗口属性和窗口标题
+        self.setWindowTitle(self.ui.windowTitle())
+        self.setFixedSize(self.ui.width(), self.ui.height())
+
+        # 创建主布局
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.ui)
 
         # 设置按钮点击事件
         self.ui.newButton.clicked.connect(self.create_new_project)
         self.ui.pathButton.clicked.connect(self.select_path)
-        self.ui.cancelButton.clicked.connect(self.cancel)
+        self.ui.cancelButton.clicked.connect(self.reject)
         
         # 添加快捷键
-        self.shortcut_create = QShortcut(QKeySequence(Qt.Key_Return), self.ui)
+        self.shortcut_create = QShortcut(QKeySequence(Qt.Key_Return), self)
         self.shortcut_create.activated.connect(self.create_new_project)
         
-        self.shortcut_cancel = QShortcut(QKeySequence(Qt.Key_Escape), self.ui)
-        self.shortcut_cancel.activated.connect(self.cancel)
+        self.shortcut_cancel = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        self.shortcut_cancel.activated.connect(self.reject)
 
         self.path = ""  # 用于保存项目的路径
         
@@ -83,10 +91,11 @@ class NewProjectDialog(QDialog):
         # 添加到最近项目列表
         self.add_to_recent_projects(project_folder)
 
-        # 发射信号，将项目路径传递给父窗口
-        self.project_info.emit(str(project_folder))
-        # 关闭新建项目窗口
-        self.ui.accept()
+        # 保存项目路径，供父窗口访问
+        self.project_folder = project_folder
+        
+        # 接受对话框
+        self.accept()
 
     def add_to_recent_projects(self, project_path):
         """将项目添加到最近项目列表"""
@@ -121,16 +130,16 @@ class NewProjectDialog(QDialog):
         """
         让用户选择保存路径
         """
-        folder = QFileDialog.getExistingDirectory(self, "选择项目保存路径")
+        folder = create_file_dialog(title="选择项目保存路径", is_folder=True)
         if folder:
             self.path = folder
             self.ui.pathEdit.setText(self.path)
-
-    def cancel(self):
+            
+    def get_project_folder(self):
         """
-        关闭新建项目窗口，返回到开始窗口
+        获取创建的项目文件夹路径
         """
-        self.ui.reject()  # 关闭当前窗口
+        return getattr(self, 'project_folder', None)
 
 
 # 开始界面窗口
@@ -302,32 +311,25 @@ class StartWindow(QMainWindow):
         打开新建项目窗口
         """
         # 创建新建项目窗口
-        new_project_dialog = NewProjectDialog()
-        # 连接信号：接收项目信息
-        new_project_dialog.project_info.connect(self.save_project_info)
-        # 使用 exec() 让新建项目窗口成为模态窗口，阻止父窗口操作
-        result = new_project_dialog.ui.exec()
-        # 根据返回值判断用户操作
-        if result == QDialog.Accepted:
-            print("新建项目成功，项目路径：", self.project_folder)
-            # 在这里执行项目创建成功后的操作
-            self.open_existing_archive(self.project_folder)
-        elif result == QDialog.Rejected:
+        new_project_dialog = NewProjectDialog(self.ui)
+        
+        # 显示对话框
+        if new_project_dialog.exec() == QDialog.Accepted:
+            # 获取项目文件夹路径
+            project_folder = new_project_dialog.get_project_folder()
+            if project_folder:
+                print("新建项目成功，项目路径：", project_folder)
+                # 打开项目
+                self.open_existing_archive(project_folder)
+        else:
             print("取消新建项目")
-            # 在这里执行项目取消操作
-
-    def save_project_info(self, project_folder):
-        """
-        处理新建项目后的项目信息
-        """
-        self.project_folder = project_folder
 
     def open_existing_archive(self, folder=None):
         """
         点击打开归档按钮，弹出文件选择对话框
         """
         if not folder:
-            folder = QFileDialog.getExistingDirectory(self, "选择项目文件夹")
+            folder = create_file_dialog(title="选择项目文件夹", is_folder=True)
         if folder:
             # 检查项目文件夹是否存在
             if not os.path.exists(folder):

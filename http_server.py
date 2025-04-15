@@ -1043,6 +1043,20 @@ class HttpDetectSamples:
         self.group_id = None
         self.save_path = None  # 保存图片的路径
 
+    def disable_ui_controls(self):
+        """禁用界面控件"""
+        # self.ui.setEnabled(False)
+        self.ui.detectList.setEnabled(False)
+        self.ui.detectColumn.setEnabled(False)
+        self.ui.toolbarWidget.setEnabled(False)
+
+    def enable_ui_controls(self):
+        """启用界面控件"""
+        # self.ui.setEnabled(True)
+        self.ui.detectList.setEnabled(True)
+        self.ui.detectColumn.setEnabled(True)
+        self.ui.toolbarWidget.setEnabled(True)
+
     def detect_samples(self):
         """启动检测样本的过程"""
         # 检查是否已选择模型和检测样本组
@@ -1065,6 +1079,9 @@ class HttpDetectSamples:
                 return
         # 获取模型ID
         try:
+            # 禁用界面控件
+            self.disable_ui_controls()
+            
             # 加载动画
             self.loading_animation = LoadingAnimation(self.ui)
             self.loading_animation.set_text("正在获取模型ID...")
@@ -1075,11 +1092,13 @@ class HttpDetectSamples:
             self.model_id = self.http_server.get_model_id(config.MODEL_GROUP)
             if not self.model_id:
                 show_message_box("错误", f"未找到模型：{config.MODEL_GROUP}", QMessageBox.Critical)
+                self.enable_ui_controls()
                 return
             # 获取样本组ID
             self.group_id = self.http_server.get_group_id(config.DETECT_SAMPLE_GROUP)
             if not self.group_id:
                 show_message_box("错误", f"未找到样本组：{config.DETECT_SAMPLE_GROUP}", QMessageBox.Critical)
+                self.enable_ui_controls()
                 return
             
             # 创建保存路径
@@ -1099,12 +1118,10 @@ class HttpDetectSamples:
             self.result_timer.timeout.connect(self.fetch_new_results)
             self.result_timer.start(1000)  # 每秒检查一次
             
-            # 更新UI状态
-            self.ui.startDetectButton.setEnabled(False)
-            
         except Exception as e:
             show_message_box("错误", f"启动检测失败: {str(e)}", QMessageBox.Critical)
             print(f"启动检测失败: {str(e)}")
+            self.enable_ui_controls()
 
     def fetch_new_results(self):
         """获取检测结果"""
@@ -1191,8 +1208,9 @@ class HttpDetectSamples:
             self.result_timer.stop()
             self.result_timer = None
             
-        # 更新UI状态
-        self.ui.startDetectButton.setEnabled(True)
+        # 启用界面控件
+        self.enable_ui_controls()
+        
         show_message_box("提示", message, QMessageBox.Information)
 
         # 将 image_list 存入本地

@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
             if confirm == QMessageBox.Yes:
                 self.model_handler.train_model()
             return
+        self.detect_handler.update_model_group()
         # 验证通过，跳转到下一页
         self.ui.tabWidget.setCurrentIndex(3)
     # def on_tab_changed(self, index):

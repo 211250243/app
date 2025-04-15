@@ -17,7 +17,7 @@ import config
 from sample_handler import SampleGroupDialog, NewSampleGroupDialog, LoadImages
 from http_server import HttpServer, HttpDetectSamples, UploadSampleGroup_HTTP
 from ssh_server import SSHServer, DefectSamples
-from utils import LoadingAnimation, ProgressDialog, check_detect_sample_group, show_message_box, join_path, is_image, update_metadata, copy_image
+from utils import LoadingAnimation, ProgressDialog, check_detect_sample_group, show_message_box, join_path, is_image, update_metadata, copy_image, create_file_dialog
 from model_handler import ModelGroupDialog
 from anomaly_gpt import AIChatDialog
 from detect_report import analyze_defect_textures, generate_pdf_report
@@ -120,6 +120,8 @@ class DetectHandler(QObject):
             image_info_list=image_info_list
         )
         dialog.exec()
+        # 恢复按钮显示状态
+        self.select_disabled()
 
     def on_threshold_changed(self, value):
         """阈值变化时更新显示"""
@@ -380,7 +382,7 @@ class DetectHandler(QObject):
 
     def init_detect_list(self):
         """
-        初始化图片列表
+        初始化检测列表
         """
         # 设置列表样式
         self.ui.detectList.setSpacing(10) # 设置项之间的间距
@@ -500,11 +502,11 @@ class DetectHandler(QObject):
         """
         从本地选择文件夹，导入其中的图片
         """
-        # 检查是否有样本组
+        # 检查是否存在检测样本组
         if not check_detect_sample_group():
             return
         # 打开文件夹选择对话框
-        folder = QFileDialog.getExistingDirectory(self.ui, "选择图片文件夹")
+        folder = create_file_dialog(title="选择图片文件夹", is_folder=True)
         if folder:
             # 遍历文件夹中的所有图片文件
             for file_name in os.listdir(folder):
@@ -517,16 +519,19 @@ class DetectHandler(QObject):
         """
         从本地文件夹中选择图片导入
         """
-        # 检查是否有样本组
+        # 检查是否存在检测样本组
         if not check_detect_sample_group():
             return
-        # 打开文件对话框选择图片
-        file_dialog = QFileDialog()
-        file_dialog.setFileMode(QFileDialog.ExistingFiles) # 设置文件对话框模式为选择多个文件
-        file_dialog.setNameFilters(["Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff)"]) # 设置文件过滤器
-        if file_dialog.exec():
-            selected_files = file_dialog.selectedFiles()
-            for file_path in selected_files:
+            
+        files = create_file_dialog(
+            title="选择图片文件",
+            is_folder=False,
+            file_filter="图片文件 (*.png *.jpg *.jpeg)",
+            file_mode=QFileDialog.ExistingFiles
+        )
+        
+        if files:
+            for file_path in files:
                 copy_image(file_path, self.group_path)
             LoadImages(self.ui, self.group_path, 'detectList').load_with_progress()  # 重新加载图片列表
 
@@ -1293,22 +1298,20 @@ class TextureAnalysisDialog(QDialog):
             
         try:
             # 让用户选择保存路径
-            save_dialog = QFileDialog()
-            save_dialog.setAcceptMode(QFileDialog.AcceptSave)
-            save_dialog.setNameFilter("PDF文件 (*.pdf)")
-            save_dialog.setDefaultSuffix("pdf")
-            
-            # 设置默认文件名（使用报告的时间戳）
             timestamp = self.current_report['report_data']['timestamp']
             default_filename = f"defect_analysis_report_{timestamp}.pdf"
-            save_dialog.selectFile(default_filename)
             
-            if not save_dialog.exec():
+            user_selected_path = create_file_dialog(
+                title="保存PDF报告",
+                is_folder=False,
+                file_filter="PDF文件 (*.pdf)",
+                accept_mode=QFileDialog.AcceptSave,
+                default_filename=default_filename
+            )
+            
+            if not user_selected_path:
                 return  # 用户取消了保存对话框
                 
-            # 获取用户选择的文件路径
-            user_selected_path = save_dialog.selectedFiles()[0]
-            
             # 创建进度对话框
             progress_dialog = ProgressDialog(self, {
                 "title": "生成PDF报告",
