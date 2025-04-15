@@ -68,9 +68,10 @@ class DetectHandler(QObject):
         self.ui.thresholdSlider.valueChanged.connect(self.on_threshold_changed)
         self.ui.applyThresholdButton.clicked.connect(self.apply_threshold)
         # 初始化检测列表
-        detect_list_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP, 'detect_list.json')
-        if config.DETECT_SAMPLE_GROUP and os.path.exists(detect_list_path):
-            config.DETECT_LIST = json.load(open(detect_list_path))
+        if config.DETECT_SAMPLE_GROUP:
+            detect_list_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP, 'detect_list.json')
+            if os.path.exists(detect_list_path):
+                config.DETECT_LIST = json.load(open(detect_list_path))
     
     def init_ai_infer(self):
         """初始化 AI 判别功能"""
