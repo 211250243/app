@@ -3,3 +3,4 @@ __pycache__/
 .idea/
 .venv/
 patchcore_inspection/
+服务端/
