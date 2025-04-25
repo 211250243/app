@@ -11,6 +11,8 @@ import config
 from main import MainWindow
 from utils import join_path, show_message_box, check_and_create_path, FloatingTimer
 
+# 在程序启动时设置工作目录为应用程序所在目录!!!
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 class NewProjectDialog(QDialog):
     # 创建一个信号，返回项目的元数据
