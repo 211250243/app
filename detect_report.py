@@ -233,8 +233,6 @@ class DefectTextureAnalyzer:
             
             # 初始化网格统计数组
             grid_means = []
-            grid_variances = []
-            grid_edges = []  # 存储边缘检测结果
             
             for img_idx, img_info in enumerate(self.defect_images):
                 # 读取热图
@@ -251,16 +249,6 @@ class DefectTextureAnalyzer:
                 
                 # 转换为灰度图
                 heatmap_gray = cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY)
-                
-                # 计算Sobel边缘
-                sobel_x = cv2.Sobel(heatmap_gray, cv2.CV_64F, 1, 0, ksize=3)
-                sobel_y = cv2.Sobel(heatmap_gray, cv2.CV_64F, 0, 1, ksize=3)
-                # 计算梯度幅度
-                sobel_mag = cv2.magnitude(sobel_x, sobel_y)
-                # 归一化到0-255范围
-                sobel_mag = cv2.normalize(sobel_mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-                # 应用阈值获取边缘掩码
-                _, edge_mask = cv2.threshold(sobel_mag, 50, 1, cv2.THRESH_BINARY)
                 
                 # 归一化灰度值
                 heatmap_norm = heatmap_gray / 255.0
