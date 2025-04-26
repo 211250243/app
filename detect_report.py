@@ -231,8 +231,6 @@ class DefectTextureAnalyzer:
             self.defect_positions = []
             self.texture_features = []
             
-            # 初始化网格统计数组
-            grid_means = []
             
             for img_idx, img_info in enumerate(self.defect_images):
                 # 读取热图
@@ -550,7 +548,7 @@ class DefectTextureAnalyzer:
                 }
             }
             
-            self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个，分析了{len(grid_means)}个网格区域")
+            self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个，分析了{len(all_means)}个网格区域")
             return len(self.defect_positions)
             
         except Exception as e:
@@ -631,73 +629,81 @@ class DefectTextureAnalyzer:
     
     def analyze_texture_patterns(self):
         """
-        分析纹理模式，统计不同类型的纹理特征
+        分析缺陷特征，判断缺陷类型（污点、划痕、裂缝等）
         """
         try:
-            self.update_progress(70, "开始分析纹理模式...")
+            self.update_progress(70, "开始分析缺陷类型...")
             
             if not self.texture_features:
-                print("没有纹理特征数据可供分析")
+                print("没有缺陷特征数据可供分析")
                 return {
-                    'texture_counts': {},
-                    'dominant_position_textures': {},
-                    'texture_details': []
+                    'texture_counts': {},  # 保持原键名不变
+                    'defect_details': []
                 }
-                
-            print(f"分析纹理模式，特征数量: {len(self.texture_features)}")
-            # 使用梯度大小对纹理进行分类
-            gradient_thresholds = [10, 30, 50]
-            texture_types = ['平滑', '轻微纹理', '中等纹理', '强烈纹理']
             
-            # 对纹理进行分类
-            texture_categories = []
+            print(f"分析缺陷类型，缺陷数量: {len(self.texture_features)}")
+            
+            # 定义缺陷类型判断标准（这些阈值需要根据实际数据调整）
+            defect_types = []
             for feature in self.texture_features:
-                gradient = feature['gradient']
+                # 提取特征
+                gradient = feature['gradient']  # 梯度特征
+                area = feature['area']          # 面积
+                mean_val = feature['mean']      # 亮度均值
+                std_val = feature['std']        # 亮度标准差
                 
-                # 根据梯度确定类别
-                category_idx = sum(gradient > threshold for threshold in gradient_thresholds)
-                category = texture_types[category_idx]
+                # 形状特征（可以从self.defect_positions获取）
+                for pos in self.defect_positions:
+                    if pos['image'] == feature['image'] and pos['center_x'] == feature['position'][0] and pos['center_y'] == feature['position'][1]:
+                        width = pos['width']
+                        height = pos['height']
+                        aspect_ratio = width / height if height > 0 else 1
+                        break
+                else:
+                    aspect_ratio = 1  # 默认值
                 
-                texture_categories.append({
+                # 基于多特征的缺陷类型判断
+                if gradient < 15 and std_val < 25:
+                    defect_type = "污点"  # 低梯度、低方差通常是污点
+                elif gradient > 40 and aspect_ratio > 2.5:
+                    defect_type = "划痕"  # 高梯度、细长形状通常是划痕
+                elif gradient > 50 and std_val > 40:
+                    defect_type = "裂缝"  # 高梯度、高方差通常是裂缝
+                elif area < 0.001:  # 小面积
+                    defect_type = "小点缺陷"
+                elif area > 0.05:   # 大面积
+                    defect_type = "大面积缺陷"
+                else:
+                    defect_type = "其他缺陷"
+                
+                defect_types.append({
                     'image': feature['image'],
                     'position': feature['position'],
-                    'texture_type': category,
-                    'texture_value': gradient
+                    'defect_type': defect_type,
+                    'gradient': gradient,
+                    'area': area,
+                    'mean': mean_val,
+                    'std': std_val
                 })
             
-            # 统计各类纹理的数量
-            texture_counts = Counter([item['texture_type'] for item in texture_categories])
-            print(f"纹理类型分布: {dict(texture_counts)}")
+            # 统计各类缺陷的数量
+            defect_counts = Counter([item['defect_type'] for item in defect_types])
+            print(f"缺陷类型分布: {dict(defect_counts)}")
             
-            # 按照位置统计纹理类型
-            position_textures = defaultdict(list)
-            for item in texture_categories:
-                # 将位置离散化为网格
-                grid_x = int(item['position'][0] * 5)  # 5x5网格
-                grid_y = int(item['position'][1] * 5)
-                position_key = f"{grid_x}_{grid_y}"
-                
-                position_textures[position_key].append(item['texture_type'])
-            
-            # 每个位置的主要纹理类型
-            dominant_textures = {}
-            for pos, textures in position_textures.items():
-                counts = Counter(textures)
-                dominant_textures[pos] = counts.most_common(1)[0][0]
-            
-            texture_analysis = {
-                'texture_counts': dict(texture_counts),
-                'dominant_position_textures': dominant_textures,
-                'texture_details': texture_categories
+            # 返回分析结果，保持键名兼容
+            defect_analysis = {
+                'texture_counts': dict(defect_counts),  # 使用原键名
+                'defect_type_counts': dict(defect_counts),  # 同时保留新键名
+                'defect_details': defect_types
             }
             
-            self.update_progress(80, "纹理分析完成")
-            return texture_analysis
+            self.update_progress(80, "缺陷类型分析完成")
+            return defect_analysis
             
         except Exception as e:
-            error_msg = f"纹理分析时出错: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"缺陷类型分析时出错: {str(e)}\n{traceback.format_exc()}"
             print(error_msg)
-            self.update_progress(80, f"纹理分析出错: {str(e)}")
+            self.update_progress(80, f"缺陷类型分析出错: {str(e)}")
             raise RuntimeError(error_msg)
     
     def generate_report(self):
