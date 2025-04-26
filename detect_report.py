@@ -220,7 +220,7 @@ class DefectTextureAnalyzer:
     
     def extract_defect_features(self, grid_size=8):
         """
-        从热图中提取缺陷特征和位置，同时进行图像网格统计分析
+        从热图中提取缺陷特征和位置，同时进行图像区域特征统计分析
         
         Args:
             grid_size: 网格划分数量，将图像均匀划分为grid_size×grid_size个区域，默认为8×8网格
@@ -230,11 +230,6 @@ class DefectTextureAnalyzer:
             self.heatmap_data = []
             self.defect_positions = []
             self.texture_features = []
-            
-            # 初始化网格统计数组
-            grid_means = []
-            grid_variances = []
-            grid_edges = []  # 存储边缘检测结果
             
             for img_idx, img_info in enumerate(self.defect_images):
                 # 读取热图
@@ -251,16 +246,6 @@ class DefectTextureAnalyzer:
                 
                 # 转换为灰度图
                 heatmap_gray = cv2.cvtColor(heatmap, cv2.COLOR_BGR2GRAY)
-                
-                # 计算Sobel边缘
-                sobel_x = cv2.Sobel(heatmap_gray, cv2.CV_64F, 1, 0, ksize=3)
-                sobel_y = cv2.Sobel(heatmap_gray, cv2.CV_64F, 0, 1, ksize=3)
-                # 计算梯度幅度
-                sobel_mag = cv2.magnitude(sobel_x, sobel_y)
-                # 归一化到0-255范围
-                sobel_mag = cv2.normalize(sobel_mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-                # 应用阈值获取边缘掩码
-                _, edge_mask = cv2.threshold(sobel_mag, 50, 1, cv2.THRESH_BINARY)
                 
                 # 归一化灰度值
                 heatmap_norm = heatmap_gray / 255.0
@@ -327,11 +312,11 @@ class DefectTextureAnalyzer:
                         self.texture_features.append({
                             'image': img_info['name'],
                             'position': (center_x, center_y),
-                            'mean': mean_val,
-                            'std': std_val,
-                            'max': max_val,
-                            'gradient': grad_mean,
-                            'area': area
+                            'mean': mean_val, # 均值
+                            'std': std_val, # 标准差
+                            'max': max_val, # 最大值
+                            'gradient': grad_mean, # 梯度均值
+                            'area': area # 面积
                         })
                 
                 # 输出有效轮廓数量
@@ -476,7 +461,7 @@ class DefectTextureAnalyzer:
                                 if is_anomaly:
                                     anomaly_grid_means.append(mean_val)
                                     anomaly_grid_variances.append(std_val**2)  # 方差是标准差的平方
-                                    anomaly_grid_edges.append(edge_density)
+                                    anomaly_grid_edges.append(edge_density)  # 边缘密度
                                 else:
                                     normal_grid_means.append(mean_val)
                                     normal_grid_variances.append(std_val**2)
@@ -562,7 +547,7 @@ class DefectTextureAnalyzer:
                 }
             }
             
-            self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个，分析了{len(grid_means)}个网格区域")
+            self.update_progress(60, f"已提取缺陷特征: {len(self.defect_positions)}个，分析了{len(all_means)}个网格区域")
             return len(self.defect_positions)
             
         except Exception as e:
