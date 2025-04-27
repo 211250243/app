@@ -76,7 +76,7 @@ class DefectTextureAnalyzer:
         self.image_count = 0  # 总图像数
         self.defect_images = []  # 存储缺陷图像信息
         self.heatmap_data = []   # 存储热图数据
-        self.defect_features = []  # 存储缺陷特征
+        self.texture_features = []  # 存储缺陷特征
         self.defect_positions = []  # 存储缺陷位置
         self.cluster_results = None  # 聚类结果
         self.best_sample = None  # 最佳样本（得分最高的图片）
@@ -850,7 +850,36 @@ class DefectTextureAnalyzer:
         生成缺陷分析报告
         """
         try:
-            self.update_progress(80, "开始生成报告...")
+            self.update_progress(30, "开始加载缺陷图像...")
+            
+            # 1. 加载缺陷图像 (从load_defect_images方法移入的逻辑)
+            defect_count = self.load_defect_images(self.threshold)  # 使用类的threshold属性
+            if defect_count == 0:
+                error_msg = "没有足够的缺陷图像用于分析"
+                print(error_msg)
+                self.update_progress(100, "所有检测样本良好，无需生成缺陷检测报告!")
+                return None
+            
+            # 2. 提取缺陷特征 (从extract_defect_features方法移入的逻辑)
+            self.update_progress(40, "开始提取缺陷特征...")
+            feature_count = self.extract_defect_features(self.grid_size)  # 使用类的grid_size属性
+            if feature_count == 0:
+                error_msg = "未能提取到有效的缺陷特征"
+                print(error_msg)
+                self.update_progress(100, error_msg)
+                raise ValueError(error_msg)
+            
+            # 3. 执行聚类分析 (从cluster_defect_positions方法移入的逻辑)
+            self.update_progress(60, "开始进行缺陷位置聚类分析...")
+            if self.cluster_results is None:
+                self.cluster_defect_positions(self.eps, self.min_samples)  # 使用类的eps和min_samples属性
+            
+            # 4. 分析缺陷特征 (从analyze_defect_texture方法移入的逻辑)
+            self.update_progress(70, "开始分析缺陷类型...")
+            texture_analysis = self.analyze_defect_texture()
+            
+            # 5. 生成报告数据
+            self.update_progress(80, "分析完毕，开始生成报告...")
             
             # 检查是否有足够的数据
             if not self.defect_positions or not self.texture_features:
@@ -858,13 +887,6 @@ class DefectTextureAnalyzer:
                 print(error_msg)
                 raise ValueError(error_msg)
                 
-            # 执行聚类
-            if self.cluster_results is None:
-                self.cluster_defect_positions()
-                
-            # 分析缺陷特征
-            texture_analysis = self.analyze_defect_texture()
-            
             # 准备报告数据
             report = {
                 'detect_group': self.detect_group,
@@ -884,13 +906,18 @@ class DefectTextureAnalyzer:
                 
             # 生成缺陷位置分布图
             chart_path = self.generate_defect_position_chart(report, report['timestamp'])
+            self.update_progress(90, "缺陷位置分布图生成完成")
+            
+            # 生成统计图表
+            chart_paths = self.generate_statistical_charts(report)
             
             self.update_progress(100, "报告生成完成")
             
             return {
                 'report_file': report_file,
                 'chart_file': chart_path,
-                'report_data': report
+                'report_data': report,
+                **chart_paths
             }
             
         except Exception as e:
@@ -1021,303 +1048,227 @@ class DefectTextureAnalyzer:
             plt.close()
             return fig_path
 
-
-def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, min_samples=3, grid_size=8, progress_callback=None):
-    """
-    分析缺陷类型并生成报告
-    
-    Args:
-        detect_path: 检测样本根目录路径
-        detect_group: 检测样本组名称
-        threshold: 缺陷判定阈值，检测得分高于此值的样本被视为异常样本
-        eps: DBSCAN聚类的邻域半径参数
-        min_samples: DBSCAN聚类的最小样本数参数
-        grid_size: 网格划分数量，将图像均匀划分为grid_size×grid_size个区域
-        progress_callback: 进度回调函数，接收进度值(0-100)和进度消息
-    
-    Returns:
-        报告信息字典，包含report_file, chart_file和report_data
-    """
-    # 设置Matplotlib使用非交互式后端，避免线程问题
-    import matplotlib
-    matplotlib.use('Agg')  # 使用非交互式后端
-    
-    try:
-        print(f"开始分析: 路径={detect_path}, 组={detect_group}, 网格划分={grid_size}×{grid_size}")
+    def generate_statistical_charts(self, report):
+        """
+        生成统计图表并保存到指定路径
         
-        # 创建分析器
-        analyzer = DefectTextureAnalyzer(detect_path, detect_group)
+        Args:
+            report: 报告数据字典
         
-        # 设置进度回调
-        if progress_callback:
-            analyzer.set_progress_callback(progress_callback)
-        
-        # 加载缺陷图像
-        defect_count = analyzer.load_defect_images(threshold)
-        if defect_count == 0:
-            error_msg = "未找到图像，无法进行分析"
-            print(error_msg)
-            if progress_callback:
-                progress_callback(100, error_msg)
-            return None
+        Returns:
+            包含图表文件路径的字典
+        """
+        try:
+            import time
+            import matplotlib.pyplot as plt
+            import os
             
-        # 提取缺陷特征
-        feature_count = analyzer.extract_defect_features(grid_size)
-        if feature_count == 0:
-            error_msg = "未能提取到有效的缺陷特征"
-            print(error_msg)
-            if progress_callback:
-                progress_callback(100, error_msg)
-            return None
+            # 设置matplotlib中文字体支持
+            plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS']  # 中文字体
+            plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+            plt.rcParams['font.family'] = 'sans-serif'  # 设置字体族
             
-        # 聚类分析
-        analyzer.cluster_defect_positions(eps, min_samples)
-        
-        # 生成报告
-        report_info = analyzer.generate_report()
-        
-        # 生成统计图表
-        if report_info:
-            chart_paths = generate_statistical_charts(report_info['report_data'], analyzer.report_path)
-            if chart_paths:
-                report_info.update(chart_paths)
-                
-            # 更新进度到100%
-            if progress_callback:
-                progress_callback(100, "分析完成")
-        
-        return report_info
-        
-    except Exception as e:
-        error_msg = f"分析缺陷类型时出错: {str(e)}\n{traceback.format_exc()}"
-        print(error_msg)
-        if progress_callback:
-            progress_callback(100, f"分析缺陷类型时出错: {str(e)}")
-        raise
-
-
-def generate_statistical_charts(report_data, report_path):
-    """
-    生成统计图表并保存到指定路径
-    
-    Args:
-        report_data: 报告数据字典
-        report_path: 报告保存路径
-    
-    Returns:
-        包含图表文件路径的字典
-    """
-    try:
-        import time
-        import matplotlib.pyplot as plt
-        import os
-        
-        # 设置matplotlib中文字体支持
-        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'SimSun', 'Arial Unicode MS']  # 中文字体
-        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
-        plt.rcParams['font.family'] = 'sans-serif'  # 设置字体族
-        
-        # 使用与其他报告图表相同的时间戳格式
-        timestamp = report_data['timestamp']
-        chart_paths = {}
-        
-        # 1. 生成网格区域特征统计直方图
-        if 'patch_statistics' in report_data and report_data['patch_statistics']:
-            try:
-                # 获取统计数据
-                patch_stats = report_data['patch_statistics']
-                
-                # 创建一个临时的图像文件存储直方图
-                plt.figure(figsize=(8, 10))
-                
-                # 绘制区域亮度直方图（使用均值：方差丢失了亮度的绝对水平信息，相同方差的区域可能一个是亮区一个是暗区）
-                plt.subplot(3, 1, 1)
-                plt.title('区域亮度分布')
-                mean_bins = patch_stats.get('mean_bin_edges', [])
-                normal_means = patch_stats.get('normal_means', [])
-                anomaly_means = patch_stats.get('anomaly_means', [])
-                
-                if normal_means or anomaly_means:
-                    # 使用相同的bin设置来保证正常和异常区域的直方图可比较
-                    bin_count = 20
-                    min_val = min(normal_means + anomaly_means) if normal_means + anomaly_means else 0
-                    max_val = max(normal_means + anomaly_means) if normal_means + anomaly_means else 1
-                    bin_range = (min_val, max_val)
+            # 使用与其他报告图表相同的时间戳格式
+            timestamp = report['timestamp']
+            chart_paths = {}
+            
+            # 1. 生成网格区域特征统计直方图
+            if 'patch_statistics' in report and report['patch_statistics']:
+                try:
+                    # 获取统计数据
+                    patch_stats = report['patch_statistics']
                     
-                    # 分别绘制正常和异常区域的直方图
-                    if normal_means:
-                        plt.hist(normal_means, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
-                                density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                    # 创建一个临时的图像文件存储直方图
+                    plt.figure(figsize=(8, 10))
                     
-                    if anomaly_means:
-                        plt.hist(anomaly_means, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
-                                density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                    # 绘制区域亮度直方图（使用均值：方差丢失了亮度的绝对水平信息，相同方差的区域可能一个是亮区一个是暗区）
+                    plt.subplot(3, 1, 1)
+                    plt.title('区域亮度分布')
+                    mean_bins = patch_stats.get('mean_bin_edges', [])
+                    normal_means = patch_stats.get('normal_means', [])
+                    anomaly_means = patch_stats.get('anomaly_means', [])
                     
-                    plt.legend()
-                elif len(mean_bins) >= 2:
-                    # 如果没有按正常/异常分类的数据，则使用总体数据
-                    bin_centers = [(mean_bins[i] + mean_bins[i+1])/2 for i in range(len(mean_bins)-1)]
-                    hist_values = patch_stats.get('mean_histogram', [])
-                    
-                    # 将直方图数据转换为出现频率
-                    total_regions = sum(hist_values)
-                    if total_regions > 0:
-                        frequency = [count / total_regions for count in hist_values]
+                    if normal_means or anomaly_means:
+                        # 使用相同的bin设置来保证正常和异常区域的直方图可比较
+                        bin_count = 20
+                        min_val = min(normal_means + anomaly_means) if normal_means + anomaly_means else 0
+                        max_val = max(normal_means + anomaly_means) if normal_means + anomaly_means else 1
+                        bin_range = (min_val, max_val)
+                        
+                        # 分别绘制正常和异常区域的直方图
+                        if normal_means:
+                            plt.hist(normal_means, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
+                                    density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                        
+                        if anomaly_means:
+                            plt.hist(anomaly_means, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
+                                    density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                        
+                        plt.legend()
+                    elif len(mean_bins) >= 2:
+                        # 如果没有按正常/异常分类的数据，则使用总体数据
+                        bin_centers = [(mean_bins[i] + mean_bins[i+1])/2 for i in range(len(mean_bins)-1)]
+                        hist_values = patch_stats.get('mean_histogram', [])
+                        
+                        # 将直方图数据转换为出现频率
+                        total_regions = sum(hist_values)
+                        if total_regions > 0:
+                            frequency = [count / total_regions for count in hist_values]
+                        else:
+                            frequency = hist_values
+                        
+                        # 区分正常和异常区域，显示实际分布的叠加效果而非完全分离
+                        plt.bar(bin_centers, frequency, width=(mean_bins[1]-mean_bins[0])*0.8, 
+                            color='lightgray', alpha=0.7, label='总体分布')
+                        plt.legend()
                     else:
-                        frequency = hist_values
+                        plt.text(0.5, 0.5, '无均值数据', ha='center', va='center')
                     
-                    # 区分正常和异常区域，显示实际分布的叠加效果而非完全分离
-                    plt.bar(bin_centers, frequency, width=(mean_bins[1]-mean_bins[0])*0.8, 
-                           color='lightgray', alpha=0.7, label='总体分布')
-                    plt.legend()
-                else:
-                    plt.text(0.5, 0.5, '无均值数据', ha='center', va='center')
-                
-                plt.grid(True, alpha=0.3)
-                plt.xlabel('亮度值')
-                plt.ylabel('出现频率')
-                
-                # 绘制区域纹理复杂度直方图（使用方差：不同纹理复杂度的区域可能有相同的均值，无法区分平滑区域和复杂但亮度平衡的纹理区域）
-                plt.subplot(3, 1, 2)
-                plt.title('区域纹理复杂度分布')
-                var_bins = patch_stats.get('variance_bin_edges', [])
-                normal_variances = patch_stats.get('normal_variances', [])
-                anomaly_variances = patch_stats.get('anomaly_variances', [])
-                
-                if normal_variances or anomaly_variances:
-                    # 使用相同的bin设置来保证正常和异常区域的直方图可比较
-                    bin_count = 20
-                    min_val = min(normal_variances + anomaly_variances) if normal_variances + anomaly_variances else 0
-                    max_val = max(normal_variances + anomaly_variances) if normal_variances + anomaly_variances else 1
-                    bin_range = (min_val, max_val)
+                    plt.grid(True, alpha=0.3)
+                    plt.xlabel('亮度值')
+                    plt.ylabel('出现频率')
                     
-                    # 分别绘制正常和异常区域的直方图
-                    if normal_variances:
-                        plt.hist(normal_variances, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
-                                density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                    # 绘制区域纹理复杂度直方图（使用方差：不同纹理复杂度的区域可能有相同的均值，无法区分平滑区域和复杂但亮度平衡的纹理区域）
+                    plt.subplot(3, 1, 2)
+                    plt.title('区域纹理复杂度分布')
+                    var_bins = patch_stats.get('variance_bin_edges', [])
+                    normal_variances = patch_stats.get('normal_variances', [])
+                    anomaly_variances = patch_stats.get('anomaly_variances', [])
                     
-                    if anomaly_variances:
-                        plt.hist(anomaly_variances, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
-                                density=True, label='异常区域', edgecolor='black', linewidth=0.5)
-                    
-                    plt.legend()
-                elif len(var_bins) >= 2:
-                    # 如果没有按正常/异常分类的数据，则使用总体数据
-                    bin_centers = [(var_bins[i] + var_bins[i+1])/2 for i in range(len(var_bins)-1)]
-                    hist_values = patch_stats.get('variance_histogram', [])
-                    
-                    # 将直方图数据转换为出现频率
-                    total_regions = sum(hist_values)
-                    if total_regions > 0:
-                        frequency = [count / total_regions for count in hist_values]
+                    if normal_variances or anomaly_variances:
+                        # 使用相同的bin设置来保证正常和异常区域的直方图可比较
+                        bin_count = 20
+                        min_val = min(normal_variances + anomaly_variances) if normal_variances + anomaly_variances else 0
+                        max_val = max(normal_variances + anomaly_variances) if normal_variances + anomaly_variances else 1
+                        bin_range = (min_val, max_val)
+                        
+                        # 分别绘制正常和异常区域的直方图
+                        if normal_variances:
+                            plt.hist(normal_variances, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
+                                    density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                        
+                        if anomaly_variances:
+                            plt.hist(anomaly_variances, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
+                                    density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                        
+                        plt.legend()
+                    elif len(var_bins) >= 2:
+                        # 如果没有按正常/异常分类的数据，则使用总体数据
+                        bin_centers = [(var_bins[i] + var_bins[i+1])/2 for i in range(len(var_bins)-1)]
+                        hist_values = patch_stats.get('variance_histogram', [])
+                        
+                        # 将直方图数据转换为出现频率
+                        total_regions = sum(hist_values)
+                        if total_regions > 0:
+                            frequency = [count / total_regions for count in hist_values]
+                        else:
+                            frequency = hist_values
+                        
+                        # 显示总体分布而非完全分离的正常/异常区域
+                        plt.bar(bin_centers, frequency, width=(var_bins[1]-var_bins[0])*0.8, 
+                            color='lightgray', alpha=0.7, label='总体分布')
+                        plt.legend()
                     else:
-                        frequency = hist_values
+                        plt.text(0.5, 0.5, '无方差数据', ha='center', va='center')
                     
-                    # 显示总体分布而非完全分离的正常/异常区域
-                    plt.bar(bin_centers, frequency, width=(var_bins[1]-var_bins[0])*0.8, 
-                           color='lightgray', alpha=0.7, label='总体分布')
-                    plt.legend()
-                else:
-                    plt.text(0.5, 0.5, '无方差数据', ha='center', va='center')
-                
-                plt.grid(True, alpha=0.3)
-                plt.xlabel('纹理复杂度值')
-                plt.ylabel('出现频率')
-                
-                # 绘制区域边缘密度直方图（使用Sobel边缘检测算子计算边缘密度）
-                plt.subplot(3, 1, 3)
-                plt.title('区域边缘密度分布')
-                edge_bins = patch_stats.get('edges_bin_edges', [])
-                normal_edges = patch_stats.get('normal_edges', [])
-                anomaly_edges = patch_stats.get('anomaly_edges', [])
-                
-                if normal_edges or anomaly_edges:
-                    # 使用相同的bin设置来保证正常和异常区域的直方图可比较
-                    bin_count = 20
-                    min_val = min(normal_edges + anomaly_edges) if normal_edges + anomaly_edges else 0
-                    max_val = max(normal_edges + anomaly_edges) if normal_edges + anomaly_edges else 1
-                    bin_range = (min_val, max_val)
+                    plt.grid(True, alpha=0.3)
+                    plt.xlabel('纹理复杂度值')
+                    plt.ylabel('出现频率')
                     
-                    # 分别绘制正常和异常区域的直方图
-                    if normal_edges:
-                        plt.hist(normal_edges, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
-                                density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                    # 绘制区域边缘密度直方图（使用Sobel边缘检测算子计算边缘密度）
+                    plt.subplot(3, 1, 3)
+                    plt.title('区域边缘密度分布')
+                    edge_bins = patch_stats.get('edges_bin_edges', [])
+                    normal_edges = patch_stats.get('normal_edges', [])
+                    anomaly_edges = patch_stats.get('anomaly_edges', [])
                     
-                    if anomaly_edges:
-                        plt.hist(anomaly_edges, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
-                                density=True, label='异常区域', edgecolor='black', linewidth=0.5)
-                    
-                    plt.legend()
-                elif len(edge_bins) >= 2:
-                    # 如果没有按正常/异常分类的数据，则使用总体数据
-                    bin_centers = [(edge_bins[i] + edge_bins[i+1])/2 for i in range(len(edge_bins)-1)]
-                    hist_values = patch_stats.get('edges_histogram', [])
-                    
-                    # 将直方图数据转换为出现频率
-                    total_regions = sum(hist_values)
-                    if total_regions > 0:
-                        frequency = [count / total_regions for count in hist_values]
+                    if normal_edges or anomaly_edges:
+                        # 使用相同的bin设置来保证正常和异常区域的直方图可比较
+                        bin_count = 20
+                        min_val = min(normal_edges + anomaly_edges) if normal_edges + anomaly_edges else 0
+                        max_val = max(normal_edges + anomaly_edges) if normal_edges + anomaly_edges else 1
+                        bin_range = (min_val, max_val)
+                        
+                        # 分别绘制正常和异常区域的直方图
+                        if normal_edges:
+                            plt.hist(normal_edges, bins=bin_count, range=bin_range, alpha=0.7, color='green', 
+                                    density=True, label='正常区域', edgecolor='black', linewidth=0.5)
+                        
+                        if anomaly_edges:
+                            plt.hist(anomaly_edges, bins=bin_count, range=bin_range, alpha=0.7, color='red', 
+                                    density=True, label='异常区域', edgecolor='black', linewidth=0.5)
+                        
+                        plt.legend()
+                    elif len(edge_bins) >= 2:
+                        # 如果没有按正常/异常分类的数据，则使用总体数据
+                        bin_centers = [(edge_bins[i] + edge_bins[i+1])/2 for i in range(len(edge_bins)-1)]
+                        hist_values = patch_stats.get('edges_histogram', [])
+                        
+                        # 将直方图数据转换为出现频率
+                        total_regions = sum(hist_values)
+                        if total_regions > 0:
+                            frequency = [count / total_regions for count in hist_values]
+                        else:
+                            frequency = hist_values
+                        
+                        # 显示总体分布
+                        plt.bar(bin_centers, frequency, width=(edge_bins[1]-edge_bins[0])*0.8, 
+                            color='lightgray', alpha=0.7, label='总体分布')
+                        plt.legend()
                     else:
-                        frequency = hist_values
+                        plt.text(0.5, 0.5, '无边缘密度数据', ha='center', va='center')
                     
-                    # 显示总体分布
-                    plt.bar(bin_centers, frequency, width=(edge_bins[1]-edge_bins[0])*0.8, 
-                           color='lightgray', alpha=0.7, label='总体分布')
-                    plt.legend()
-                else:
-                    plt.text(0.5, 0.5, '无边缘密度数据', ha='center', va='center')
-                
-                plt.grid(True, alpha=0.3)
-                plt.xlabel('边缘密度值')
-                plt.ylabel('出现频率')
-                
-                # 保存直方图文件之前设置tight_layout
-                plt.tight_layout()
-                
-                # 保存直方图文件
-                os.makedirs(report_path, exist_ok=True)
-                histogram_path = os.path.join(report_path, f"grid_histogram_{timestamp}.png")
-                plt.savefig(histogram_path)
-                plt.close()
-                
-                chart_paths['histogram_chart'] = histogram_path
-                print(f"区域特征直方图已保存: {histogram_path}")
-                
-            except Exception as e:
-                print(f"生成区域统计图表时出错: {str(e)}")
-        
-        # 2. 生成缺陷类型分布饼图
-        texture_counts = report_data['texture_analysis']['texture_counts']
-        if texture_counts:
-            try:
-                # 创建缺陷类型分布的饼图
-                plt.figure(figsize=(7, 5))
-                labels = list(texture_counts.keys())
-                sizes = list(texture_counts.values())
-                colors = ['#1976D2', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FFEB3B'][:len(labels)]
-                
-                plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', 
-                        shadow=False, startangle=90, textprops={'fontsize': 10})
-                plt.axis('equal')
-                plt.title('缺陷类型分布', fontsize=12)
-                
-                # 保存饼图文件
-                os.makedirs(report_path, exist_ok=True)
-                pie_chart_path = os.path.join(report_path, f"texture_pie_{timestamp}.png")
-                plt.savefig(pie_chart_path, dpi=120, bbox_inches='tight')
-                plt.close()
-                
-                chart_paths['pie_chart'] = pie_chart_path
-                print(f"缺陷类型饼图已保存: {pie_chart_path}")
-                
-            except Exception as e:
-                print(f"生成缺陷类型饼图时出错: {str(e)}")
-        
-        return chart_paths
-        
-    except Exception as e:
-        print(f"生成统计图表时出错: {str(e)}")
-        return {}
+                    plt.grid(True, alpha=0.3)
+                    plt.xlabel('边缘密度值')
+                    plt.ylabel('出现频率')
+                    
+                    # 保存直方图文件之前设置tight_layout
+                    plt.tight_layout()
+                    
+                    # 保存直方图文件
+                    os.makedirs(self.report_path, exist_ok=True)
+                    histogram_path = os.path.join(self.report_path, f"grid_histogram_{timestamp}.png")
+                    plt.savefig(histogram_path)
+                    plt.close()
+                    
+                    chart_paths['histogram_chart'] = histogram_path
+                    print(f"区域特征直方图已保存: {histogram_path}")
+                    
+                except Exception as e:
+                    print(f"生成区域统计图表时出错: {str(e)}")
+            
+            # 2. 生成缺陷类型分布饼图
+            texture_counts = report['texture_analysis']['texture_counts']
+            if texture_counts:
+                try:
+                    # 创建缺陷类型分布的饼图
+                    plt.figure(figsize=(7, 5))
+                    labels = list(texture_counts.keys())
+                    sizes = list(texture_counts.values())
+                    colors = ['#1976D2', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FFEB3B'][:len(labels)]
+                    
+                    plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', 
+                            shadow=False, startangle=90, textprops={'fontsize': 10})
+                    plt.axis('equal')
+                    plt.title('缺陷类型分布', fontsize=12)
+                    
+                    # 保存饼图文件
+                    os.makedirs(self.report_path, exist_ok=True)
+                    pie_chart_path = os.path.join(self.report_path, f"texture_pie_{timestamp}.png")
+                    plt.savefig(pie_chart_path, dpi=120, bbox_inches='tight')
+                    plt.close()
+                    
+                    chart_paths['pie_chart'] = pie_chart_path
+                    print(f"缺陷类型饼图已保存: {pie_chart_path}")
+                    
+                except Exception as e:
+                    print(f"生成缺陷类型饼图时出错: {str(e)}")
+            
+            return chart_paths
+            
+        except Exception as e:
+            print(f"生成统计图表时出错: {str(e)}")
+            return {}
 
 
 def generate_pdf_report(report_data, report_path, chart_file=None, histogram_chart=None, pie_chart=None, output_filename=None):

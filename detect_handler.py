@@ -20,7 +20,7 @@ from ssh_server import SSHServer, DefectSamples
 from utils import LoadingAnimation, ProgressDialog, check_detect_sample_group, show_message_box, join_path, is_image, update_metadata, copy_image, create_file_dialog
 from model_handler import ModelGroupDialog
 from anomaly_gpt import AIChatDialog
-from detect_report import analyze_defect_textures, generate_pdf_report
+from detect_report import generate_pdf_report
 
 
 class DetectHandler(QObject):
@@ -663,21 +663,33 @@ class AnalysisWorker(QThread):
     
     def run(self):
         try:
-            # 调用分析函数，传递进度回调
-            result = analyze_defect_textures(
-                self.detect_path,
-                self.detect_group,
-                self.threshold,
-                self.eps,
-                self.min_samples,
-                self.grid_size,
-                self.update_progress
-            )
+            # 设置Matplotlib使用非交互式后端，避免线程问题
+            import matplotlib
+            matplotlib.use('Agg')  # 使用非交互式后端
             
-            if result:
-                self.finished_signal.emit(result)
+            print(f"开始分析: 路径={self.detect_path}, 组={self.detect_group}, 网格划分={self.grid_size}×{self.grid_size}")
+            
+            # 创建分析器
+            from detect_report import DefectTextureAnalyzer
+            analyzer = DefectTextureAnalyzer(self.detect_path, self.detect_group)
+            
+            # 设置进度回调
+            analyzer.set_progress_callback(self.update_progress)
+            
+            # 设置分析参数
+            analyzer.threshold = self.threshold  # 设置阈值
+            analyzer.eps = self.eps  # 设置聚类邻域半径
+            analyzer.min_samples = self.min_samples  # 设置聚类最小样本数
+            analyzer.grid_size = self.grid_size  # 设置网格大小
+            
+            # 生成报告（包含所有分析步骤）
+            report_info = analyzer.generate_report()
+                        
+            if report_info:
+                self.finished_signal.emit(report_info)
             else:
-                self.error_signal.emit("分析未返回有效结果")
+                # 如果report_info为None，表示"所有检测样本良好"
+                self.finished_signal.emit("所有检测样本良好，无需生成缺陷检测报告!")
                 
         except Exception as e:
             error_msg = f"分析过程出错: {str(e)}\n{traceback.format_exc()}"
@@ -766,6 +778,13 @@ class TextureAnalysisDialog(QDialog):
             # 添加到下拉框
             self.ui.sampleGroupComboBox.addItems(sample_groups)
             
+            # 如果当前有选定的检测样本组，自动选择它
+            if config.DETECT_SAMPLE_GROUP and config.DETECT_SAMPLE_GROUP in sample_groups:
+                index = self.ui.sampleGroupComboBox.findText(config.DETECT_SAMPLE_GROUP)
+                if index >= 0:
+                    self.ui.sampleGroupComboBox.setCurrentIndex(index)
+                    print(f"自动选择当前检测样本组: {config.DETECT_SAMPLE_GROUP}")
+            
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载样本组失败: {str(e)}")
     
@@ -843,12 +862,15 @@ class TextureAnalysisDialog(QDialog):
     def analysis_finished(self, result):
         """
         分析完成
-        """
-        self.current_report = result
-        
+        """        
         # 更新UI
         self.setWindowTitle("缺陷纹理分析 - 分析完成")
         self.ui.analyzeButton.setEnabled(True)
+        if not result:
+            # 使用信息框显示样本良好的消息
+            QMessageBox.information(self, "分析结果", "所有检测样本良好，无需生成缺陷检测报告!")
+            return
+        self.current_report = result
         self.ui.exportButton.setEnabled(True)
         
         # 显示分析图表
@@ -865,9 +887,7 @@ class TextureAnalysisDialog(QDialog):
         
         # 显示详细信息
         self.show_details(result['report_data'])
-        
-        # 显示完成消息
-        QMessageBox.information(self, "完成", "缺陷纹理分析已完成")
+
     
     def analysis_error(self, error_message):
         """
