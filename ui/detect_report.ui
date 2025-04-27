@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>缺陷纹理分析</string>
+   <string>缺陷检测报告</string>
   </property>
   <property name="styleSheet">
    <string notr="true">* {
@@ -206,7 +206,7 @@ border-radius: 8px;
 padding: 5px;</string>
      </property>
      <property name="text">
-      <string>缺陷纹理分析</string>
+      <string>缺陷检测报告</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignmentFlag::AlignCenter</set>

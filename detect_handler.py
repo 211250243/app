@@ -1133,8 +1133,8 @@ class TextureAnalysisDialog(QDialog):
             else:
                 html_content.append("<p>未生成区域特征分布图表</p>")
         
-        # 纹理分析
-        html_content.append("<h3>纹理分析</h3>")
+        # 缺陷类型分析
+        html_content.append("<h3>缺陷类型分析</h3>")
         texture_counts = report_data['texture_analysis']['texture_counts']
         if texture_counts:
             # 显示饼图（从报告中获取路径）
@@ -1144,13 +1144,33 @@ class TextureAnalysisDialog(QDialog):
                 html_content.append('</div>')
             
             main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
-            html_content.append(f"<p>主要纹理类型: <b>{main_texture}</b></p>")
+            html_content.append(f"<p>主要缺陷类型: <b>{main_texture}</b></p>")
             
-            html_content.append("<p>纹理类型分布:</p>")
-            html_content.append("<ul style='margin-top: 5px; margin-bottom: 10px;'>")
+            html_content.append("<p>缺陷类型分布:</p>")
+            html_content.append("<table style='width:90%; border-collapse:collapse; margin:10px 0;'>")
+            html_content.append("<tr style='background-color:#f0f0f0;'>")
+            html_content.append("<th style='border:1px solid #ddd; padding:8px; text-align:center;'>主要类型</th>")
+            html_content.append("<th style='border:1px solid #ddd; padding:8px; text-align:center;'>缺陷数量</th>")
+            html_content.append("<th style='border:1px solid #ddd; padding:8px; text-align:center;'>样本数量</th>")
+            html_content.append("<th style='border:1px solid #ddd; padding:8px; text-align:center;'>详细类型</th>")
+            html_content.append("</tr>")
+            
+            # 获取样本主要缺陷类型统计
+            sample_main_type_counts = report_data['texture_analysis'].get('sample_main_type_counts', {})
+            
             for texture, count in texture_counts.items():
-                html_content.append(f"<li>{texture}: {count}个</li>")
-            html_content.append("</ul>")
+                # 获取详细类型描述（如果存在）
+                type_desc = report_data['texture_analysis'].get('type_description', {}).get(texture, "")
+                # 获取该类型的样本数量
+                sample_count = sample_main_type_counts.get(texture, 0)
+                
+                html_content.append("<tr>")
+                html_content.append(f"<td style='border:1px solid #ddd; padding:8px; text-align:center;'>{texture}</td>")
+                html_content.append(f"<td style='border:1px solid #ddd; padding:8px; text-align:center;'>{count}个</td>")
+                html_content.append(f"<td style='border:1px solid #ddd; padding:8px; text-align:center;'>{sample_count}个样本</td>")
+                html_content.append(f"<td style='border:1px solid #ddd; padding:8px; text-align:left;'>{type_desc}</td>")
+                html_content.append("</tr>")
+            html_content.append("</table>")
         
         # 结束HTML文档
         html_content.append("</body></html>")
@@ -1196,10 +1216,10 @@ class TextureAnalysisDialog(QDialog):
             item.setText(0, name)
             item.setText(1, value)
         
-        # 添加缺陷图像列表 (使用config.DETECT_LIST)
+        # 添加检测图像列表 (使用config.DETECT_LIST)
         if config.DETECT_LIST:
             images_item = QTreeWidgetItem(basic_info)
-            images_item.setText(0, "缺陷图像列表")
+            images_item.setText(0, "检测图像列表")
             images_item.setText(1, f"{len(config.DETECT_LIST)}个图像")
             
             for img_info in config.DETECT_LIST:
@@ -1248,42 +1268,106 @@ class TextureAnalysisDialog(QDialog):
                 range_item.setText(0, "位置范围")
                 range_item.setText(1, f"X: {min_x:.3f}-{max_x:.3f}, Y: {min_y:.3f}-{max_y:.3f}")
         
-        # 添加纹理信息
+        # 添加缺陷类型信息
         texture_info = QTreeWidgetItem(root)
-        texture_info.setText(0, "纹理分析")
+        texture_info.setText(0, "缺陷类型分析")
         
-        # 添加纹理统计
+        # 添加样本缺陷类型统计
+        sample_main_type_counts = report_data['texture_analysis'].get('sample_main_type_counts', {})
+        if sample_main_type_counts:
+            sample_types = QTreeWidgetItem(texture_info)
+            sample_types.setText(0, "样本缺陷类型统计")
+            sample_types.setText(1, f"{sum(sample_main_type_counts.values())}个样本")
+            
+            # 定义严重程度顺序
+            severity_order = {
+                "轻微污染": 1,
+                "轻度异常": 2,
+                "中度缺陷": 3,
+                "严重损坏": 4
+            }
+            
+            # 按照严重程度顺序排序（从轻到重）
+            for main_type, count in sorted(sample_main_type_counts.items(), key=lambda x: severity_order.get(x[0], 0)):
+                type_item = QTreeWidgetItem(sample_types)
+                type_item.setText(0, main_type)
+                type_item.setText(1, f"{count}个样本")
+                
+                # 获取该缺陷类型对应的样本列表
+                samples_with_type = []
+                for img, type_name in report_data['texture_analysis']['image_main_type'].items():
+                    if type_name == main_type:
+                        samples_with_type.append(img)
+                
+                # 直接在缺陷类型节点下显示样本列表
+                for sample in sorted(samples_with_type):
+                    sample_node = QTreeWidgetItem(type_item)
+                    sample_node.setText(0, sample)
+                    
+                    # 统计该样本包含的具体缺陷类型及数量
+                    if 'defect_details' in report_data['texture_analysis']:
+                        # 创建缺陷类型计数字典
+                        sample_defect_counts = {}
+                        
+                        # 遍历所有缺陷详情
+                        for defect in report_data['texture_analysis']['defect_details']:
+                            if defect.get('image') == sample:
+                                detail_type = defect.get('defect_type', '')
+                                if detail_type:
+                                    if detail_type not in sample_defect_counts:
+                                        sample_defect_counts[detail_type] = 0
+                                    sample_defect_counts[detail_type] += 1
+                        
+                        # 生成缺陷类型统计文本
+                        if sample_defect_counts:
+                            defect_text = []
+                            for defect_type, count in sample_defect_counts.items():
+                                defect_text.append(f"{defect_type}: {count}个")
+                            sample_node.setText(1, ", ".join(defect_text))
+                        else:
+                            sample_node.setText(1, "")
+                    else:
+                        sample_node.setText(1, "")
+        
+        # 添加缺陷区域类型统计
         texture_counts = QTreeWidgetItem(texture_info)
-        texture_counts.setText(0, "纹理统计")
+        texture_counts.setText(0, "缺陷区域类型统计")
+        texture_counts.setText(1, f"{sum(report_data['texture_analysis']['texture_counts'].values())}个缺陷")
         
-        # 为每种纹理类型计算每个图像中该纹理的数量
-        texture_images_count = {}
-        if 'texture_details' in report_data['texture_analysis']:
-            for texture_detail in report_data['texture_analysis']['texture_details']:
-                texture_type = texture_detail['texture_type']
-                image_name = texture_detail['image']
-                
-                if texture_type not in texture_images_count:
-                    texture_images_count[texture_type] = {}
-                
-                if image_name not in texture_images_count[texture_type]:
-                    texture_images_count[texture_type][image_name] = 0
-                
-                texture_images_count[texture_type][image_name] += 1
-        
-        for texture, count in report_data['texture_analysis']['texture_counts'].items():
+        # 为每种缺陷类型添加详细统计，按照严重程度从轻到重排序
+        for texture, count in sorted(report_data['texture_analysis']['texture_counts'].items(), key=lambda x: severity_order.get(x[0], 0)):
             texture_item = QTreeWidgetItem(texture_counts)
             texture_item.setText(0, texture)
-            texture_item.setText(1, str(count))
+            texture_item.setText(1, f"{count}个缺陷")
             
-            # 添加该纹理类型对应的图像列表 (左侧为文件名，右侧为纹理数量)
-            if texture in texture_images_count:
-                # 按照图像名称排序
-                sorted_images = sorted(texture_images_count[texture].items(), key=lambda x: x[0])
-                for img_name, texture_count in sorted_images:
-                    img_item = QTreeWidgetItem(texture_item)
-                    img_item.setText(0, img_name)
-                    img_item.setText(1, f"{texture_count}个")
+            # 添加详细类型计数信息
+            type_desc = report_data['texture_analysis'].get('type_description', {}).get(texture, "")
+            if type_desc:
+                # 解析type_desc获取详细类型和数量
+                # 例如：（包括：5个划痕, 3个小缺口, 2个大面积缺陷）
+                if "包括" in type_desc:
+                    detail_types_text = type_desc.replace("（包括：", "").replace("）", "")
+                    detail_types_list = detail_types_text.split(", ")
+                    
+                    # 为每个详细类型创建子节点
+                    for detail_type_text in detail_types_list:
+                        # 将"5个划痕"分解为数量和类型名
+                        if "个" in detail_type_text:
+                            parts = detail_type_text.split("个")
+                            if len(parts) == 2:
+                                count_str = parts[0]
+                                type_name = parts[1]
+                                
+                                # 只有当数量大于0时才添加
+                                if count_str.isdigit() and int(count_str) > 0:
+                                    detail_item = QTreeWidgetItem(texture_item)
+                                    detail_item.setText(0, type_name)
+                                    detail_item.setText(1, f"{count_str}个")
+                else:
+                    # 如果不符合预期格式，则直接显示原始描述
+                    desc_item = QTreeWidgetItem(texture_item)
+                    desc_item.setText(0, "详细类型")
+                    desc_item.setText(1, type_desc)
         
         # 展开根节点
         tree.expandItem(root)
