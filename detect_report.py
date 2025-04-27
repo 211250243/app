@@ -29,7 +29,7 @@ except ImportError:
 
 class DefectTextureAnalyzer:
     """
-    缺陷纹理分析器，用于分析检测结果热图中的缺陷位置和纹理特征
+    缺陷分析器，用于分析检测结果热图中的缺陷位置和缺陷特征
     """
     def __init__(self, detect_path, detect_group, result_path=None, report_path=None):
         """
@@ -76,7 +76,7 @@ class DefectTextureAnalyzer:
         self.image_count = 0  # 总图像数
         self.defect_images = []  # 存储缺陷图像信息
         self.heatmap_data = []   # 存储热图数据
-        self.texture_features = []  # 存储纹理特征
+        self.defect_features = []  # 存储缺陷特征
         self.defect_positions = []  # 存储缺陷位置
         self.cluster_results = None  # 聚类结果
         self.best_sample = None  # 最佳样本（得分最高的图片）
@@ -97,10 +97,10 @@ class DefectTextureAnalyzer:
     
     def load_defect_images(self, threshold=0.5):
         """
-        直接加载指定路径中的所有热图图像
+        根据检测得分加载异常热图图像
         
         Args:
-            threshold: 不再使用，保留参数以兼容接口
+            threshold: 判定为异常的得分阈值（0-1之间）
         """
         self.update_progress(0, "开始加载图像...")
         self.defect_images = []
@@ -115,60 +115,73 @@ class DefectTextureAnalyzer:
         # 获取所有图像文件
         try:
             # 先尝试获取所有热图（包含_3.的图像）
-            image_files = [f for f in os.listdir(self.result_path) 
+            all_image_files = [f for f in os.listdir(self.result_path) 
                           if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')) and '_3.' in f]
             
             # 如果找不到热图，则获取所有图像文件
-            if not image_files:
+            if not all_image_files:
                 print("未找到热图文件，尝试加载所有图像文件")
-                image_files = [f for f in os.listdir(self.result_path) 
+                all_image_files = [f for f in os.listdir(self.result_path) 
                               if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))]
             
             # 如果还是找不到图像，使用更宽松的匹配
-            if not image_files:
+            if not all_image_files:
                 print("使用宽松匹配搜索图像文件")
-                image_files = []
+                all_image_files = []
                 for f in os.listdir(self.result_path):
                     try:
                         if os.path.isfile(join_path(self.result_path, f)):
                             # 尝试读取文件看是否为图像
                             img = cv2.imread(join_path(self.result_path, f), cv2.IMREAD_UNCHANGED)
                             if img is not None:
-                                image_files.append(f)
+                                all_image_files.append(f)
                     except Exception as e:
                         print(f"检查文件 {f} 时出错: {str(e)}")
         
-            self.image_count = len(image_files)
+            self.image_count = len(all_image_files)
             print(f"找到 {self.image_count} 个图像文件")
             
             if self.image_count == 0:
                 self.update_progress(30, "未找到图像文件")
                 return 0
             
-            if not config.DETECT_LIST:
-                # 尝试加载detect_list.json获取得分信息
-                detect_list_path = join_path(self.detect_path, 'detect_list.json')
-                if os.path.exists(detect_list_path):
-                    try:
-                        config.DETECT_LIST = json.load(open(detect_list_path))
-                        print(f"加载了 {len(config.DETECT_LIST)} 个检测结果记录")
-                    except Exception as e:
-                        print(f"读取detect_list.json出错: {str(e)}")
+            # 加载detect_list.json获取得分信息
+            detect_list = []
+            print(f"self.detect_path: {self.detect_path}")
+            detect_list_path = join_path(self.detect_path, 'detect_list.json')
+            if os.path.exists(detect_list_path):
+                try:
+                    detect_list = json.load(open(detect_list_path))
+                    config.DETECT_LIST = detect_list
+                    print(f"加载了 {len(detect_list)} 个检测结果记录")
+                except Exception as e:
+                    print(f"读取detect_list.json出错: {str(e)}")
+                else:
+                    print(f"未找到检测结果文件: {detect_list_path}")
             
-            # 找出得分最高的样本
-            best_score = -1
+            # 创建文件名到得分的映射
+            score_map = {}
             self.best_sample = None
-            for item in config.DETECT_LIST:
+            best_score = -1
+            
+            for item in detect_list:
+                file_name = item.get('origin_name', '')
                 score = item.get('score')
+                
+                # 确保得分是数值类型
                 if isinstance(score, str):
                     try:
                         score = float(score)
                     except:
                         score = 0
                 
+                # 找出得分最高的样本
                 if score > best_score:
                     best_score = score
-                    self.best_sample = item.get('origin_name')
+                    self.best_sample = file_name
+                
+                # 将原始文件名与得分关联
+                score_map[file_name] = score
             
             if self.best_sample:
                 print(f"得分最高的样本是: {self.best_sample}, 得分: {best_score}")
@@ -178,10 +191,38 @@ class DefectTextureAnalyzer:
                     self.best_sample_path = potential_path
                     print(f"找到最佳样本原图路径: {self.best_sample_path}")
             
-            # 处理每个图像
-            for i, image_file in enumerate(image_files):
+            # 筛选出超过阈值的图像文件
+            defect_image_files = []
+            for image_file in all_image_files:
+                # 提取原始文件名（去掉热图后缀）
+                name_parts = image_file.split('_')
+                if len(name_parts) > 1:
+                    # 假设热图命名格式为: original_name_3.jpg
+                    # 尝试提取原始文件名
+                    possible_name = '_'.join(name_parts[:-1])
+                    for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+                        original_name = possible_name + ext
+                        if original_name in score_map:
+                            score = score_map[original_name]
+                            # 检查得分是否超过阈值
+                            if score >= threshold:
+                                print(f"图像 {image_file} 得分为 {score}，超过阈值 {threshold}，添加到缺陷列表")
+                                defect_image_files.append(image_file)
+                            else:
+                                print(f"图像 {image_file} 得分为 {score}，低于阈值 {threshold}，跳过")
+                            break
+                    else:
+                        # 如果找不到匹配的原始文件名，默认添加
+                        print(f"无法在检测列表中找到 {image_file} 对应的原始文件名，将其添加到缺陷列表")
+                        defect_image_files.append(image_file)
+                else:
+                    # 如果文件名格式不符合预期，默认添加
+                    defect_image_files.append(image_file)
+            
+            # 处理每个超过阈值的缺陷图像
+            for i, image_file in enumerate(defect_image_files):
                 image_path = join_path(self.result_path, image_file)
-                print(f"处理图像: {image_path}")
+                print(f"处理缺陷图像: {image_path}")
                 
                 # 检查文件是否存在且可读
                 if not os.path.exists(image_path):
@@ -198,7 +239,7 @@ class DefectTextureAnalyzer:
                     print(f"读取图像失败: {image_path}, 错误: {str(e)}")
                     continue
                 
-                # 假设所有热图都是缺陷图像
+                # 添加缺陷图像
                 self.defect_images.append({
                     'name': image_file,
                     'heatmap_path': image_path
@@ -206,10 +247,10 @@ class DefectTextureAnalyzer:
                 
                 # 更新进度
                 if i % 5 == 0:  # 每5张图像更新一次进度
-                    progress = int((i + 1) / len(image_files) * 30)  # 总进度的30%用于加载图像
-                    self.update_progress(progress, f"加载图像 {i+1}/{len(image_files)}...")
+                    progress = int((i + 1) / len(defect_image_files) * 30)  # 总进度的30%用于加载图像
+                    self.update_progress(progress, f"加载图像 {i+1}/{len(defect_image_files)}...")
             
-            self.update_progress(30, f"已加载图像: {len(self.defect_images)}张")
+            self.update_progress(30, f"已加载缺陷图像: {len(self.defect_images)}张，总共: {self.image_count}张")
             return len(self.defect_images)
         
         except Exception as e:
@@ -626,75 +667,182 @@ class DefectTextureAnalyzer:
             self.update_progress(70, f"聚类分析出错: {str(e)}")
             raise RuntimeError(error_msg)
     
-    def analyze_texture_patterns(self):
+    def analyze_defect_texture(self):
         """
-        分析纹理模式，统计不同类型的纹理特征
+        分析缺陷特征，判断缺陷类型（基于亮度特征）
         """
         try:
-            self.update_progress(70, "开始分析纹理模式...")
+            self.update_progress(70, "开始分析缺陷类型...")
             
             if not self.texture_features:
-                print("没有纹理特征数据可供分析")
+                print("没有缺陷特征数据可供分析")
                 return {
                     'texture_counts': {},
-                    'dominant_position_textures': {},
-                    'texture_details': []
+                    'defect_details': []
                 }
-                
-            print(f"分析纹理模式，特征数量: {len(self.texture_features)}")
-            # 使用梯度大小对纹理进行分类
-            gradient_thresholds = [10, 30, 50]
-            texture_types = ['平滑', '轻微纹理', '中等纹理', '强烈纹理']
             
-            # 对纹理进行分类
-            texture_categories = []
+            print(f"分析缺陷类型，缺陷数量: {len(self.texture_features)}")
+            
+            # 定义亮度阈值
+            LOW_BRIGHTNESS_THRESHOLD = 80  # 低亮度阈值
+            HIGH_BRIGHTNESS_THRESHOLD = 180  # 高亮度阈值
+            EXTREME_BRIGHTNESS_THRESHOLD = 220  # 极高亮度阈值
+            
+            # 创建缺陷位置字典，方便查找
+            defect_pos_map = {}
+            for pos in self.defect_positions:
+                key = f"{pos['image']}_{pos['center_x']}_{pos['center_y']}"
+                defect_pos_map[key] = pos
+            
+            defect_types = []
             for feature in self.texture_features:
-                gradient = feature['gradient']
+                # 提取特征并转换为Python原生类型
+                mean_val = float(feature['mean'])      # 亮度均值
+                max_val = float(feature['max'])        # 最大亮度值
                 
-                # 根据梯度确定类别
-                category_idx = sum(gradient > threshold for threshold in gradient_thresholds)
-                category = texture_types[category_idx]
+                # 查找对应的归一化面积
+                pos_key = f"{feature['image']}_{feature['position'][0]}_{feature['position'][1]}"
+                pos_data = defect_pos_map.get(pos_key)
                 
-                texture_categories.append({
+                if pos_data:
+                    # 使用defect_positions中已经归一化的面积
+                    normalized_area = float(pos_data['area'])
+                else:
+                    # 如果找不到对应数据，使用texture_features中的面积（可能需要归一化）
+                    # 这里假设面积是像素数，设置一个非常小的默认值
+                    normalized_area = float(feature['area']) / 88888 # 假设平均图像大小约为88888像素
+                
+                # 打印面积值，用于调试
+                # print(f"缺陷归一化面积: {normalized_area}, 原始面积: {feature['area']}")
+                
+                # 形状特征
+                aspect_ratio = 1.0  # 默认值
+                if pos_data:
+                    width = float(pos_data['width'])
+                    height = float(pos_data['height'])
+                    if height > 0:
+                        aspect_ratio = width / height
+                print(f"最大亮度值: {max_val}, 亮度均值: {mean_val}, 归一化面积: {normalized_area}, 形状比例: {aspect_ratio}")
+                # 基于亮度和形状特征的缺陷分类（详细分类）
+                # 判定条件根据样本数据进行调整：
+                # 000-002为严重损坏样本，003-006为正常/轻微污染样本，007-021为中度缺陷/轻度异常样本
+                
+                # 打印特征信息用于调试
+                print(f"样本: {feature['image']}, 最大亮度值: {max_val}, 亮度均值: {mean_val}, 归一化面积: {normalized_area}, 形状比例: {aspect_ratio}")
+                
+                # 严重损坏类别判断
+                if normalized_area > 0.03 and max_val > 210:  # 大面积高亮度缺陷
+                    main_type = "严重损坏"
+                    detail_type = "大缺口"
+                elif normalized_area > 0.02 and max_val > 200:  # 较大面积中高亮度
+                    main_type = "严重损坏"
+                    detail_type = "大面积缺陷"
+                # 中度缺陷类别判断
+                elif normalized_area > 0.01 and max_val > 210:  # 中等面积高亮度
+                    main_type = "中度缺陷"
+                    if aspect_ratio > 1.8:  # 细长形状
+                        detail_type = "划痕"
+                    elif normalized_area > 0.015:
+                        detail_type = "大面积缺陷"
+                    else:
+                        detail_type = "小缺口"
+                elif normalized_area > 0.007 and max_val > 210:  # 小面积高亮度
+                    main_type = "中度缺陷"
+                    if aspect_ratio > 1.8:
+                        detail_type = "划痕"
+                    else:
+                        detail_type = "小缺口"
+                # 轻度异常类别判断
+                elif normalized_area > 0.007 and max_val > 180:  # 中小面积中等亮度
+                    main_type = "轻度异常"
+                    detail_type = "小面积异常"
+                elif normalized_area > 0.005 and max_val > 170:  # 小面积中等亮度
+                    main_type = "轻度异常"
+                    detail_type = "小面积异常"
+                elif max_val > 190:  # 高亮度点
+                    main_type = "轻度异常"
+                    detail_type = "小面积异常"
+                # 轻微污染或正常
+                else:
+                    main_type = "轻微污染"
+                    detail_type = "小面积污染"
+                
+                defect_types.append({
                     'image': feature['image'],
-                    'position': feature['position'],
-                    'texture_type': category,
-                    'texture_value': gradient
+                    'position': (float(feature['position'][0]), float(feature['position'][1])),
+                    'defect_type': detail_type,  # 详细类型
+                    'main_type': main_type,      # 主要类型
+                    'mean': float(mean_val),
+                    'max': float(max_val),
+                    'area': float(feature['area']),
+                    'normalized_area': normalized_area,
+                    'aspect_ratio': float(aspect_ratio)
                 })
             
-            # 统计各类纹理的数量
-            texture_counts = Counter([item['texture_type'] for item in texture_categories])
-            print(f"纹理类型分布: {dict(texture_counts)}")
+            # 统计各主要类型和详细类型缺陷的数量
+            main_type_counts = Counter([item['main_type'] for item in defect_types])
+            detail_type_counts = Counter([item['defect_type'] for item in defect_types])
             
-            # 按照位置统计纹理类型
-            position_textures = defaultdict(list)
-            for item in texture_categories:
-                # 将位置离散化为网格
-                grid_x = int(item['position'][0] * 5)  # 5x5网格
-                grid_y = int(item['position'][1] * 5)
-                position_key = f"{grid_x}_{grid_y}"
+            print(f"主要缺陷类型分布: {dict(main_type_counts)}")
+            print(f"详细缺陷类型分布: {dict(detail_type_counts)}")
+            
+            # 计算每个图像的主要缺陷类型
+            image_defect_types = {}
+            for defect in defect_types:
+                image_name = defect['image']
+                main_type = defect['main_type']
                 
-                position_textures[position_key].append(item['texture_type'])
+                if image_name not in image_defect_types:
+                    image_defect_types[image_name] = []
+                
+                image_defect_types[image_name].append(main_type)
             
-            # 每个位置的主要纹理类型
-            dominant_textures = {}
-            for pos, textures in position_textures.items():
-                counts = Counter(textures)
-                dominant_textures[pos] = counts.most_common(1)[0][0]
-            
-            texture_analysis = {
-                'texture_counts': dict(texture_counts),
-                'dominant_position_textures': dominant_textures,
-                'texture_details': texture_categories
+            # 缺陷严重程度排序（从高到低）
+            # 注意：一个样本的缺陷类型由最严重的缺陷区域类型决定，而不是数量最多的缺陷类型
+            severity_order = {
+                "严重损坏": 4,  # 最严重
+                "中度缺陷": 3,
+                "轻度异常": 2,
+                "轻微污染": 1   # 最轻微
             }
             
-            self.update_progress(80, "纹理分析完成")
-            return texture_analysis
+            # 对每个图像，确定主要缺陷类型（基于最严重的缺陷类型）
+            image_main_type = {}
+            for image_name, types in image_defect_types.items():
+                # 找出该图像中最严重的缺陷类型
+                most_severe_type = max(types, key=lambda t: severity_order.get(t, 0))
+                image_main_type[image_name] = most_severe_type
+            
+            # 统计每种主要缺陷类型有多少个样本
+            sample_main_type_counts = Counter(image_main_type.values())
+            print(f"样本主要缺陷类型分布: {dict(sample_main_type_counts)}")
+            
+            # 生成主要类型与详细类型的映射关系描述
+            type_description = {
+                "轻微污染": f"（包括：{detail_type_counts.get('小面积污染', 0)}个小面积污染, {detail_type_counts.get('大面积污染', 0)}个大面积污染）",
+                "轻度异常": f"（包括：{detail_type_counts.get('小面积异常', 0)}个小面积异常，{detail_type_counts.get('大面积异常', 0)}个大面积异常）",
+                "中度缺陷": f"（包括：{detail_type_counts.get('划痕', 0)}个划痕, {detail_type_counts.get('小缺口', 0)}个小缺口, {detail_type_counts.get('大面积缺陷', 0)}个大面积缺陷）",
+                "严重损坏": f"（包括：{detail_type_counts.get('裂缝', 0)}个裂缝, {detail_type_counts.get('大缺口', 0)}个大缺口）"
+            }
+            
+            # 返回分析结果，保持键名兼容
+            defect_analysis = {
+                'texture_counts': dict(main_type_counts),  # 使用原键名但返回主要类型计数
+                'defect_type_counts': dict(detail_type_counts),  # 详细类型计数
+                'main_type_counts': dict(main_type_counts),  # 主要类型计数
+                'sample_main_type_counts': dict(sample_main_type_counts),  # 样本主要类型计数
+                'defect_details': defect_types,
+                'type_description': type_description,  # 添加类型描述
+                'image_main_type': image_main_type  # 每张图像的主要缺陷类型
+            }
+            
+            self.update_progress(80, "缺陷类型分析完成")
+            return defect_analysis
             
         except Exception as e:
-            error_msg = f"纹理分析时出错: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"缺陷类型分析时出错: {str(e)}\n{traceback.format_exc()}"
             print(error_msg)
-            self.update_progress(80, f"纹理分析出错: {str(e)}")
+            self.update_progress(80, f"缺陷类型分析出错: {str(e)}")
             raise RuntimeError(error_msg)
     
     def generate_report(self):
@@ -714,8 +862,8 @@ class DefectTextureAnalyzer:
             if self.cluster_results is None:
                 self.cluster_defect_positions()
                 
-            # 分析纹理模式
-            texture_analysis = self.analyze_texture_patterns()
+            # 分析缺陷特征
+            texture_analysis = self.analyze_defect_texture()
             
             # 准备报告数据
             report = {
@@ -734,8 +882,8 @@ class DefectTextureAnalyzer:
             with open(report_file, 'w', encoding='utf-8') as f:
                 json.dump(report, f, ensure_ascii=False, indent=2)
                 
-            # 生成可视化报告
-            chart_path = self._generate_visualization(report, report['timestamp'])
+            # 生成缺陷位置分布图
+            chart_path = self.generate_defect_position_chart(report, report['timestamp'])
             
             self.update_progress(100, "报告生成完成")
             
@@ -751,9 +899,9 @@ class DefectTextureAnalyzer:
             self.update_progress(100, f"生成报告出错: {str(e)}")
             raise RuntimeError(error_msg)
 
-    def _generate_visualization(self, report, timestamp):
+    def generate_defect_position_chart(self, report, timestamp):
         """
-        生成可视化报告
+        生成缺陷位置分布图
         
         Args:
             report: 报告数据
@@ -826,7 +974,7 @@ class DefectTextureAnalyzer:
                 y = int(pos['center_y'] * 49)
                 heatmap[y, x] += 1
                 
-            # 平滑热力图
+            # 应用高斯模糊平滑热力图
             heatmap = cv2.GaussianBlur(heatmap, (5, 5), 0)
             
             # 显示热力图，设置透明度
@@ -864,7 +1012,7 @@ class DefectTextureAnalyzer:
             error_msg = f"生成可视化报告时出错: {str(e)}\n{traceback.format_exc()}"
             print(error_msg)
             # 创建一个简单的错误图像
-            fig, ax = plt.subplots(figsize=(10, 6))
+            ax = plt.subplots(figsize=(10, 6))
             ax.text(0.5, 0.5, f"Error generating report: {str(e)}", 
                    ha='center', va='center', fontsize=12)
             ax.axis('off')
@@ -876,12 +1024,12 @@ class DefectTextureAnalyzer:
 
 def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, min_samples=3, grid_size=8, progress_callback=None):
     """
-    分析缺陷纹理并生成报告
+    分析缺陷类型并生成报告
     
     Args:
         detect_path: 检测样本根目录路径
         detect_group: 检测样本组名称
-        threshold: 缺陷阈值(已不再使用，保留参数兼容性)
+        threshold: 缺陷判定阈值，检测得分高于此值的样本被视为异常样本
         eps: DBSCAN聚类的邻域半径参数
         min_samples: DBSCAN聚类的最小样本数参数
         grid_size: 网格划分数量，将图像均匀划分为grid_size×grid_size个区域
@@ -941,10 +1089,10 @@ def analyze_defect_textures(detect_path, detect_group, threshold=0.5, eps=0.1, m
         return report_info
         
     except Exception as e:
-        error_msg = f"分析缺陷纹理时出错: {str(e)}\n{traceback.format_exc()}"
+        error_msg = f"分析缺陷类型时出错: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
         if progress_callback:
-            progress_callback(100, f"分析缺陷纹理时出错: {str(e)}")
+            progress_callback(100, f"分析缺陷类型时出错: {str(e)}")
         raise
 
 
@@ -978,16 +1126,9 @@ def generate_statistical_charts(report_data, report_path):
             try:
                 # 获取统计数据
                 patch_stats = report_data['patch_statistics']
-                grid_size = patch_stats.get('patch_size', 8)
                 
                 # 创建一个临时的图像文件存储直方图
                 plt.figure(figsize=(8, 10))
-                
-                # 设置阈值，用于区分正常和异常区域
-                # 这些阈值是基于统计分析的估计值，实际上正常和异常区域往往有重叠
-                mean_threshold = patch_stats.get('mean_avg', 0) * 1.2  # 亮度阈值
-                variance_threshold = patch_stats.get('variance_avg', 0) * 1.5  # 纹理复杂度阈值
-                edges_threshold = patch_stats.get('edges_avg', 0) * 1.3  # 边缘密度阈值
                 
                 # 绘制区域亮度直方图（使用均值：方差丢失了亮度的绝对水平信息，相同方差的区域可能一个是亮区一个是暗区）
                 plt.subplot(3, 1, 1)
@@ -1145,11 +1286,11 @@ def generate_statistical_charts(report_data, report_path):
             except Exception as e:
                 print(f"生成区域统计图表时出错: {str(e)}")
         
-        # 2. 生成纹理类型分布饼图
+        # 2. 生成缺陷类型分布饼图
         texture_counts = report_data['texture_analysis']['texture_counts']
         if texture_counts:
             try:
-                # 创建纹理类型分布的饼图
+                # 创建缺陷类型分布的饼图
                 plt.figure(figsize=(7, 5))
                 labels = list(texture_counts.keys())
                 sizes = list(texture_counts.values())
@@ -1158,7 +1299,7 @@ def generate_statistical_charts(report_data, report_path):
                 plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', 
                         shadow=False, startangle=90, textprops={'fontsize': 10})
                 plt.axis('equal')
-                plt.title('纹理类型分布', fontsize=12)
+                plt.title('缺陷类型分布', fontsize=12)
                 
                 # 保存饼图文件
                 os.makedirs(report_path, exist_ok=True)
@@ -1167,10 +1308,10 @@ def generate_statistical_charts(report_data, report_path):
                 plt.close()
                 
                 chart_paths['pie_chart'] = pie_chart_path
-                print(f"纹理类型饼图已保存: {pie_chart_path}")
+                print(f"缺陷类型饼图已保存: {pie_chart_path}")
                 
             except Exception as e:
-                print(f"生成纹理类型饼图时出错: {str(e)}")
+                print(f"生成缺陷类型饼图时出错: {str(e)}")
         
         return chart_paths
         
@@ -1188,7 +1329,7 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
         report_path: 报告保存路径
         chart_file: 缺陷位置分布图路径
         histogram_chart: 网格特征直方图路径
-        pie_chart: 纹理分布饼图路径
+        pie_chart: 缺陷类型分布饼图路径
         output_filename: 指定的输出文件路径，如果提供则直接使用该路径
     
     Returns:
@@ -1257,6 +1398,15 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
             leading=14,
             italic=True,  # 斜体
             textColor=colors.darkgrey
+        ))
+        # 添加注释样式
+        styles.add(ParagraphStyle(
+            name='ReportNote',
+            fontName=cn_font_name,
+            fontSize=9,
+            leading=12,
+            italic=True,
+            textColor=colors.grey
         ))
         # 添加粗体样式
         styles.add(ParagraphStyle(
@@ -1438,6 +1588,7 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
             
             patch_stats = report_data['patch_statistics']
             grid_size = patch_stats.get('patch_size', 8)
+
             
             content.append(Paragraph(
                 f"区域划分: {grid_size}×{grid_size}（图像被均匀划分为{grid_size*grid_size}个区域）",
@@ -1578,39 +1729,48 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
             
             content.append(Spacer(1, 0.5*cm))
         
-        # 纹理分析
-        content.append(Paragraph("4. 纹理分析", styles['ReportHeading1']))
+        # 缺陷类型分析
+        content.append(Paragraph("4. 缺陷类型分析", styles['ReportHeading1']))
         content.append(Spacer(1, 0.2*cm))
         
         texture_counts = report_data['texture_analysis']['texture_counts']
         if texture_counts:
-            # 添加纹理类型饼图
+            # 添加缺陷类型饼图
             if pie_chart and os.path.exists(pie_chart):
                 try:
                     img = Image(pie_chart, width=12*cm, height=10*cm)
                     content.append(img)
-                    content.append(Paragraph("图3. 纹理类型分布饼图", styles['ImageCaption']))
+                    content.append(Paragraph("图3. 缺陷类型分布饼图", styles['ImageCaption']))
                 except Exception as e:
-                    content.append(Paragraph(f"加载纹理类型饼图失败: {str(e)}", styles['ReportNormal']))
+                    content.append(Paragraph(f"加载缺陷类型饼图失败: {str(e)}", styles['ReportNormal']))
             
-            # 获取主要纹理类型
+            # 获取主要缺陷类型
             main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
-            content.append(Paragraph(f"主要纹理类型: {main_texture}", styles['ReportNormal']))
+            content.append(Paragraph(f"主要缺陷类型: {main_texture}", styles['ReportNormal']))
             content.append(Spacer(1, 0.2*cm))
             
-            # 创建纹理分布表格
-            content.append(Paragraph("纹理类型分布:", styles['ReportNormal']))
-            texture_data = [["纹理类型", "数量"]]
+            # 创建缺陷分布表格
+            content.append(Paragraph("缺陷类型分布:", styles['ReportNormal']))
+            texture_data = [["主要类型", "缺陷数量", "样本数量", "详细类型"]]
+            
+            # 获取样本主要缺陷类型统计
+            sample_main_type_counts = report_data['texture_analysis'].get('sample_main_type_counts', {})
+            
             for texture, count in texture_counts.items():
-                texture_data.append([texture, str(count)])
+                # 获取详细类型描述
+                type_desc = report_data['texture_analysis'].get('type_description', {}).get(texture, "")
+                # 获取该类型的样本数量
+                sample_count = sample_main_type_counts.get(texture, 0)
+                texture_data.append([texture, str(count), f"{sample_count}个样本", type_desc])
                 
-            texture_table = Table(texture_data, colWidths=[8*cm, 6*cm])
+            texture_table = Table(texture_data, colWidths=[3*cm, 2*cm, 2*cm, 7*cm])
             texture_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, -1), cn_font_name),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # 详细类型列左对齐
                 ('PADDING', (0, 0), (-1, -1), 6),
             ]))
             
@@ -1621,44 +1781,144 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
         content.append(Paragraph("5. 分析结论", styles['ReportHeading1']))
         content.append(Spacer(1, 0.2*cm))
         
-        # 根据数据生成简单的结论
+        # 根据数据生成详细结论
         conclusions = []
+        recommendations = []
         
         # 缺陷分布结论
         if clusters:
-            if len(clusters) == 1:
-                conclusions.append("1. 缺陷高度集中，存在明显的单点问题区域，建议重点检查该区域的生产工艺")
-            elif len(clusters) <= 3:
-                conclusions.append(f"1. 缺陷集中在{len(clusters)}个区域，表明可能存在多个工艺缺陷点")
-            else:
-                conclusions.append(f"1. 缺陷分散在{len(clusters)}个不同区域，表明可能存在系统性的工艺问题")
-        
-        # 纹理分析结论
-        if texture_counts:
-            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
-            texture_ratio = max(texture_counts.values()) / sum(texture_counts.values())
+            # 计算主要聚类区域包含的缺陷比例
+            total_defects = sum([c['count'] for c in clusters])
+            main_cluster_ratio = clusters[0]['count'] / total_defects if total_defects > 0 else 0
             
-            if texture_ratio > 0.7:
-                conclusions.append(f"2. 缺陷纹理以{main_texture}为主（占比{texture_ratio*100:.1f}%），表明存在特定类型的缺陷模式")
+            if len(clusters) == 1:
+                conclusions.append(f"1. 缺陷高度集中，存在明显的单点问题区域（占比{main_cluster_ratio*100:.1f}%），表明产品在特定位置存在固定缺陷")
+                recommendations.append("• 建议重点检查该区域的生产工艺参数和设备状态")
+                recommendations.append("• 可能需要调整模具或工装夹具的相关部件")
+            elif len(clusters) <= 3:
+                conclusions.append(f"1. 缺陷集中在{len(clusters)}个区域，主要区域占比{main_cluster_ratio*100:.1f}%，表明可能存在多个工艺缺陷点")
+                recommendations.append("• 建议分别检查这几个区域的生产工艺，寻找共性问题")
+                recommendations.append("• 可能需要检查多个工序或多个加工单元")
             else:
-                conclusions.append(f"2. 缺陷纹理类型多样，但{main_texture}相对较多，建议进一步分析各类纹理的成因")
+                conclusions.append(f"1. 缺陷分散在{len(clusters)}个不同区域，分布较为均匀，表明可能存在系统性的工艺问题")
+                recommendations.append("• 建议全面检查生产工艺流程，可能存在基础工艺参数问题")
+                recommendations.append("• 检查原料品质、环境条件等全局因素")
+        
+        # 缺陷类型分析结论
+        if texture_counts:
+            # 获取严重程度排序的缺陷类型
+            severity_order = {
+                "严重损坏": 4,
+                "中度缺陷": 3,
+                "轻度异常": 2,
+                "轻微污染": 1
+            }
+            
+            # 按照严重程度排序
+            sorted_textures = sorted(texture_counts.items(), key=lambda x: severity_order.get(x[0], 0), reverse=True)
+            main_texture = sorted_textures[0][0]  # 最严重的缺陷类型
+            main_texture_count = sorted_textures[0][1]
+            texture_ratio = main_texture_count / sum(texture_counts.values())
+            
+            # 收集所有出现的缺陷类型
+            all_defect_types = []
+            for texture_type, _ in sorted_textures:
+                if texture_type in report_data['texture_analysis'].get('type_description', {}):
+                    type_desc = report_data['texture_analysis']['type_description'][texture_type]
+                    if "包括" in type_desc:
+                        detail_types_text = type_desc.replace("（包括：", "").replace("）", "")
+                        detail_types_list = detail_types_text.split(", ")
+                        for detail_type in detail_types_list:
+                            if "个" in detail_type and int(detail_type.split("个")[0]) > 0:
+                                all_defect_types.append(detail_type.split("个")[1])
+            
+            # 根据主要缺陷类型生成结论
+            if main_texture == "严重损坏":
+                defects_str = "、".join(all_defect_types[:3]) if all_defect_types else "裂缝、大缺口等"
+                conclusions.append(f"2. 样本中存在严重损坏类型的缺陷（占比{texture_ratio*100:.1f}%），如{defects_str}")
+                recommendations.append("• 建议立即停机排查，检查加工设备和模具状态")
+                recommendations.append("• 对设备进行维护保养，消除可能的异常振动或过载")
+                recommendations.append("• 检查原材料质量是否符合要求")
+            elif main_texture == "中度缺陷":
+                defects_str = "、".join(all_defect_types[:3]) if all_defect_types else "划痕、小缺口等"
+                conclusions.append(f"2. 样本中主要为中度缺陷（占比{texture_ratio*100:.1f}%），包括{defects_str}")
+                recommendations.append("• 需要对生产工艺进行针对性调整")
+                recommendations.append("• 检查产品在传输过程中是否受到不当接触或碰撞")
+                recommendations.append("• 优化工装夹具或传送设备以减少产品表面磨损")
+            elif main_texture == "轻度异常":
+                defects_str = "、".join(all_defect_types[:3]) if all_defect_types else "小面积异常、亮斑等"
+                conclusions.append(f"2. 样本中主要为轻度异常（占比{texture_ratio*100:.1f}%），表现为{defects_str}")
+                recommendations.append("• 建议对生产参数进行微调，如温度、压力或速度等")
+                recommendations.append("• 检查产品表面清洁处理和涂层工艺")
+                recommendations.append("• 调整光源或检测环境以排除误检可能性")
+            elif main_texture == "轻微污染":
+                defects_str = "、".join(all_defect_types[:3]) if all_defect_types else "小面积污染、微尘等"
+                conclusions.append(f"2. 样本中主要为轻微污染（占比{texture_ratio*100:.1f}%），主要是{defects_str}")
+                recommendations.append("• 建议检查生产环境的洁净度和除尘系统")
+                recommendations.append("• 优化产品清洁工序和包装流程")
+                recommendations.append("• 检查是否存在静电吸附问题导致表面污染")
+            else:
+                conclusions.append(f"2. 缺陷类型以{main_texture}为主（占比{texture_ratio*100:.1f}%）")
+                recommendations.append("• 建议针对此类缺陷进行专项改进")
+            
+            # 如果存在多种缺陷类型，添加综合分析
+            if len(sorted_textures) > 1 and sorted_textures[1][1] > total_defects * 0.2:
+                second_texture = sorted_textures[1][0]
+                second_ratio = sorted_textures[1][1] / sum(texture_counts.values())
+                conclusions.append(f"   同时还存在较多的{second_texture}类型缺陷（占比{second_ratio*100:.1f}%），表明生产过程中可能存在多种问题")
+                recommendations.append(f"• 同时关注{second_texture}类型缺陷的成因，可能需要多方面改进")
         
         # 区域特征结论
         if 'patch_statistics' in report_data and report_data['patch_statistics']:
             patch_stats = report_data['patch_statistics']
             edge_avg = patch_stats.get('edges_avg', 0)
+            texture_variance = patch_stats.get('variance_avg', 0)
+            brightness_mean = patch_stats.get('mean_avg', 0)
             
+            feature_conclusion = "3. "
+            
+            # 基于边缘密度分析
             if edge_avg > 0.3:
-                conclusions.append("3. 图像边缘密度较高，表明检测对象表面存在较多边缘特征，可能是划痕或裂纹类缺陷")
+                feature_conclusion += f"图像边缘密度较高（{edge_avg:.4f}），表明检测对象表面存在较多边缘特征，"
+                if texture_variance > 100:
+                    feature_conclusion += "结合较高的纹理复杂度，可能是划痕或裂纹类缺陷"
+                    recommendations.append("• 建议检查加工工具是否有损伤或磨损")
+                else:
+                    feature_conclusion += "可能是细小的表面裂纹或刻痕"
+                    recommendations.append("• 建议检查模具表面状态和脱模工艺")
             elif edge_avg > 0.1:
-                conclusions.append("3. 图像边缘密度适中，表明检测对象表面存在一定的边缘特征，可能是轻微的表面不规则")
+                feature_conclusion += f"图像边缘密度适中（{edge_avg:.4f}），表明检测对象表面存在一定的边缘特征，"
+                if brightness_mean > 180:
+                    feature_conclusion += "结合较高的亮度水平，可能是表面微小凹凸或轻微磨损"
+                    recommendations.append("• 建议优化表面处理工艺，如抛光或打磨参数")
+                else:
+                    feature_conclusion += "可能是轻微的表面不规则或纹理变化"
+                    recommendations.append("• 建议检查原料均匀性和加工参数一致性")
             else:
-                conclusions.append("3. 图像边缘密度较低，表明检测对象表面较为平滑，缺陷可能以颜色或亮度异常为主")
+                feature_conclusion += f"图像边缘密度较低（{edge_avg:.4f}），表明检测对象表面较为平滑，"
+                if brightness_mean > 190:
+                    feature_conclusion += "但亮度较高，缺陷可能以亮斑或反光异常为主"
+                    recommendations.append("• 建议检查表面涂层均匀性和光源条件")
+                else:
+                    feature_conclusion += "缺陷可能以颜色或亮度异常为主"
+                    recommendations.append("• 建议检查材料成分和加工温度控制")
+            
+            conclusions.append(feature_conclusion)
         
-        # 添加结论
+        # 添加结论和建议
+        content.append(Paragraph("5.1 缺陷分析结论", styles['ReportHeading2']))
         for conclusion in conclusions:
             content.append(Paragraph(conclusion, styles['ReportNormal']))
             content.append(Spacer(1, 0.2*cm))
+        
+        content.append(Paragraph("5.2 改进建议", styles['ReportHeading2']))
+        for recommendation in recommendations:
+            content.append(Paragraph(recommendation, styles['ReportNormal']))
+            content.append(Spacer(1, 0.1*cm))
+        
+        content.append(Spacer(1, 0.5*cm))
+        disclaimer = "注: 本报告中的分析结论和建议基于当前样本数据，实际生产问题可能更为复杂，请结合具体情况进行判断。"
+        content.append(Paragraph(disclaimer, styles['ReportNote']))
         
         # 生成PDF
         doc.build(content)
