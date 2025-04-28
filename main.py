@@ -83,6 +83,10 @@ class MainWindow(QMainWindow):
         # 验证通过，跳转到下一页
         self.ui.tabWidget.setCurrentIndex(2)
     def switch_to_page_3(self):
+        # 如果不是从第二页来的，直接跳转
+        if self.ui.tabWidget.currentIndex() != 2:
+            self.ui.tabWidget.setCurrentIndex(3)
+            return
         # 检查是否训练过模型
         if not self.model_handler.is_model_trained():
             # 提示用户是否要训练模型
@@ -96,7 +100,7 @@ class MainWindow(QMainWindow):
             # 如果用户选择训练
             if confirm == QMessageBox.Yes:
                 self.model_handler.train_model()
-            return
+                return
         self.detect_handler.update_model_group()
         # 验证通过，跳转到下一页
         self.ui.tabWidget.setCurrentIndex(3)

@@ -508,7 +508,7 @@ def create_file_dialog(title="选择文件", parent=None, is_folder=True, file_f
         title (str): 对话框标题
         parent (QWidget): 父窗口，传入 None 则显示在系统屏幕中心
         is_folder (bool): 是否选择文件夹
-        file_filter (str): 文件过滤器 如 "Images (*.png *.jpg *.jpeg)"
+        file_filter (str): 文件过滤器 如 "Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp *.heic *.heif *.svg *.raw *.cr2 *.nef *.arw *.psd *.jp2 *.j2k *.dpx)"
         accept_mode (QFileDialog.AcceptMode): 接受模式
         file_mode (QFileDialog.FileMode): 文件选择模式
         default_filename (str): 默认文件名
