@@ -1880,29 +1880,3 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
         print(error_msg)
         return None
 
-
-if __name__ == "__main__":
-    
-    # 示例路径和参数
-    detect_path = "B:/Development/GraduationDesign/app/test/detect_result"
-    detect_group = "test_group"
-    threshold = 0.5
-    
-    # 定义简单的进度回调函数
-    def print_progress(value, message):
-        print(f"进度: {value}% - {message}")
-    
-    # 运行分析
-    try:
-        report_info = analyze_defect_textures(
-            detect_path, 
-            detect_group, 
-            threshold, 
-            progress_callback=print_progress
-        )
-        
-        if report_info:
-            print(f"报告文件: {report_info['report_file']}")
-            print(f"图表文件: {report_info['chart_file']}")
-    except Exception as e:
-        print(f"错误: {str(e)}")
