@@ -526,7 +526,7 @@ class DetectHandler(QObject):
         files = create_file_dialog(
             title="选择图片文件",
             is_folder=False,
-            file_filter="图片文件 (*.png *.jpg *.jpeg)",
+            file_filter=f"图片文件 ({config.IMAGE_FORMATS})",
             file_mode=QFileDialog.ExistingFiles
         )
         

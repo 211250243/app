@@ -1,10 +1,10 @@
-# 远程服务器配置
-SERVER_HOSTNAME = '10.160.22.114'
-SERVER_PORT = 20045
-SERVER_USERNAME = 'nieercong'
-SERVER_PASSWORD = 'NAec19216800.'
-SERVER_SAMPLE_PATH = 'data/sample_groups'
-SERVER_DOWNLOAD_PATH = 'patchcore/evaluated_results/2025_1_9'
+# # ssh远程服务器配置
+# SERVER_HOSTNAME = '10.160.22.114'
+# SERVER_PORT = 20045
+# SERVER_USERNAME = 'nieercong'
+# SERVER_PASSWORD = 'NAec19216800.'
+# SERVER_SAMPLE_PATH = 'data/sample_groups'
+# SERVER_DOWNLOAD_PATH = 'patchcore/evaluated_results/2025_1_9'
 
 # http服务器配置
 HOSTNAME = '10.160.22.114'
@@ -53,3 +53,4 @@ DEFECT_THRESHOLD = 0.5  # 默认阈值为0.5，高于此值判断为异常
 
 # 参数配置
 TEST_RATIO = 0.1
+IMAGE_FORMATS = "*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp *.heic *.heif *.svg *.raw *.cr2 *.nef *.arw *.psd *.jp2 *.j2k *.dpx" # 支持的图片格式
