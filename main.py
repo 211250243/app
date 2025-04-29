@@ -1,14 +1,12 @@
-import os
-
 from PySide6.QtWidgets import QMainWindow, QApplication, QMessageBox
-from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtUiTools import QUiLoader
 
 import config
 from detect_handler import DetectHandler
 from model_handler import ModelHandler
 from sample_handler import SampleHandler
-from utils import FloatingTimer, join_path
+from utils import FloatingTimer, join_path, WatermarkWidget
 from http_server import is_sample_group_uploaded
 
 
@@ -54,6 +52,19 @@ class MainWindow(QMainWindow):
         self.ui.tabWidget.currentChanged.connect(self.on_tab_changed)
         # self.cur_index = self.ui.tabWidget.currentIndex()
         # self.to_next = False # 用于判断是否点击下一步按钮
+
+        # 添加水印控件（覆盖整个窗口）
+        self.watermark = WatermarkWidget(
+            text="多模态智能及应用研究中心",
+            angle=-45,
+            opacity=0.2,
+            parent=self.ui
+        )
+        # 设置水印控件属性
+        self.watermark.setAttribute(Qt.WA_TransparentForMouseEvents)  # 穿透鼠标事件
+        self.watermark.resize(self.ui.size())
+        self.watermark.raise_()  # 确保在最上层
+
 
     def on_tab_changed(self, index):
         """
