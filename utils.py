@@ -3,7 +3,7 @@ import os
 import shutil
 
 from PySide6.QtCore import QCoreApplication, Qt, QTimer, QDateTime, QPoint, QSize
-from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont
+from PySide6.QtGui import QMovie, QPainter, QLinearGradient, QColor, QPen, QFont, QFontMetrics
 from PySide6.QtWidgets import QMessageBox, QVBoxLayout, QLabel, QWidget, QApplication, QProgressDialog, QPushButton, QFileDialog
 
 import config
@@ -556,3 +556,50 @@ def create_file_dialog(title="选择文件", parent=None, is_folder=True, file_f
                     options=options
                 )
             return file
+        
+
+class WatermarkWidget(QWidget):
+
+    def __init__(self, text="Watermark", angle=45, opacity=0.5, parent=None):
+        super().__init__(parent)
+        self.text = text
+        self.angle = angle
+        self.opacity = int(255 * opacity)  # 转换为0-255范围
+        # 设置控件透明
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # 设置半透明颜色
+        color = QColor(128, 128, 128, self.opacity)
+        painter.setPen(color)
+        
+        # 设置字体（根据控件大小自适应）
+        font_size = max(min(self.width() // 15, 24), 12)
+        font = QFont("Arial", font_size)
+        painter.setFont(font)
+        
+        # 计算文本尺寸
+        fm = QFontMetrics(font)
+        text_width = fm.horizontalAdvance(self.text)
+        text_height = fm.height()
+        
+        # 循环平铺水印
+        spacing = int(text_width)  # 水印间距
+        for x in range(-self.width(), self.width() * 2, spacing):
+            for y in range(-self.height(), self.height() * 2, spacing):
+                painter.save()
+                # 移动坐标系到当前平铺位置
+                painter.translate(x, y)
+                # 以文本中心为旋转点
+                painter.rotate(self.angle)
+                # 绘制文本（居中）
+                painter.drawText(
+                    -text_width // 2,
+                    text_height // 4,  # 微调垂直居中
+                    self.text
+                )
+                painter.restore()
