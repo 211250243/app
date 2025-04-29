@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import platform
 from PySide6.QtCore import Qt, QEvent, QObject, QThread, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIcon
 from PySide6.QtWidgets import (QWidget, QDialog, QMessageBox, QFileDialog, 
                              QAbstractItemView, QTreeWidgetItem, QApplication, QVBoxLayout)
 from PySide6.QtUiTools import QUiLoader
@@ -67,6 +67,11 @@ class DetectHandler(QObject):
         self.ui.thresholdValueLabel.setText(f"阈值: {config.DEFECT_THRESHOLD:.2f}")
         self.ui.thresholdSlider.valueChanged.connect(self.on_threshold_changed)
         self.ui.applyThresholdButton.clicked.connect(self.apply_threshold)
+        
+        # 添加阈值手动编辑功能
+        self.ui.thresholdEditButton.clicked.connect(self.show_threshold_edit)
+        self.ui.thresholdEditField.editingFinished.connect(self.on_threshold_edit_done)
+        
         # 初始化检测列表
         if config.DETECT_SAMPLE_GROUP:
             detect_list_path = join_path(config.DETECT_PATH, config.DETECT_SAMPLE_GROUP, 'detect_list.json')
@@ -147,6 +152,37 @@ class DetectHandler(QObject):
             self.toggle_image()
             return True
         return super(DetectHandler, self).eventFilter(obj, event)
+        
+    def show_threshold_edit(self):
+        """显示阈值编辑框"""
+        # 获取当前阈值值并设置到编辑框
+        current_threshold = self.ui.thresholdSlider.value() / 100.0
+        self.ui.thresholdEditField.setText(f"{current_threshold:.2f}")
+        
+        # 隐藏标签，显示编辑框
+        self.ui.thresholdValueLabel.setVisible(False)
+        self.ui.thresholdEditField.setVisible(True)
+        self.ui.thresholdEditField.setFocus()
+        self.ui.thresholdEditField.selectAll()
+    
+    def on_threshold_edit_done(self):
+        """阈值编辑完成处理"""
+        # 隐藏编辑框，显示标签
+        self.ui.thresholdEditField.setVisible(False)
+        self.ui.thresholdValueLabel.setVisible(True)
+        
+        # 获取编辑的值
+        try:
+            edited_value = float(self.ui.thresholdEditField.text().replace(',', '.'))
+            # 确保值在有效范围内 (-10 到 20)
+            if -10 <= edited_value <= 20:
+                # 更新滑动条和标签
+                slider_value = int(edited_value * 100)
+                self.ui.thresholdSlider.setValue(slider_value)
+                self.ui.thresholdValueLabel.setText(f"阈值: {edited_value:.2f}")
+        except ValueError:
+            # 如果输入无效，恢复原来的值
+            pass
 
     def init_sample_group(self):
         """
@@ -794,9 +830,7 @@ class TextureAnalysisDialog(QDialog):
         self.ui.gridSizeValueLabel.setText(f"{value}×{value} ({total_cells}个区域)")
     
     def update_threshold_label(self, value):
-        """
-        更新阈值标签
-        """
+        """更新阈值标签显示"""
         threshold = value / 100.0
         self.ui.thresholdValueLabel.setText(f"阈值: {threshold:.2f}")
     
@@ -1478,17 +1512,3 @@ class TextureAnalysisDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"生成PDF报告失败: {str(e)}")
             print(f"生成PDF报告失败: {str(e)}")
-
-
-
-# class ImageClickEventFilter(QObject):
-#     """图片点击事件过滤器"""
-#     def __init__(self, detect_handler):
-#         super().__init__()
-#         self.detect_handler = detect_handler
-        
-#     def eventFilter(self, obj, event):
-#         if obj is self.detect_handler.ui.resultLabel and event.type() == QEvent.MouseButtonPress:
-#             self.detect_handler.toggle_image()
-#             return True
-#         return super().eventFilter(obj, event)
