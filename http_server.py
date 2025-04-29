@@ -898,19 +898,22 @@ class PatchCoreParamMapper_Http:
         # 精度选项
         self.accuracy_options = {
             "低精度": {
-                "end_acc": 0.85,
+                "end_acc": 0.90,
                 "embed_dimension": 256,
-                "layers": ["layer2"]
+                "input_h": 224,
+                "input_w": 224
             },
             "中等精度": {
-                "end_acc": 0.92,
+                "end_acc": 0.94,
                 "embed_dimension": 512,
-                "layers": ["layer2", "layer3"]
+                "input_h": 448,
+                "input_w": 448
             },
             "高精度": {
                 "end_acc": 0.98,
-                "embed_dimension": 1024,
-                "layers": ["layer1", "layer2", "layer3"]
+                "embed_dimension": 1536,
+                "input_h": 1024,
+                "input_w": 1024
             }
         }
         
@@ -918,46 +921,31 @@ class PatchCoreParamMapper_Http:
         self.defect_size_options = {
             "小缺陷": {
                 "patchsize": 3,
-                "input_h": 224,
-                "input_w": 224
+                "layers": ["layer2"]
             },
             "中等缺陷": {
-                "patchsize": 5,
-                "input_h": 256,
-                "input_w": 256
+                "patchsize": 3,
+                "layers": ["layer2", "layer3"]
             },
             "大缺陷": {
-                "patchsize": 9,
-                "input_h": 320,
-                "input_w": 320
+                "patchsize": 3,
+                "layers": ["layer3"]
             }
         }
         
         # 训练速度选项 - 影响多个参数以全面控制训练性能和质量
         self.training_speed_options = {
             "快速": {
-                # 低精度层
-                "layers_factor": -1,  # 减少使用的层数
-                # 减小嵌入维度以加快训练
-                "embed_dimension_factor": 0.7,
-                # 降低结束精度要求
-                "end_acc_delta": -0.03
+                "embed_dimension_factor": 0.9, # 减小嵌入维度以加快训练
+                "end_acc_delta": -0.01 # 降低结束精度要求
             },
             "均衡": {
-                # 不修改层数
-                "layers_factor": 0,
-                # 不修改嵌入维度
-                "embed_dimension_factor": 1.0,
-                # 不修改结束精度
-                "end_acc_delta": 0.0
+                "embed_dimension_factor": 1.0, # 不修改嵌入维度
+                "end_acc_delta": 0.0 # 不修改结束精度
             },
             "慢速高质量": {
-                # 增加使用的层数
-                "layers_factor": 1,
-                # 增大嵌入维度以提高质量
-                "embed_dimension_factor": 1.3,
-                # 提高结束精度要求
-                "end_acc_delta": 0.02
+                "embed_dimension_factor": 1.1, # 增大嵌入维度以提高质量
+                "end_acc_delta": 0.01 # 提高结束精度要求
             }
         }
     
@@ -991,23 +979,7 @@ class PatchCoreParamMapper_Http:
         # 1. 修改嵌入维度
         params["embed_dimension"] = int(params["embed_dimension"] * speed_params["embed_dimension_factor"])
         
-        # 2. 修改层数 - 基于layers_factor
-        layers_factor = speed_params["layers_factor"]
-        base_layers = params["layers"]
-        if layers_factor < 0 and len(base_layers) > 1:
-            # 减少层数（保留至少一层）
-            params["layers"] = base_layers[-min(len(base_layers), abs(layers_factor)+1):]
-        elif layers_factor > 0:
-            # 增加层数，可能添加额外的层
-            available_layers = ["layer1", "layer2", "layer3", "layer4"]
-            # 找出当前未使用的层
-            unused_layers = [l for l in available_layers if l not in base_layers]
-            # 按顺序添加未使用的层，最多添加layers_factor个
-            for i in range(min(layers_factor, len(unused_layers))):
-                if unused_layers[i] not in params["layers"]:
-                    params["layers"] = [unused_layers[i]] + params["layers"]
-        
-        # 3. 修改结束精度
+        # 2. 修改结束精度
         params["end_acc"] = min(0.99, max(0.8, params["end_acc"] + speed_params["end_acc_delta"]))
         
         # 确保嵌入维度在合理范围内
