@@ -629,7 +629,7 @@ class DefectTextureAnalyzer:
     
     def analyze_texture_patterns(self):
         """
-        分析缺陷特征，判断缺陷类型（污点、划痕、裂缝等）
+        分析缺陷特征，判断缺陷类型（基于亮度特征）
         """
         try:
             self.update_progress(70, "开始分析缺陷类型...")
@@ -637,64 +637,97 @@ class DefectTextureAnalyzer:
             if not self.texture_features:
                 print("没有缺陷特征数据可供分析")
                 return {
-                    'texture_counts': {},  # 保持原键名不变
+                    'texture_counts': {},
                     'defect_details': []
                 }
             
             print(f"分析缺陷类型，缺陷数量: {len(self.texture_features)}")
             
-            # 定义缺陷类型判断标准（这些阈值需要根据实际数据调整）
+            # 定义亮度阈值
+            LOW_BRIGHTNESS_THRESHOLD = 80  # 低亮度阈值
+            HIGH_BRIGHTNESS_THRESHOLD = 180  # 高亮度阈值
+            EXTREME_BRIGHTNESS_THRESHOLD = 220  # 极高亮度阈值
+            
             defect_types = []
             for feature in self.texture_features:
-                # 提取特征
-                gradient = feature['gradient']  # 梯度特征
-                area = feature['area']          # 面积
-                mean_val = feature['mean']      # 亮度均值
-                std_val = feature['std']        # 亮度标准差
+                # 提取特征并转换为Python原生类型
+                mean_val = float(feature['mean'])      # 亮度均值
+                max_val = float(feature['max'])        # 最大亮度值
+                area = float(feature['area'])          # 面积
                 
-                # 形状特征（可以从self.defect_positions获取）
+                # 形状特征
                 for pos in self.defect_positions:
                     if pos['image'] == feature['image'] and pos['center_x'] == feature['position'][0] and pos['center_y'] == feature['position'][1]:
-                        width = pos['width']
-                        height = pos['height']
-                        aspect_ratio = width / height if height > 0 else 1
+                        width = float(pos['width'])
+                        height = float(pos['height'])
+                        aspect_ratio = width / height if height > 0 else 1.0
                         break
                 else:
-                    aspect_ratio = 1  # 默认值
+                    aspect_ratio = 1.0  # 默认值
                 
-                # 基于多特征的缺陷类型判断
-                if gradient < 15 and std_val < 25:
-                    defect_type = "污点"  # 低梯度、低方差通常是污点
-                elif gradient > 40 and aspect_ratio > 2.5:
-                    defect_type = "划痕"  # 高梯度、细长形状通常是划痕
-                elif gradient > 50 and std_val > 40:
-                    defect_type = "裂缝"  # 高梯度、高方差通常是裂缝
-                elif area < 0.001:  # 小面积
-                    defect_type = "小点缺陷"
-                elif area > 0.05:   # 大面积
-                    defect_type = "大面积缺陷"
+                # 基于亮度和形状特征的缺陷分类（详细分类）
+                if max_val > EXTREME_BRIGHTNESS_THRESHOLD:
+                    if aspect_ratio > 2.5:
+                        detail_type = "裂缝"
+                    else:
+                        detail_type = "大缺口"
+                    main_type = "严重损坏"
+                elif mean_val > HIGH_BRIGHTNESS_THRESHOLD:
+                    # 高亮度区域分类
+                    if aspect_ratio > 2.5:
+                        detail_type = "划痕"
+                        main_type = "中度缺陷"
+                    elif area > 0.03:
+                        detail_type = "大面积缺陷"
+                        main_type = "中度缺陷"
+                    else:
+                        detail_type = "小缺口"
+                        main_type = "中度缺陷"
+                elif mean_val < LOW_BRIGHTNESS_THRESHOLD:
+                    # 低亮度区域分类
+                    if area > 0.03:
+                        detail_type = "大面积污染"
+                    else:
+                        detail_type = "小面积污染"
+                    main_type = "轻微污染"
                 else:
-                    defect_type = "其他缺陷"
+                    # 亮度适中，可能是轻微变化
+                    detail_type = "轻度异常"
+                    main_type = "轻度异常"
                 
                 defect_types.append({
                     'image': feature['image'],
-                    'position': feature['position'],
-                    'defect_type': defect_type,
-                    'gradient': gradient,
-                    'area': area,
-                    'mean': mean_val,
-                    'std': std_val
+                    'position': (float(feature['position'][0]), float(feature['position'][1])),
+                    'defect_type': detail_type,  # 详细类型
+                    'main_type': main_type,      # 主要类型
+                    'mean': float(mean_val),
+                    'max': float(max_val),
+                    'area': float(area),
+                    'aspect_ratio': float(aspect_ratio)
                 })
             
-            # 统计各类缺陷的数量
-            defect_counts = Counter([item['defect_type'] for item in defect_types])
-            print(f"缺陷类型分布: {dict(defect_counts)}")
+            # 统计各主要类型和详细类型缺陷的数量
+            main_type_counts = Counter([item['main_type'] for item in defect_types])
+            detail_type_counts = Counter([item['defect_type'] for item in defect_types])
+            
+            print(f"主要缺陷类型分布: {dict(main_type_counts)}")
+            print(f"详细缺陷类型分布: {dict(detail_type_counts)}")
+            
+            # 生成主要类型与详细类型的映射关系描述
+            type_description = {
+                "轻微污染": f"（包括：{detail_type_counts.get('小面积污染', 0)}个小面积污染, {detail_type_counts.get('大面积污染', 0)}个大面积污染）",
+                "轻度异常": f"（包括：{detail_type_counts.get('轻度异常', 0)}个轻度异常）",
+                "中度缺陷": f"（包括：{detail_type_counts.get('划痕', 0)}个划痕, {detail_type_counts.get('小缺口', 0)}个小缺口, {detail_type_counts.get('大面积缺陷', 0)}个大面积缺陷）",
+                "严重损坏": f"（包括：{detail_type_counts.get('裂缝', 0)}个裂缝, {detail_type_counts.get('大缺口', 0)}个大缺口）"
+            }
             
             # 返回分析结果，保持键名兼容
             defect_analysis = {
-                'texture_counts': dict(defect_counts),  # 使用原键名
-                'defect_type_counts': dict(defect_counts),  # 同时保留新键名
-                'defect_details': defect_types
+                'texture_counts': dict(main_type_counts),  # 使用原键名但返回主要类型计数
+                'defect_type_counts': dict(detail_type_counts),  # 详细类型计数
+                'main_type_counts': dict(main_type_counts),  # 主要类型计数
+                'defect_details': defect_types,
+                'type_description': type_description  # 添加类型描述
             }
             
             self.update_progress(80, "缺陷类型分析完成")
