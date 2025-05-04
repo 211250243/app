@@ -1,0 +1,30 @@
+\addvspace {10.0pt}
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {2-1}{\ignorespaces Transformers的模型结构}}{8}{figure.caption.6}%
+\contentsline {figure}{\numberline {2-2}{\ignorespaces Qwen系列模型脉络}}{10}{figure.caption.7}%
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {3-1}{\ignorespaces PEFT的结构图}}{16}{figure.caption.9}%
+\contentsline {figure}{\numberline {3-2}{\ignorespaces Adapter的结构图}}{17}{figure.caption.10}%
+\contentsline {figure}{\numberline {3-3}{\ignorespaces LoRA的原理结构图}}{18}{figure.caption.11}%
+\contentsline {figure}{\numberline {3-4}{\ignorespaces Deep Prompt Tuning的原理结构图}}{19}{figure.caption.12}%
+\contentsline {figure}{\numberline {3-5}{\ignorespaces 输入数据格式}}{21}{figure.caption.14}%
+\contentsline {figure}{\numberline {3-6}{\ignorespaces 数据准备脚本}}{22}{figure.caption.15}%
+\contentsline {figure}{\numberline {3-7}{\ignorespaces P-tuning v2微调脚本参数}}{23}{figure.caption.16}%
+\contentsline {figure}{\numberline {3-8}{\ignorespaces LoRA微调脚本参数}}{24}{figure.caption.17}%
+\contentsline {figure}{\numberline {3-9}{\ignorespaces 20000规模数据集微调模型loss变化图}}{24}{figure.caption.18}%
+\contentsline {figure}{\numberline {3-10}{\ignorespaces 200000规模数据集微调模型loss变化图}}{25}{figure.caption.19}%
+\contentsline {figure}{\numberline {3-11}{\ignorespaces 500000规模数据集微调模型loss变化图}}{25}{figure.caption.20}%
+\contentsline {figure}{\numberline {3-12}{\ignorespaces 50000规模数据集的LoRA方法微调模型loss变化图}}{26}{figure.caption.21}%
+\contentsline {figure}{\numberline {3-13}{\ignorespaces 50000规模NiuTrans数据集的P-tuning v2方法微调模型loss变化图}}{27}{figure.caption.22}%
+\contentsline {figure}{\numberline {3-14}{\ignorespaces ChatGLM3-6B-200000的评分变化图}}{28}{figure.caption.24}%
+\contentsline {figure}{\numberline {3-15}{\ignorespaces ChatGLM3-6B-500000的评分变化图}}{29}{figure.caption.25}%
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {4-1}{\ignorespaces 百度翻译API调用脚本}}{31}{figure.caption.28}%
+\contentsline {figure}{\numberline {4-2}{\ignorespaces 【随无涯】运行参数}}{32}{figure.caption.29}%
+\contentsline {figure}{\numberline {4-3}{\ignorespaces mengzi-t5-base微调参数}}{33}{figure.caption.30}%
+\contentsline {figure}{\numberline {4-4}{\ignorespaces Qwen1.5-1.8B的微调脚本}}{33}{figure.caption.31}%
+\contentsline {figure}{\numberline {4-5}{\ignorespaces ChatGLM3-6B选择Token的过程}}{34}{figure.caption.32}%
+\contentsline {figure}{\numberline {4-6}{\ignorespaces $Temperature=0.95$，未设置$Top_k$时评分随$Top_p$取值变化}}{36}{figure.caption.34}%
+\contentsline {figure}{\numberline {4-7}{\ignorespaces $TOP_p=0.35$，未设置$Top_k$时评分随$Temperature$取值变化}}{36}{figure.caption.35}%
+\contentsline {figure}{\numberline {4-8}{\ignorespaces $TOP_p=0.35$，$Temperature=0.95$，评分随$Top_k$取值变化}}{37}{figure.caption.36}%
+\addvspace {10.0pt}

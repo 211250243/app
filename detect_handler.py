@@ -190,6 +190,7 @@ class DetectHandler(QObject):
         """
         self.ui.newDetectSampleGroupButton.clicked.connect(self.new_sample_group)
         self.ui.importDetectSampleGroupButton.clicked.connect(self.import_sample_group)
+        self.ui.importDetectSampleGroupButton_2.clicked.connect(self.import_sample_group)
         self.ui.deleteDetectSampleGroupButton.clicked.connect(self.delete_sample_group)
         self.ui.uploadDetectSampleGroupButton.clicked.connect(self.upload_sample_group)
         # 获取样本组并初始化路径

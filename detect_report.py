@@ -132,7 +132,13 @@ class DefectTextureAnalyzer:
                     try:
                         if os.path.isfile(join_path(self.result_path, f)):
                             # 尝试读取文件看是否为图像
-                            img = cv2.imread(join_path(self.result_path, f), cv2.IMREAD_UNCHANGED)
+                            file_path = join_path(self.result_path, f)
+                            try:
+                                # 使用np.fromfile和cv2.imdecode处理可能的中文路径
+                                img_array = np.fromfile(file_path, np.uint8)
+                                img = cv2.imdecode(img_array, cv2.IMREAD_UNCHANGED)
+                            except Exception:
+                                img = None
                             if img is not None:
                                 all_image_files.append(f)
                     except Exception as e:
@@ -230,8 +236,11 @@ class DefectTextureAnalyzer:
                     continue
                 
                 try:
-                    # 尝试读取图像，确保它是有效的
-                    test_img = cv2.imread(image_path)
+                    # 修复中文路径问题：使用正确编码方式处理路径
+                    # 方法1: 使用np.fromfile读取二进制数据，然后用cv2.imdecode解码
+                    img_array = np.fromfile(image_path, np.uint8)
+                    test_img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                    
                     if test_img is None:
                         print(f"无法读取图像: {image_path}")
                         continue
@@ -277,9 +286,15 @@ class DefectTextureAnalyzer:
                 heatmap_path = img_info['heatmap_path']
                 print(f"读取热图: {heatmap_path}")
                 
-                heatmap = cv2.imread(heatmap_path)
-                if heatmap is None:
-                    print(f"无法读取热图: {heatmap_path}")
+                try:
+                    # 使用np.fromfile和cv2.imdecode处理可能的中文路径
+                    img_array = np.fromfile(heatmap_path, np.uint8)
+                    heatmap = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                    if heatmap is None:
+                        print(f"无法读取热图: {heatmap_path}")
+                        continue
+                except Exception as e:
+                    print(f"读取热图失败: {heatmap_path}, 错误: {str(e)}")
                     continue
                     
                 # 输出图像形状以进行调试
@@ -393,11 +408,19 @@ class DefectTextureAnalyzer:
                 if original_name:
                     print(f"尝试读取原始图像: {original_path}")
                     if os.path.exists(original_path):
-                        original_image = cv2.imread(original_path)
-                        if original_image is not None:
-                            print(f"成功加载原始图像: {original_path}")
-                        else:
-                            print(f"无法读取原始图像: {original_path}")
+                        try:
+                            # 使用np.fromfile和cv2.imdecode处理可能的中文路径
+                            img_array = np.fromfile(original_path, np.uint8)
+                            original_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+                            if original_image is not None:
+                                print(f"成功加载原始图像: {original_path}")
+                            else:
+                                print(f"无法读取原始图像: {original_path}")
+                        except Exception as e:
+                            print(f"读取原始图像失败: {original_path}, 错误: {str(e)}")
+                            original_image = None
+                    else:
+                        print(f"未找到热图 {image_name} 对应的原始图像")
                 else:
                     print(f"未找到热图 {image_name} 对应的原始图像")
                 
@@ -956,7 +979,9 @@ class DefectTextureAnalyzer:
             if self.best_sample_path and os.path.exists(self.best_sample_path):
                 try:
                     # 读取图像并转换为RGB
-                    background_img = cv2.imread(self.best_sample_path)
+                    # 使用np.fromfile和cv2.imdecode处理可能的中文路径
+                    img_array = np.fromfile(self.best_sample_path, np.uint8)
+                    background_img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
                     background_img = cv2.cvtColor(background_img, cv2.COLOR_BGR2RGB)
                     background_width = background_img.shape[1]
                     background_height = background_img.shape[0]
@@ -975,7 +1000,9 @@ class DefectTextureAnalyzer:
                     try:
                         sample_path = self.defect_images[0].get('heatmap_path')
                         if sample_path and os.path.exists(sample_path):
-                            background_img = cv2.imread(sample_path)
+                            # 使用np.fromfile和cv2.imdecode处理可能的中文路径
+                            img_array = np.fromfile(sample_path, np.uint8)
+                            background_img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
                             background_img = cv2.cvtColor(background_img, cv2.COLOR_BGR2RGB)
                             background_width = background_img.shape[1]
                             background_height = background_img.shape[0]
