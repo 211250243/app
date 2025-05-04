@@ -1,0 +1,14 @@
+\addvspace {10.0pt}
+\addvspace {10.0pt}
+\addvspace {10.0pt}
+\contentsline {table}{\numberline {3-1}{\ignorespaces Erya数据集评测基准数据}}{14}{table.caption.8}%
+\contentsline {table}{\numberline {3-2}{\ignorespaces 项目运行的环境、组件依赖和硬件条件}}{21}{table.caption.13}%
+\contentsline {table}{\numberline {3-3}{\ignorespaces ChatGLM3-6B、ChatGLM3-6B-20000、ChatGLM3-6B-200000、ChatGLM3-6B-500000训练过程的评分}}{27}{table.caption.23}%
+\contentsline {table}{\numberline {3-4}{\ignorespaces ChatGLM3-6B-P-tuning v2、ChatGLM3-6B-LoRA在验证集上的分数}}{28}{table.caption.26}%
+\contentsline {table}{\numberline {3-5}{\ignorespaces ChatGLM3-6B-Erya、ChatGLM3-6B-NiuTrans在验证集上的分数}}{28}{table.caption.27}%
+\addvspace {10.0pt}
+\contentsline {table}{\numberline {4-1}{\ignorespaces 不同的超参数在验证集上的分数}}{35}{table.caption.33}%
+\contentsline {table}{\numberline {4-2}{\ignorespaces 百度翻译与ChatGLM3-6B在测试集上的分数对比}}{37}{table.caption.37}%
+\contentsline {table}{\numberline {4-3}{\ignorespaces 【随无涯】、mengzi-t5-base与ChatGLM3-6B在测试集上的分数对比}}{38}{table.caption.38}%
+\contentsline {table}{\numberline {4-4}{\ignorespaces 百度翻译、【随无涯】与ChatGLM3-6B的人工评分对比}}{38}{table.caption.39}%
+\addvspace {10.0pt}
