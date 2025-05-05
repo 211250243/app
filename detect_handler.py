@@ -1198,7 +1198,9 @@ class TextureAnalysisDialog(QDialog):
                 html_content.append(f'<img src="{self.current_report["pie_chart"]}" width="450" style="max-width:100%; border-radius:6px;"/>')
                 html_content.append('</div>')
             
-            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
+            # 将基于缺陷点数量的判断改为基于样本数量的判断
+            sample_main_type_counts = report_data['texture_analysis'].get('sample_main_type_counts', {})
+            main_texture = max(sample_main_type_counts.items(), key=lambda x: x[1])[0]
             html_content.append(f"<p>主要缺陷类型: <b>{main_texture}</b></p>")
             
             html_content.append("<p>缺陷类型分布:</p>")

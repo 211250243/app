@@ -753,42 +753,45 @@ class DefectTextureAnalyzer:
                 # 打印特征信息用于调试
                 print(f"样本: {feature['image']}, 最大亮度值: {max_val}, 亮度均值: {mean_val}, 归一化面积: {normalized_area}, 形状比例: {aspect_ratio}")
                 
-                # 严重损坏类别判断
-                if normalized_area > 0.03 and max_val > 210:  # 大面积高亮度缺陷
+                # 严重损坏类别判断 - 降低阈值以识别更多严重损坏
+                if normalized_area > 0.02 and max_val > 195:  # 原为0.03/210，降低面积和亮度阈值
                     main_type = "严重损坏"
                     detail_type = "大缺口"
-                elif normalized_area > 0.02 and max_val > 200:  # 较大面积中高亮度
+                elif normalized_area > 0.015 and max_val > 190:  # 原为0.02/200，降低面积和亮度阈值
                     main_type = "严重损坏"
                     detail_type = "大面积缺陷"
                 # 中度缺陷类别判断
-                elif normalized_area > 0.01 and max_val > 210:  # 中等面积高亮度
+                elif normalized_area > 0.006 and max_val > 185:  # 原为0.01/210
                     main_type = "中度缺陷"
                     if aspect_ratio > 1.8:  # 细长形状
                         detail_type = "划痕"
-                    elif normalized_area > 0.015:
+                    elif normalized_area > 0.01:
                         detail_type = "大面积缺陷"
                     else:
                         detail_type = "小缺口"
-                elif normalized_area > 0.007 and max_val > 210:  # 小面积高亮度
+                elif normalized_area > 0.003 and max_val > 180:  # 原为0.007/210
                     main_type = "中度缺陷"
                     if aspect_ratio > 1.8:
                         detail_type = "划痕"
                     else:
                         detail_type = "小缺口"
                 # 轻度异常类别判断
-                elif normalized_area > 0.007 and max_val > 180:  # 中小面积中等亮度
+                elif normalized_area > 0.002 and max_val > 160:  # 原为0.005/170
                     main_type = "轻度异常"
-                    detail_type = "小面积异常"
-                elif normalized_area > 0.005 and max_val > 170:  # 小面积中等亮度
-                    main_type = "轻度异常"
-                    detail_type = "小面积异常"
-                elif max_val > 190:  # 高亮度点
+                    if normalized_area > 0.004:  # 添加大面积异常的判断
+                        detail_type = "大面积异常"
+                    else:
+                        detail_type = "小面积异常"
+                elif max_val > 175:  # 原为190
                     main_type = "轻度异常"
                     detail_type = "小面积异常"
                 # 轻微污染或正常
                 else:
                     main_type = "轻微污染"
-                    detail_type = "小面积污染"
+                    if normalized_area > 0.004:  # 添加大面积污染的判断
+                        detail_type = "大面积污染"
+                    else:
+                        detail_type = "小面积污染"
                 
                 defect_types.append({
                     'image': feature['image'],
@@ -809,7 +812,7 @@ class DefectTextureAnalyzer:
             print(f"主要缺陷类型分布: {dict(main_type_counts)}")
             print(f"详细缺陷类型分布: {dict(detail_type_counts)}")
             
-            # 计算每个图像的主要缺陷类型
+            # 计算每个图像的缺陷类型分布
             image_defect_types = {}
             for defect in defect_types:
                 image_name = defect['image']
@@ -820,21 +823,56 @@ class DefectTextureAnalyzer:
                 
                 image_defect_types[image_name].append(main_type)
             
-            # 缺陷严重程度排序（从高到低）
-            # 注意：一个样本的缺陷类型由最严重的缺陷区域类型决定，而不是数量最多的缺陷类型
-            severity_order = {
-                "严重损坏": 4,  # 最严重
-                "中度缺陷": 3,
-                "轻度异常": 2,
-                "轻微污染": 1   # 最轻微
-            }
-            
-            # 对每个图像，确定主要缺陷类型（基于最严重的缺陷类型）
+            # 定义缺陷类型晋升规则
+            def determine_sample_type(defect_counts):
+                """基于缺陷数量分布确定样本的最终缺陷类型，实现缺陷类型的晋升"""
+                # 将缺陷类型计数转换为字典
+                counts = Counter(defect_counts)
+                
+                # 将多个低级别缺陷转换为少量高级别缺陷
+                # 1. 先统计各类型实际数量
+                light_pollution_count = counts.get("轻微污染", 0)  # 轻微污染数量
+                light_anomaly_count = counts.get("轻度异常", 0)    # 轻度异常数量
+                moderate_defect_count = counts.get("中度缺陷", 0)  # 中度缺陷数量
+                severe_damage_count = counts.get("严重损坏", 0)    # 严重损坏数量
+                
+                print(f"原始缺陷统计 - 轻微污染: {light_pollution_count}, 轻度异常: {light_anomaly_count}, 中度缺陷: {moderate_defect_count}, 严重损坏: {severe_damage_count}")
+                
+                # 2. 转换计算 - 实现"2个低级别=1个高级别"的转换逻辑
+                # 轻微污染转换为轻度异常
+                extra_light_anomaly = light_pollution_count // 2
+                light_anomaly_count += extra_light_anomaly
+                
+                # 轻度异常转换为中度缺陷
+                extra_moderate_defect = light_anomaly_count // 2
+                moderate_defect_count += extra_moderate_defect
+                
+                # 中度缺陷转换为严重损坏
+                extra_severe_damage = moderate_defect_count // 2
+                severe_damage_count += extra_severe_damage
+                
+                print(f"转换后缺陷统计 - 轻度异常: {light_anomaly_count}, 中度缺陷: {moderate_defect_count}, 严重损坏: {severe_damage_count}")
+                
+                # 3. 确定最终缺陷类型（取最严重的类型）
+                if severe_damage_count > 0:
+                    return "严重损坏"
+                elif moderate_defect_count > 0:
+                    return "中度缺陷"
+                elif light_anomaly_count > 0:
+                    return "轻度异常"
+                else:
+                    return "轻微污染"
+                        
+            # 对每个图像，综合考虑所有缺陷区域确定主要缺陷类型
             image_main_type = {}
             for image_name, types in image_defect_types.items():
-                # 找出该图像中最严重的缺陷类型
-                most_severe_type = max(types, key=lambda t: severity_order.get(t, 0))
-                image_main_type[image_name] = most_severe_type
+                # 应用晋升规则，而非仅取最严重的单个缺陷
+                final_type = determine_sample_type(types)
+                image_main_type[image_name] = final_type
+                
+                # 打印每个样本的缺陷分布和最终判定结果
+                type_counts = Counter(types)
+                print(f"样本[{image_name}]缺陷分布: {dict(type_counts)}，最终判定为: {final_type}")
             
             # 统计每种主要缺陷类型有多少个样本
             sample_main_type_counts = Counter(image_main_type.values())
@@ -1265,19 +1303,19 @@ class DefectTextureAnalyzer:
                     print(f"生成区域统计图表时出错: {str(e)}")
             
             # 2. 生成缺陷类型分布饼图
-            texture_counts = report['texture_analysis']['texture_counts']
-            if texture_counts:
+            sample_main_type_counts = report['texture_analysis'].get('sample_main_type_counts', {})
+            if sample_main_type_counts:
                 try:
                     # 创建缺陷类型分布的饼图
                     plt.figure(figsize=(7, 5))
-                    labels = list(texture_counts.keys())
-                    sizes = list(texture_counts.values())
+                    labels = list(sample_main_type_counts.keys())
+                    sizes = list(sample_main_type_counts.values())
                     colors = ['#1976D2', '#4CAF50', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FFEB3B'][:len(labels)]
                     
                     plt.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', 
                             shadow=False, startangle=90, textprops={'fontsize': 10})
                     plt.axis('equal')
-                    plt.title('缺陷类型分布', fontsize=12)
+                    plt.title('缺陷类型分布（基于样本数量）', fontsize=12)
                     
                     # 保存饼图文件
                     os.makedirs(self.report_path, exist_ok=True)
@@ -1723,7 +1761,8 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
                     content.append(Paragraph(f"加载缺陷类型饼图失败: {str(e)}", styles['ReportNormal']))
             
             # 获取主要缺陷类型
-            main_texture = max(texture_counts.items(), key=lambda x: x[1])[0]
+            sample_main_type_counts = report_data['texture_analysis'].get('sample_main_type_counts', {})
+            main_texture = max(sample_main_type_counts.items(), key=lambda x: x[1])[0]
             content.append(Paragraph(f"主要缺陷类型: {main_texture}", styles['ReportNormal']))
             content.append(Spacer(1, 0.2*cm))
             
@@ -1792,11 +1831,15 @@ def generate_pdf_report(report_data, report_path, chart_file=None, histogram_cha
                 "轻微污染": 1
             }
             
+            # 使用样本数量来确定主要缺陷类型
+            sample_main_type_counts = report_data['texture_analysis'].get('sample_main_type_counts', {})
+            total_samples = sum(sample_main_type_counts.values())
+            
             # 按照严重程度排序
-            sorted_textures = sorted(texture_counts.items(), key=lambda x: severity_order.get(x[0], 0), reverse=True)
+            sorted_textures = sorted(sample_main_type_counts.items(), key=lambda x: severity_order.get(x[0], 0), reverse=True)
             main_texture = sorted_textures[0][0]  # 最严重的缺陷类型
             main_texture_count = sorted_textures[0][1]
-            texture_ratio = main_texture_count / sum(texture_counts.values())
+            texture_ratio = main_texture_count / total_samples if total_samples > 0 else 0
             
             # 收集所有出现的缺陷类型
             all_defect_types = []
