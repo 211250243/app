@@ -37,7 +37,7 @@
 </string>
     </property>
     <property name="currentIndex">
-     <number>3</number>
+     <number>0</number>
     </property>
     <property name="iconSize">
      <size>
@@ -1882,7 +1882,7 @@ QPushButton:pressed {
        <property name="geometry">
         <rect>
          <x>70</x>
-         <y>5</y>
+         <y>3</y>
          <width>60</width>
          <height>28</height>
         </rect>
@@ -1915,7 +1915,7 @@ QPushButton:pressed {
        <property name="geometry">
         <rect>
          <x>140</x>
-         <y>5</y>
+         <y>3</y>
          <width>60</width>
          <height>28</height>
         </rect>
@@ -1978,7 +1978,7 @@ QPushButton:pressed {
        <property name="geometry">
         <rect>
          <x>210</x>
-         <y>5</y>
+         <y>3</y>
          <width>60</width>
          <height>28</height>
         </rect>
@@ -3459,7 +3459,7 @@ QPushButton:pressed {
           <property name="geometry">
            <rect>
             <x>70</x>
-            <y>5</y>
+            <y>0</y>
             <width>60</width>
             <height>28</height>
            </rect>
@@ -3492,7 +3492,7 @@ QPushButton:pressed {
           <property name="geometry">
            <rect>
             <x>140</x>
-            <y>5</y>
+            <y>0</y>
             <width>60</width>
             <height>28</height>
            </rect>
@@ -3555,7 +3555,7 @@ QPushButton:pressed {
           <property name="geometry">
            <rect>
             <x>210</x>
-            <y>5</y>
+            <y>0</y>
             <width>60</width>
             <height>28</height>
            </rect>
