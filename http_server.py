@@ -936,7 +936,7 @@ class PatchCoreParamMapper_Http:
         # 训练速度选项 - 影响多个参数以全面控制训练性能和质量
         self.training_speed_options = {
             "快速": {
-                "embed_dimension_factor": 0.9, # 减小嵌入维度以加快训练
+                "embed_dimension_factor": 0.8, # 减小嵌入维度以加快训练
                 "end_acc_delta": -0.01 # 降低结束精度要求
             },
             "均衡": {
@@ -944,7 +944,7 @@ class PatchCoreParamMapper_Http:
                 "end_acc_delta": 0.0 # 不修改结束精度
             },
             "慢速高质量": {
-                "embed_dimension_factor": 1.1, # 增大嵌入维度以提高质量
+                "embed_dimension_factor": 1.2, # 增大嵌入维度以提高质量
                 "end_acc_delta": 0.01 # 提高结束精度要求
             }
         }
