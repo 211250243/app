@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 patchcore_inspection/
 服务端/
+*.zip
