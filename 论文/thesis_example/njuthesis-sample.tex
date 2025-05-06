@@ -693,7 +693,7 @@ ChatGLM3-6B-NiuTrans & 26.8861         & 46.2848          & 22.3509          & 4
 
 \begin{figure}[h]
     \centering
-    {\linespread{1.0}
+    {\linespread{1.0} % 设置行间距
     \begin{lstlisting}[   
     language=Python, 
     style=pycharm,
@@ -853,7 +853,7 @@ $Temperature$采样是用于调节Softmax函数输出分布的参数。在生成
 ChatGLM3-6B的代码实现的应用场景为聊天机器人，而聊天机器人要求模型的输出文本应当有足够的随机性和趣味性，因此在其代码中超参数的默认取值为$Top_p$=0.7、$Temperature$=0.95、不设置$Top_k$。在文言文-现代文翻译任务上需要模型输出保持一定的质量和准确性，如此高的采样概率显然是没必要的，因此我们针对超参数在验证集上进行对比实验，通过按顺序调整$Top_k$、$Temperature$、$Top_p$来尝试获得最好的生成效果下的参数，实验结果如表\ref{scorecanshu}、单个参数的分数变化图如\ref{topp}、\ref{temp}、\ref{topk}所示：
 
 \begin{table}[]
-\renewcommand\arraystretch{1.5}
+\renewcommand\arraystretch{1.5} % 设置表格行高
 \caption{不同的超参数在验证集上的分数}
 \label{scorecanshu}
 \begin{tabular}{|l|l|l|l|l|}

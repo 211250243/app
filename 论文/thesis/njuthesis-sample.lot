@@ -1,0 +1,18 @@
+\addvspace {10.0pt}
+\addvspace {10.0pt}
+\addvspace {10.0pt}
+\contentsline {table}{\numberline {3-1}{\ignorespaces 缺陷检测项目管理用例}}{16}{table.caption.11}%
+\contentsline {table}{\numberline {3-2}{\ignorespaces 训练样本管理用例}}{17}{table.caption.12}%
+\contentsline {table}{\numberline {3-3}{\ignorespaces 无监督学习模型训练用例}}{18}{table.caption.13}%
+\contentsline {table}{\numberline {3-4}{\ignorespaces 无监督缺陷检测用例}}{19}{table.caption.14}%
+\contentsline {table}{\numberline {3-5}{\ignorespaces AI辅助检测分析用例}}{20}{table.caption.15}%
+\contentsline {table}{\numberline {3-6}{\ignorespaces 缺陷检测结果报告用例}}{21}{table.caption.16}%
+\addvspace {10.0pt}
+\contentsline {table}{\numberline {4-1}{\ignorespaces API接口说明}}{47}{table.caption.46}%
+\contentsline {table}{\numberline {4-2}{\ignorespaces 模型相关API接口说明}}{47}{table.caption.47}%
+\contentsline {table}{\numberline {4-3}{\ignorespaces 样本组相关API接口说明}}{48}{table.caption.48}%
+\addvspace {10.0pt}
+\contentsline {table}{\numberline {5-1}{\ignorespaces 不同精度级别下异常检测的性能对比。其中，ACC\_LEVEL 为所选精度级别，I-AUROC 为图像级 AUROC，P-AUROC 为像素级 AUROC，TIME 为单张样本检测耗时。}}{55}{table.caption.53}%
+\contentsline {table}{\numberline {5-2}{\ignorespaces 不同速度级别下异常检测的性能对比。其中，SPEED\_LEVEL 为所选速度级别，I-AUROC 为图像级 AUROC，P-AUROC 为像素级 AUROC，TIME 为单张样本检测耗时。}}{55}{table.caption.54}%
+\contentsline {table}{\numberline {5-3}{\ignorespaces 不同缺陷类别下 AI 辅助判定缺陷存在性与定位缺陷的性能。其中，DEFECT\_CLASS 为样本缺陷类别，EXISTANCE\_ACC 为异常存在性准确率，POSITION\_ACC 为缺陷位置准确率。}}{55}{table.caption.55}%
+\addvspace {10.0pt}

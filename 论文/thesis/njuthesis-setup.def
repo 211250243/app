@@ -26,11 +26,11 @@
     % 作者英文姓名
     % 一般使用拼音
     %
-    keywords = {计算机视觉,无监督深度学习,工业缺陷检测,自动化检测,缺陷检测系统},
+    keywords = {计算机视觉, 无监督深度学习, 工业缺陷检测, 自动化检测, 缺陷检测系统},
     % 中文关键词列表
     % 使用英文半角逗号(,)分隔
     %
-    keywords* = {Computer Vision,Unsupervised Deep Learning,Industrial Defect Detection,Automatic Detection,Defect Detection System},
+    keywords* = {Computer Vision, Unsupervised Deep Learning, Industrial Defect Detection, Automated Detection, Defect Detection System},
     % 英文关键词
     % 使用英文半角逗号(,)分隔
     %
@@ -43,7 +43,7 @@
     % 本模板并不会自动更正大小写
     %
     department = {软件学院},
-    department* = {School of Software},
+    department* = {Software Institute},
     % 院系
     %
     major = {软件工程},
@@ -58,12 +58,12 @@
     % 导师全称
     % 使用英文半角逗号(,)分隔中文姓名和职称
     %
-    % supervisor-ii = {葛季栋,副教授},
-    % supervisor-ii* = {Associate professor My Second Supervisor},
+    supervisor-ii = {葛季栋,副教授},
+    supervisor-ii* = {Associate Professor Ge Jidong},
     % 第二导师全称
     % 如果确实没有第二导师，不填写即可
     %
-    submit-date = {2025-03-31},
+    submit-date = {2025-05-07},
     % 提交日期
     % 格式为 yyyy-mm-dd
     % 不填就是编译当天日期
@@ -105,7 +105,7 @@
     % 格式为 yyyy-mm-dd
     % 不填就是编译当天日期
     %
-    email = {nie@smail.nju.edu.cn},
+    email = {nieercong@outlook.com},
     % 电子邮箱地址
     % 只用于出版授权书
     %

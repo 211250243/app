@@ -1,0 +1,44 @@
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {1-1}{\ignorespaces HALCON系统进行缺陷检测的界面}}{4}{figure.caption.6}%
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {2-1}{\ignorespaces SimpleNet概述。在训练阶段，样本被送入预训练的特征提取器以获取局部特征。然后，利用特征适配器将预训练的特征适配到目标域，并通过添加高斯噪声来合成异常特征。最后分别用作正样本和负样本来训练鉴别器。另外，推断时会移除异常特征生成器。}}{8}{figure.caption.7}%
+\contentsline {figure}{\numberline {2-2}{\ignorespaces 在 MVTec AD 基准测试中推理速度(FPS)与 I-AUROC 的对比。SimpleNet 在准确性和效率上都远远超过了以前的所有方法。}}{9}{figure.caption.8}%
+\contentsline {figure}{\numberline {2-3}{\ignorespaces AnomalyGPT、现有 IAD 方法和现有 LVLMs 之间的比较。现有的 IAD 方法只能提供异常分数，需要手动设置阈值，而现有的 LVLMs 无法检测图像中的异常。AnomalyGPT 不仅能提供图像信息，还能指示异常的存在和位置。}}{10}{figure.caption.9}%
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {3-1}{\ignorespaces 系统用例图}}{15}{figure.caption.10}%
+\contentsline {figure}{\numberline {3-2}{\ignorespaces 系统总体架构设计图}}{22}{figure.caption.17}%
+\contentsline {figure}{\numberline {3-3}{\ignorespaces “4+1” 视图}}{23}{figure.caption.18}%
+\contentsline {figure}{\numberline {3-4}{\ignorespaces 逻辑视图}}{24}{figure.caption.19}%
+\contentsline {figure}{\numberline {3-5}{\ignorespaces 物理视图}}{24}{figure.caption.20}%
+\contentsline {figure}{\numberline {3-6}{\ignorespaces 过程视图}}{25}{figure.caption.21}%
+\contentsline {figure}{\numberline {3-7}{\ignorespaces 开发视图}}{26}{figure.caption.22}%
+\contentsline {figure}{\numberline {3-8}{\ignorespaces 模块划分图}}{27}{figure.caption.23}%
+\contentsline {figure}{\numberline {3-9}{\ignorespaces E-R图}}{28}{figure.caption.24}%
+\contentsline {figure}{\numberline {3-10}{\ignorespaces 样本组表}}{28}{figure.caption.25}%
+\contentsline {figure}{\numberline {3-11}{\ignorespaces 样本表}}{29}{figure.caption.26}%
+\contentsline {figure}{\numberline {3-12}{\ignorespaces 模型表}}{29}{figure.caption.27}%
+\contentsline {figure}{\numberline {3-13}{\ignorespaces 检测结果表}}{30}{figure.caption.28}%
+\contentsline {figure}{\numberline {3-14}{\ignorespaces 模型训练样本表}}{30}{figure.caption.29}%
+\contentsline {figure}{\numberline {3-15}{\ignorespaces 模型推理样本表}}{31}{figure.caption.30}%
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {4-1}{\ignorespaces 开始界面}}{34}{figure.caption.31}%
+\contentsline {figure}{\numberline {4-2}{\ignorespaces 项目结构图}}{35}{figure.caption.32}%
+\contentsline {figure}{\numberline {4-3}{\ignorespaces 样本界面}}{36}{figure.caption.33}%
+\contentsline {figure}{\numberline {4-4}{\ignorespaces 样本组列表}}{36}{figure.caption.34}%
+\contentsline {figure}{\numberline {4-5}{\ignorespaces 裁剪画面}}{38}{figure.caption.35}%
+\contentsline {figure}{\numberline {4-6}{\ignorespaces 模型界面}}{39}{figure.caption.36}%
+\contentsline {figure}{\numberline {4-7}{\ignorespaces 参数设置}}{39}{figure.caption.37}%
+\contentsline {figure}{\numberline {4-8}{\ignorespaces 训练进度}}{40}{figure.caption.38}%
+\contentsline {figure}{\numberline {4-9}{\ignorespaces 检测界面}}{41}{figure.caption.39}%
+\contentsline {figure}{\numberline {4-10}{\ignorespaces 检测过程}}{42}{figure.caption.40}%
+\contentsline {figure}{\numberline {4-11}{\ignorespaces AI对话}}{42}{figure.caption.41}%
+\contentsline {figure}{\numberline {4-12}{\ignorespaces 可视化分析标签页，又为检测报告界面，包含缺陷位置分布图}}{43}{figure.caption.42}%
+\contentsline {figure}{\numberline {4-13}{\ignorespaces 区域特征分布图}}{44}{figure.caption.43}%
+\contentsline {figure}{\numberline {4-14}{\ignorespaces 统计数据标签页。包含缺陷类型分布图}}{45}{figure.caption.44}%
+\contentsline {figure}{\numberline {4-15}{\ignorespaces 详细信息标签页}}{46}{figure.caption.45}%
+\contentsline {figure}{\numberline {4-16}{\ignorespaces 加载进度}}{48}{figure.caption.49}%
+\contentsline {figure}{\numberline {4-17}{\ignorespaces 加载动画}}{49}{figure.caption.50}%
+\contentsline {figure}{\numberline {4-18}{\ignorespaces 流程引导界面}}{50}{figure.caption.51}%
+\addvspace {10.0pt}
+\contentsline {figure}{\numberline {5-1}{\ignorespaces MVTec 异常检测数据集的五个纹理和十个对象类别的示例图像。对于每个类别，都显示了一个无异常和异常的示例。上面一行显示了输入图像，下面一行是特写视图。}}{53}{figure.caption.52}%
+\addvspace {10.0pt}
