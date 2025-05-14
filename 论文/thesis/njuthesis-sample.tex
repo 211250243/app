@@ -125,7 +125,11 @@
 \raggedbottom
 
 \begin{abstract}
-产品质量是工业制造的基础，随着工业制造智能化的发展，对于产品质量检测的高效性与准确性的要求越来越高，而缺陷检测正是工业产品质量检测中不可或缺的一环，它保障了如金属、芯片、纺织物等各种工业制品的质量。众所周知，传统的人工检测方法存在效率低、成本高、稳定性差等缺点，注定会被更高效、经济的检测方法所替代。近年来，随着计算机视觉、工业成像、深度学习等领域的兴起，基于视觉的工业缺陷检测取得了重大突破，也为检测方法的更新迭代提供了可能——构建神经网络训练样本并提取其特征，以实现自动化缺陷检测。最初，基于有监督深度学习的缺陷检测需要大量带标注的缺陷数据，这些标注数据不仅难以获得、成本高，且泛化能力弱，已不能满足当前主流的工业生产需求，于是基于无监督深度学习的缺陷检测方法应运而生。无监督学习仅依据正常样本进行，通过挖掘特征实现对缺陷的识别，无疑更适合复杂的工业场景，逐渐成为研究的热点。然而，现有的无监督系统通常存在样本与模型缺乏管理、检测流程及参数配置复杂、辅助信息有限、界面布局混乱以及功能模块割裂等问题，难以满足工业场景快速部署的需求。因此，本课题基于开源项目 SimpleNet 和 AnomalyGPT，结合工业检测实际需求，设计并实现了集样本管理、模型训练、缺陷检测模块于一体的基于无监督学习的缺陷检测系统，旨在降低对标注数据的依赖，提高检测的灵活性，同时通过模块化设计与功能优化，提升系统的易用性与适应性。具体研究内容如下：
+产品质量是工业制造的基础，随着工业制造智能化的发展，对于产品质量检测的高效性与准确性的要求越来越高，而缺陷检测正是工业产品质量检测中不可或缺的一环，它保障了如金属、芯片、纺织物等各种工业制品的质量。
+
+众所周知，传统的人工检测方法存在效率低、成本高、稳定性差等缺点，注定会被更高效、经济的检测方法所替代。近年来，随着计算机视觉、工业成像、深度学习等领域的兴起，基于视觉的工业缺陷检测取得了重大突破，也为检测方法的更新迭代提供了可能——构建神经网络训练样本并提取其特征，以实现自动化缺陷检测。最初，基于有监督深度学习的缺陷检测需要大量带标注的缺陷数据，这些标注数据不仅难以获得、成本高，且泛化能力弱，已不能满足当前主流的工业生产需求，于是基于无监督深度学习的缺陷检测方法应运而生。
+
+无监督学习仅依据正常样本进行，通过挖掘特征实现对缺陷的识别，无疑更适合复杂的工业场景，逐渐成为研究的热点。然而，现有的无监督系统通常存在样本与模型缺乏管理、检测流程及参数配置复杂、辅助信息有限、界面布局混乱以及功能模块割裂等问题，难以满足工业场景快速部署的需求。因此，本课题基于开源项目 SimpleNet 和 AnomalyGPT，结合工业检测实际需求，设计并实现了集样本管理、模型训练、缺陷检测模块于一体的基于无监督学习的缺陷检测系统，旨在降低对标注数据的依赖，提高检测的灵活性，同时通过模块化设计与功能优化，提升系统的易用性与适应性。具体研究内容如下：
 
 1. 针对样本类型多种多样、样本数量稀缺、样本质量参差不齐等问题，本课题设计了由动态样本组管理、数据增强与样本编辑操作等部分构建的样本组管理模块。
 
@@ -135,7 +139,11 @@
 \end{abstract}
 
 \begin{abstract*}
-Product quality is the foundation of industrial manufacturing. With the development of intelligent industrial manufacturing, there is an increasing demand for efficiency and accuracy in product quality inspection. Defect detection is an indispensable part of industrial product quality inspection, ensuring the quality of various industrial products such as metals, chips, textiles, etc. It is well known that traditional manual detection methods have disadvantages such as low efficiency, high cost, and poor stability, which will inevitably be replaced by more efficient and economical detection methods. In recent years, with the rise of computer vision, industrial imaging, deep learning and other fields, vision-based industrial defect detection has made significant breakthroughs, providing possibilities for updating detection methods—constructing neural network training samples and extracting their features to achieve automated defect detection. Initially, defect detection based on supervised deep learning required a large amount of annotated defect data, which was not only difficult to obtain, costly, but also had weak generalization ability, and could no longer meet the needs of current mainstream industrial production. Thus, defect detection methods based on unsupervised deep learning emerged. Unsupervised learning relies only on normal samples, identifying defects by mining features, which is undoubtedly more suitable for complex industrial scenarios and has gradually become a research hotspot. However, existing unsupervised systems often suffer from problems such as lack of sample and model management, complex detection processes and parameter configurations, limited auxiliary information, chaotic interface layouts, and fragmented functional modules, making it difficult to meet the rapid deployment needs in industrial scenarios. Therefore, based on the open-source projects SimpleNet and AnomalyGPT, and combined with practical industrial inspection requirements, this study designed and implemented a defect detection system based on unsupervised learning that integrates sample management, model training, and defect detection modules. It aims to reduce dependence on annotated data, improve detection flexibility, and enhance system usability and adaptability through modular design and functional optimization. The specific research contents are as follows:
+Product quality is the foundation of industrial manufacturing. With the development of intelligent industrial manufacturing, there is an increasing demand for efficiency and accuracy in product quality inspection. Defect detection is an indispensable part of industrial product quality inspection, ensuring the quality of various industrial products such as metals, chips, textiles, etc. 
+
+It is well known that traditional manual detection methods have disadvantages such as low efficiency, high cost, and poor stability, which will inevitably be replaced by more efficient and economical detection methods. In recent years, with the rise of computer vision, industrial imaging, deep learning and other fields, vision-based industrial defect detection has made significant breakthroughs, providing possibilities for updating detection methods—constructing neural network training samples and extracting their features to achieve automated defect detection. Initially, defect detection based on supervised deep learning required a large amount of annotated defect data, which was not only difficult to obtain, costly, but also had weak generalization ability, and could no longer meet the needs of current mainstream industrial production. Thus, defect detection methods based on unsupervised deep learning emerged. 
+
+Unsupervised learning relies only on normal samples, identifying defects by mining features, which is undoubtedly more suitable for complex industrial scenarios and has gradually become a research hotspot. However, existing unsupervised systems often suffer from problems such as lack of sample and model management, complex detection processes and parameter configurations, limited auxiliary information, chaotic interface layouts, and fragmented functional modules, making it difficult to meet the rapid deployment needs in industrial scenarios. Therefore, based on the open-source projects SimpleNet and AnomalyGPT, and combined with practical industrial inspection requirements, this study designed and implemented a defect detection system based on unsupervised learning that integrates sample management, model training, and defect detection modules. It aims to reduce dependence on annotated data, improve detection flexibility, and enhance system usability and adaptability through modular design and functional optimization. The specific research contents are as follows:
 
 1. Addressing issues of diverse sample types, scarce sample quantities, and varying sample quality, this study designed a sample group management module consisting of dynamic sample group management, data augmentation, and sample editing operations.
 
@@ -160,9 +168,9 @@ Product quality is the foundation of industrial manufacturing. With the developm
 
 \section{研究背景及意义}
 
-在人类现代社会生活的各个方面，不论是衣食住行，亦或是晨昏四季，工业制品都无处不在。《中国制造 2025》行动纲领指出，建设制造强国任务艰巨而紧迫，需要加速推进信息化与工业化的深度融合，推进生产过程的智能化\cite{[1]}。众所周知，在工业制造智能化进程中，产品质量的把控始终是提升工业生产经济效益的关键环节，而这一环离不开产品的缺陷检测。通过缺陷检测能够有效把控产品质量、检测流水线机器的工作状态以及评估生产制造技术的优良，对提高产品质量和生产效率、降低生产成本有着至关重要的作用\cite{[2]}。因此，基于视觉的工业缺陷检测不仅有非常重要的研究价值，同时也拥有广阔的应用前景\cite{[1]}。在传统的工业生产过程，缺陷检测主要依靠人工视觉，不仅具有检测效率低、误检率和漏检率高、人工成本高、实时性差、主观误差高的缺点，还有接触损伤的风险。同时，在缺陷尺寸小于 0.5 mm 且无较大光学形变时，人眼检测不到缺陷信息，不适用于大规模工业生产的要求\cite{[3]}。
+在人类现代社会生活的各个方面，不论是衣食住行，亦或是晨昏四季，工业制品都无处不在。《中国制造 2025》行动纲领指出，建设制造强国任务艰巨而紧迫，需要加速推进信息化与工业化的深度融合，推进生产过程的智能化\cite{[1]}。众所周知，在工业制造智能化进程中，产品质量的把控始终是提升工业生产经济效益的关键环节，而这一环离不开产品的缺陷检测。通过缺陷检测能够有效把控产品质量、检测流水线机器的工作状态以及评估生产制造技术的优良，对提高产品质量和生产效率、降低生产成本有着至关重要的作用\cite{[2]}。因此，基于视觉的工业缺陷检测不仅有非常重要的研究价值，同时也拥有广阔的应用前景\cite{[1]}。在传统的工业生产过程，缺陷检测主要依靠人工视觉，不仅具有检测效率低、误检率和漏检率高、人工成本高、实时性差、主观误差高的缺点，还有接触损伤的风险\cite{[3]}。同时，在缺陷尺寸小于 0.5 mm 且无较大光学形变时，人眼检测不到缺陷信息，不适用于大规模工业生产的要求\cite{[4]}。
 
-后来，随着计算机图像处理技术的突破，机器视觉有效地解决了缺陷检测中人工的弊端。机器视觉检测技术是一种非接触式的自动检测技术，具有安全可靠、检测精度高、可在复杂的生产环境中长时间运行等优点，是实现工厂生产自动化和智能化的一种有效方法\cite{[4]}。因而机器视觉逐渐取代人工视觉，成为工业缺陷检测的主力。目前，基于机器视觉的缺陷检测技术已广泛应用于工业产品的质量检测、分类检测和包装检测等，涉及钢板、玻璃、印刷、电子、纺织品、零件、木材、钢轨、瓷砖等多种关系国计民生的行业和产品\cite{[5]}。
+后来，随着计算机图像处理技术与视觉传感技术的突破，机器视觉有效地解决了缺陷检测中人工的弊端，凭借其高效率、高精度、低成本等优势在工业检测领域中被广泛研究\cite{[5]}。机器视觉检测技术是一种非接触式的自动检测技术，具有安全可靠、检测精度高、可在复杂的生产环境中长时间运行等优点，是实现工厂生产自动化和智能化的一种有效方法\cite{[6]}。因而机器视觉逐渐取代人工视觉，成为工业缺陷检测的主力。目前，基于机器视觉的缺陷检测技术已广泛应用于工业产品的质量检测、分类检测和包装检测等，涉及钢板、玻璃、印刷、电子、纺织品、零件、木材、钢轨、瓷砖等多种关系国计民生的行业和产品\cite{[7]}。
 
 然而，基于规则的传统图像处理算法往往只适用于特定场景，对于纹理背景复杂、缺陷类型多样化的工业场景来说有待提升。随着深度学习的发展，有监督学习方法通过其理解和提取产品缺陷特征方面的优势，在检测精度和检测速度上取得了双重突破，但这类方法存在两个问题：一是工业场景中缺陷样本数量稀少，收集大量带标注的缺陷样本成本高昂；二是工业生产过程复杂，缺陷模式和类型变幻莫测，基于有监督学习的缺陷检测模型对未训练过的新型缺陷类型泛化能力不足，难以适应快速变化的生产工艺。
 
@@ -176,9 +184,9 @@ Product quality is the foundation of industrial manufacturing. With the developm
 
 工业缺陷检测技术经历了从人工检测到计算机视觉自动检测的发展历程。随着深度学习技术的发展，缺陷检测也经历了从传统图像处理方法到无监督深度学习方法的演进。本节将对工业缺陷检测方法的三个研究阶段展开介绍。
 
-在深度学习技术尚未兴起之时，产品表面缺陷检测方法可划分为基于传统图像处理的方法和基于机器学习的方法。基于图像处理的缺陷检测主要分为图像预处理和缺陷检测两个部分，图像预处理包括图像去噪和图像分割等算法，是缺陷检测的前期工作，缺陷检测部分主要利用图像特征提取或模板匹配算法完成对缺陷的检测\cite{[4]}。基于机器学习的缺陷检测方法通常使用支持向量机(SVM)、随机森林(Random Forest)等算法对缺陷进行分类，取得了较好的缺陷识别和分类效果。然而，此类方法一般依赖于人为设定的环境，仅适用于简单场景和规则缺陷，无法直接应用于实际复杂的工业生产环境。
+在深度学习技术尚未兴起之时，产品表面缺陷检测方法可划分为基于传统图像处理的方法和基于机器学习的方法\cite{[8]}。基于图像处理的缺陷检测主要分为图像预处理和缺陷检测两个部分，图像预处理包括图像去噪和图像分割等算法，是缺陷检测的前期工作，缺陷检测部分主要利用图像特征提取或模板匹配算法完成对缺陷的检测\cite{[6]}。基于机器学习的缺陷检测方法通常使用支持向量机(SVM)、随机森林(Random Forest)等算法对缺陷进行分类，取得了较好的缺陷识别和分类效果。然而，此类方法一般依赖于人为设定的环境，仅适用于简单场景和规则缺陷，无法直接应用于实际复杂的工业生产环境。
 
-随着深度学习技术在机器视觉领域的发展，以卷积神经网络(CNN)为代表的深度学习方法开始占据工业缺陷检测领域的主导地位，缺陷检测不再需要手动提取特征。目前较为典型的基于深度学习的缺陷检测方法包括基于卷积神经网络的缺陷检测方法、基于深度信任网络(DBN)的缺陷检测方法、基于自编码器(AE)的缺陷检测方法等。其中，前两者属于有监督深度学习，后者属于无监督深度学习\cite{[4]}。有监督学习算法，如 Faster R-CNN、YOLO 系列算法在缺陷定位与分类中表现良好，但依赖大量标注数据，而工业领域中缺陷数据往往难以获取且成本高昂。
+随着深度学习技术在机器视觉领域的发展，以卷积神经网络(CNN)为代表的深度学习方法开始占据工业缺陷检测领域的主导地位，缺陷检测不再需要手动提取特征。目前较为典型的基于深度学习的缺陷检测方法包括基于卷积神经网络的缺陷检测方法、基于深度信任网络(DBN)的缺陷检测方法、基于自编码器(AE)的缺陷检测方法等。其中，前两者属于有监督深度学习，后者属于无监督深度学习\cite{[6]}。有监督学习算法，如 Faster R-CNN、YOLO 系列算法在缺陷定位与分类中表现良好，但依赖大量标注数据，而工业领域中缺陷数据往往难以获取且成本高昂。
 
 针对深度学习中缺陷样本过少的问题，基于无监督学习的缺陷检测方法被提出并逐步推广。无监督缺陷检测方法是利用正常样本训练，学习其分布模式，来检测缺陷的。它不依赖于标注数据，不受限于缺陷类型。根据数据处理与比较的维度不同，无监督方法可以分为基于图像相似度的方法和基于特征相似度的方法。前者包括自编码器(AE)、变分自编码器(VAE)和生成对抗网络(GAN)等，后者包括深度一类分类、流模型和教师-学生架构等\cite{[1]}。
 
@@ -236,17 +244,17 @@ Product quality is the foundation of industrial manufacturing. With the developm
 
 \subsection{缺陷与异常的概念}
 
-缺陷是产品表面的物理瑕疵，如裂纹、划痕和凹陷，而异常是图像中不符合正常模式的部分，包括颜色、纹理或形状的异常变化\cite{[6]}。在工业上的缺陷检测中，缺陷通常被视作异常。因而，本课题中“缺陷”是指在实际生产过程中，受工艺流程、生产设备和现场环境等因素的影响，造成产品表面出现的各种异常\cite{[4]}，如瓶底表面的裂纹、划痕，木板表面的磨损，皮革表面的污渍，螺母表面的锈迹等。这些缺陷不仅影响产品的外观，还可能影响其功能和使用寿命，甚至产生一系列安全隐患。
+缺陷是产品表面的物理瑕疵，如裂纹、划痕和凹陷，而异常是图像中不符合正常模式的部分，包括颜色、纹理或形状的异常变化\cite{[9]}。在工业上的缺陷检测中，缺陷通常被视作异常。因而，本课题中“缺陷”是指在实际生产过程中，由于生产设备、工艺流程、生产环境等各因素的影响，造成产品表面出现的各种异常\cite{[10]}，如瓶底表面的裂纹、划痕，木板表面的磨损，皮革表面的污渍，螺母表面的锈迹等。这些缺陷不仅影响产品的外观，还可能影响其功能和使用寿命，甚至产生一系列安全隐患。
 
-理论上缺陷检测系统是利用制品表面的光学物理性质，在特定的光学成像条件下，令缺陷表现出区别于背景的图像特征，然后通过图像处理技术和缺陷检测算法进行缺陷识别和定位\cite{[7]}。也就是说，完整的流程应该包括光学成像、图像预处理和缺陷检测三个部分，我们主要关注后两者。其中，图像预处理是指对采集的样本进行去噪、增强、分割、拼接等操作，将目标集中于感兴趣的区域，以提取缺陷区别于背景的特征。而缺陷检测在本课题中则是指使用基于无监督学习的缺陷检测算法进行缺陷识别和定位的过程。
+理论上缺陷检测系统是利用制品表面的光学物理性质，在特定的光学成像条件下，令缺陷表现出区别于背景的图像特征，然后通过图像处理技术和缺陷检测算法进行缺陷识别和定位\cite{[11]}。也就是说，完整的流程应该包括光学成像、图像预处理和缺陷检测三个部分，我们主要关注后两者。其中，图像预处理是指对采集的样本进行去噪、增强、分割、拼接等操作，将目标集中于感兴趣的区域，以提取缺陷区别于背景的特征。而缺陷检测在本课题中则是指使用基于无监督学习的缺陷检测算法进行缺陷识别和定位的过程。
 
-缺陷标注样本是指人工标注出缺陷区域，并提供缺陷的类型、位置、大小等信息的用于模型训练的样本。它们大量使用于有监督学习中，但在工业场景中难以收集，且成本高昂。这也是无监督学习方法能够快速发展的重要原因。但是由于工业流程的不断优化，缺陷样本的数量在减少，在数据集较小的情况下，模型很难从有限的数据中学习到足够的特征，导致模型的泛化能力较差 \cite{[8]}。数据增强是目前解决这一问题的常用方法，它通过对初始样本进行一系列随机变换，如裁剪、缩放、旋转、平移等操作，生成新的样本，从而增加样本数量。
+缺陷标注样本是指人工标注出缺陷区域，并提供缺陷的类型、位置、大小等信息的用于模型训练的样本。它们大量使用于有监督学习中，但在工业场景中难以收集，且成本高昂。这也是无监督学习方法能够快速发展的重要原因。但是由于工业流程的不断优化，缺陷样本的数量在减少，在数据集较小的情况下，模型很难从有限的数据中学习到足够的特征，导致模型的泛化能力较差 \cite{[12]}。数据增强是目前解决这一问题的常用方法，它通过对初始样本进行一系列随机变换，如裁剪、缩放、旋转、平移等操作，生成新的样本，从而增加样本数量。
 
 \section{SimpleNet}
 
 \subsection{SimpleNet 概述}
 
-SimpleNet\cite{[9]} 是中国科学技术大学提出的一个用于检测和定位图像异常区域的简单和应用友好的网络，它结合了合成型和嵌入型方法的优势，并做了一些改进：首先，使用特征适配器将预训练的特征转换为目标导向的特征以减少领域偏差，以适应工业产品图像。其次，在特征空间中向正常特征添加高斯噪声来生成合成异常，因为缺陷在图像空间中没有太多共性。简单来说就是工业缺陷表现形式多样，在图像层面难以找到统一的模式规律来合成逼真的缺陷，而在特征空间添加高斯噪声可以模拟各种特征偏移而不必关心具体缺陷形态。再者，通过简单的鉴别器来简化异常检测过程，提升计算效率。具体来说，如图 \ref{SimpleNet} 所示，在训练阶段，SimpleNet 先使用预训练的主干网络提取局部特征，然后通过特征适配器将特征转移到目标域，接着向正常特征添加高斯噪声以伪造异常特征，最后使用简单鉴别器训练特征并鉴别异常。
+SimpleNet\cite{[13]} 是中国科学技术大学提出的一个用于检测和定位图像异常区域的简单和应用友好的网络，它结合了合成型和嵌入型方法的优势，并做了一些改进：首先，使用特征适配器将预训练的特征转换为目标导向的特征以减少领域偏差，以适应工业产品图像。其次，在特征空间中向正常特征添加高斯噪声来生成合成异常，因为缺陷在图像空间中没有太多共性。简单来说就是工业缺陷表现形式多样，在图像层面难以找到统一的模式规律来合成逼真的缺陷，而在特征空间添加高斯噪声可以模拟各种特征偏移而不必关心具体缺陷形态。再者，通过简单的鉴别器来简化异常检测过程，提升计算效率。具体来说，如图 \ref{SimpleNet} 所示，在训练阶段，SimpleNet 先使用预训练的主干网络提取局部特征，然后通过特征适配器将特征转移到目标域，接着向正常特征添加高斯噪声以伪造异常特征，最后使用简单鉴别器训练特征并鉴别异常。
 
 \begin{figure}[ht]
     \centering
@@ -257,24 +265,17 @@ SimpleNet\cite{[9]} 是中国科学技术大学提出的一个用于检测和定
 
 \subsection{SimpleNet 分析}
 
-SimpleNet 能够检测到从细微变化到结构缺陷等不同程度的异常，适用于缺陷样本稀缺的工业场景。如图 \ref{MVTec基准测试结果}，SimpleNet 在 MVTec AD 数据集上的异常检测中 AUROC 高达 99.6\%，并且准确性与效率均远远超过以前的所有方法，满足了工业质检的实时性和质量要求。综上所述，SimpleNet 具有优异的性能和推理速度，且易于训练和应用，因此本课题使用它来构建工业场景下的无监督缺陷检测系统。
-
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.72\textwidth]{images/MVTec基准测试结果.png}
-    \caption{在 MVTec AD 基准测试中推理速度(FPS)与 I-AUROC 的对比}
-    \label{MVTec基准测试结果}
-\end{figure}
+SimpleNet 能够检测到从细微变化到结构缺陷等不同程度的异常，适用于缺陷样本稀缺的工业场景。SimpleNet 在 MVTec AD 数据集上的异常检测中 AUROC 高达 99.6\%，并且准确性与效率均远远超过以前的所有方法，满足了工业质检的实时性和质量要求。综上所述，SimpleNet 具有优异的性能和推理速度，且易于训练和应用，因此本课题使用它来构建工业场景下的无监督缺陷检测系统。
 
 \section{AnomalyGPT}
 
 \subsection{AnomalyGPT 概述}
 
-AnomalyGPT\cite{[10]} 是中国科学院提出的一种基于大型视觉语言模型(LVLMs)的工业异常检测(IAD)方法。如图 \ref{AnomalyGPT比较图} 所示，现有的 IAD 方法和 LVLMs 都不能很好地解决工业异常检测问题，比如前者只能提供异常分数，需要手动设置阈值，后者无法检测图像中的异常。而 AnomalyGPT 使用合成的异常视觉文本数据对 LVLM 进行微调，将 IAD 知识集成到模型中，加强了对图像内部细节的理解，不仅能提供图像信息，还能指示异常的存在和位置。作为第一个成功将 LVLM 应用到工业异常检测领域的方法，AnomalyGPT 的贡献如下：（1）无需手动调整阈值即可检测和定位异常，且支持多轮对话。（2）设计了一个轻量级的视觉文本特征匹配解码器，解决了大语言模型无法识别细粒度图像细节的问题，同时突破了输出形式的限制，以热图、文本结合的方式提供更多元的信息。（3）采用提示嵌入(prompt embedding)进行微调，并使用缺陷检测数据和 LVLM 的预训练数据进行训练，从而保留了 LVLM 所固有的上下文理解和对话管理能力，以支持多轮对话。最后，模型具有很强的可移植性，通过上下文少样本学习，即可快速适应新数据集。
+AnomalyGPT\cite{[14]} 是中国科学院提出的一种基于大型视觉语言模型(LVLMs)的工业异常检测(IAD)方法。如图 \ref{AnomalyGPT比较图} 所示，现有的 IAD 方法和 LVLMs 都不能很好地解决工业异常检测问题，比如前者只能提供异常分数，需要手动设置阈值，后者无法检测图像中的异常。而 AnomalyGPT 使用合成的异常视觉文本数据对 LVLM 进行微调，将 IAD 知识集成到模型中，加强了对图像内部细节的理解，不仅能提供图像信息，还能指示异常的存在和位置。作为第一个成功将 LVLM 应用到工业异常检测领域的方法，AnomalyGPT 的贡献如下：（1）无需手动调整阈值即可检测和定位异常，且支持多轮对话。（2）设计了一个轻量级的视觉文本特征匹配解码器，解决了大语言模型无法识别细粒度图像细节的问题，同时突破了输出形式的限制，以热图、文本结合的方式提供更多元的信息。（3）采用提示嵌入(prompt embedding)进行微调，并使用缺陷检测数据和 LVLM 的预训练数据进行训练，从而保留了 LVLM 所固有的上下文理解和对话管理能力，以支持多轮对话。最后，模型具有很强的可移植性，通过上下文少样本学习，即可快速适应新数据集。
 
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=0.75\textwidth]{images/AnomalyGPT、IAD、LVLMs比较图.png}
+    \includegraphics[width=0.75\textwidth]{images/AnomalyGPT演示.png}
     \caption{AnomalyGPT、现有 IAD 方法和现有 LVLMs 之间的比较}
     \label{AnomalyGPT比较图}
 \end{figure}
@@ -320,9 +321,9 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
 
 \subsection{系统目标}
 
-本系统是工业质检的辅助工具，旨在帮助质检人员方便、快捷、直观地识别工业产品表面的缺陷，同时能够平衡检测精度和速度，满足各种尺寸的缺陷检测需要。作为一款跨平台的桌面应用程序，系统的前端使用 Qt 框架和 PySide6 库开发，后端采用 FastAPI 框架和 MySQL 数据库。系统主要分为样本管理模块、模型训练模块、缺陷检测和报告模块，具有样本编辑管理、模型可视化训练、实时缺陷检测、AI智能判别和自动报告生成等功能。
+本系统是工业质检的辅助工具，旨在帮助质检人员方便、快捷、直观地识别工业产品表面的缺陷，同时能够平衡检测精度和速度，满足各种尺寸的缺陷检测需要。作为一款跨平台的桌面应用程序，系统的前端使用 Qt 框架和 PySide6 库开发，后端采用 FastAPI 框架和 MySQL 数据库。系统主要分为样本管理模块、模型训练模块、缺陷检测和报告模块，具有样本编辑管理、模型可视化训练、实时缺陷检测、AI 辅助判别和自动报告生成等功能。
 
-系统的核心算法基于 SimpleNet 和 AnomalyGPT，能够实现仅基于正常样本的无监督学习、缺陷检测和智能化分析。同时，系统应该尽量满足人机交互启发式原则，能够提供用户友好的界面，支持专业用户与业余用户操作。另外，系统应能够支持多线程，同时满足一定的数据处理效率。
+系统的核心算法基于 SimpleNet 和 AnomalyGPT，能够实现仅基于正常样本的无监督学习、缺陷检测和辅助分析。同时，系统应该尽量满足人机交互启发式原则，能够提供用户友好的界面，支持专业用户与业余用户操作。另外，系统应能够支持多线程，同时满足一定的数据处理效率。
 
 \subsection{用户特征}
 
@@ -340,7 +341,7 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
 
 （4）缺陷检测功能。用户可以导入和管理待检测样本，使用已训练的模型执行缺陷检测。系统集成服务器检测能力，提供结果可视化功能，包括原图/热图切换、缺陷区域标记等。用户可调整检测阈值优化结果，并进行批量检测和结果存储。
 
-（5）AI辅助分析功能。用户可通过自然语言交互界面对检测结果进行智能分析。系统集成大型视觉语言模型的分析能力，支持多图像分析，包括说明缺陷是否存在（无需手动设置阈值）和缺陷位置，以及提供图像相关信息，使检测结果更具可解释性和实用价值。
+（5）AI辅助分析功能。用户可通过自然语言交互界面对检测结果进行辅助分析。系统集成大型视觉语言模型的分析能力，支持多图像分析，包括说明缺陷是否存在（无需手动设置阈值）和缺陷位置，以及提供图像相关信息，使检测结果更具可解释性和实用价值。
 
 （6）检测结果报告功能。用户可查看缺陷数据统计与分析结果，包括位置分布、聚类分析等多维度信息，以及对工艺改进的建议。系统自动生成检测报告，集成各类可视化图表，并支持导出为 PDF 格式，便于分享和存档。
 
@@ -539,7 +540,7 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
     \midrule[1pt]
     ID & 05 \\
     \midrule[0.5pt]
-    用例名称 & AI智能分析 \\
+    用例名称 & AI辅助分析 \\
     \midrule[0.5pt]
     参与者 & 用户 \\
     \midrule[0.5pt]
@@ -637,7 +638,7 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
 
 \subsection{“4+1” 视图}
 
-Kruchten 在 1995 年提出了软件体系结构的 “4+1” 的视图模型，如图 \ref{4+1视图} 所示。该模型从逻辑视图、过程视图、物理视图、开发视图和场景视图这五个不同的视角来描述软件体系结构。每一个视图针对系统的一个特定群体，专注于系统的一个侧面，五个视图描述了软件系统结构的全部内容\cite{[11]}。
+Kruchten 在 1995 年提出了软件体系结构的 “4+1” 的视图模型，如图 \ref{4+1视图} 所示。该模型从逻辑视图、过程视图、物理视图、开发视图和场景视图这五个不同的视角来描述软件体系结构。每一个视图针对系统的一个特定群体，专注于系统的一个侧面，五个视图描述了软件系统结构的全部内容\cite{[15]}。
 
 \begin{figure}[htb]
     \centering
@@ -978,7 +979,7 @@ ResizableRectItem 类是仿照安卓手机的相片编辑功能对 Qt 的 QGraph
 
 （3）AI辅助分析模块
 
-AI 辅助分析模块是缺陷检测模块的智能增强组件，融合了大型视觉语言模型（LVLM），弥补了核心缺陷检测算法依赖阈值判定检测结果的不足，同时通过交互式对话界面，提供了异常位置等辅助信息。在检测完成后，用户可选择对其结果存疑的一个或多个样本进行 AI 辅助分析。如图 \ref{AI对话} 所示，用户可以输入缺陷检测相关问题，如图像是否存在缺陷、缺陷的位置，以及描述图像等，在分析完成后系统会自动生成对应的回答。同样地，在 AI 分析启动后，系统进入等待态，显示加载动画，直至处理结束。交互式问答支持对多个分析对象进行连续多轮对话，另外，点击左右导航按钮可以切换分析目标，点击当前分析对象可以切换原图与 AI 分析结果图，这样用户可以直观地对比分析结果。
+AI 辅助分析模块是缺陷检测模块的增强组件，融合了大型视觉语言模型（LVLM），弥补了核心缺陷检测算法依赖阈值判定检测结果的不足，同时通过交互式对话界面，提供了异常位置等辅助信息。在检测完成后，用户可选择对其结果存疑的一个或多个样本进行 AI 辅助分析。如图 \ref{AI对话} 所示，用户可以输入缺陷检测相关问题，如图像是否存在缺陷、缺陷的位置，以及描述图像等，在分析完成后系统会自动生成对应的回答。同样地，在 AI 分析启动后，系统进入等待态，显示加载动画，直至处理结束。交互式问答支持对多个分析对象进行连续多轮对话，另外，点击左右导航按钮可以切换分析目标，点击当前分析对象可以切换原图与 AI 分析结果图，这样用户可以直观地对比分析结果。
 
 \begin{figure}[H]
     \centering
@@ -1209,12 +1210,12 @@ LoadingAnimation 类基于 GIF 动图实现，支持文本提示和动画显示�
 
 \section{数据集}
 
-我们在 MVTec AD 数据集上进行测试，该数据集用于工业领域的无监督缺陷检测，包含 5354 张不同物体和纹理类别的高分辨率彩色图像。MVTec AD 共有 15 个不同的产品类别，每个类别包括一组无缺陷的训练集，和一组包含各种缺陷的图像以及无缺陷的图像的测试集。这 15 个类别又可细分为 5 种纹理图，如铁丝网、皮革、瓷砖等，和 10 种物体图，如瓶子、电缆、胶囊、栗子、金属螺母等。如图 \ref{MVTec} 所示，每个类别都包含了一个无异常的示例和一个异常的示例，上面一行为输入图像，下面一行是特写视图。它们共包含 73 种不同类型的缺陷，如划痕、凹痕、污染和各种结构变化。
+我们在 MVTec AD\cite{[16]} 数据集上进行测试，该数据集用于工业领域的无监督缺陷检测，包含 5354 张不同物体和纹理类别的高分辨率彩色图像。MVTec AD 共有 15 个不同的产品类别，每个类别包括一组无缺陷的训练集，和一组包含各种缺陷的图像以及无缺陷的图像的测试集。这 15 个类别又可细分为 5 种纹理图，如铁丝网、皮革、瓷砖等，和 10 种物体图，如瓶子、电缆、胶囊、榛子、金属螺母等。如图 \ref{MVTec} 所示，每个类别都给出了一个正常图像、异常示例和异常区域的特写视图。它们共包含 73 种不同类型的缺陷，如划痕、凹痕、污染和各种结构变化。
 
 \begin{figure}[htb]
     \centering
     \includegraphics[width=0.88\textwidth]{images/MVTec.png}
-    \caption{MVTec 异常检测数据集的五个纹理和十个对象类别的示例图像}
+    \caption{MVTec AD 数据集的五个纹理和十个对象类别的示例图像}
     \label{MVTec}
 \end{figure}
 

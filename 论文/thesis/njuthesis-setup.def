@@ -26,11 +26,11 @@
     % 作者英文姓名
     % 一般使用拼音
     %
-    keywords = {计算机视觉, 无监督深度学习, 工业缺陷检测, 自动化检测, 缺陷检测系统},
+    keywords = {无监督深度学习, 工业质检, 缺陷检测系统, 缺陷检测, 异常检测},
     % 中文关键词列表
     % 使用英文半角逗号(,)分隔
     %
-    keywords* = {Computer Vision, Unsupervised Deep Learning, Industrial Defect Detection, Automated Detection, Defect Detection System},
+    keywords* = {Unsupervised Deep Learning, Industrial Quality Inspection, Defect Detection System, Defect Detection, Anomaly Detection},
     % 英文关键词
     % 使用英文半角逗号(,)分隔
     %
@@ -63,7 +63,7 @@
     % 第二导师全称
     % 如果确实没有第二导师，不填写即可
     %
-    submit-date = {2025-05-07},
+    submit-date = {2025-05-14},
     % 提交日期
     % 格式为 yyyy-mm-dd
     % 不填就是编译当天日期
