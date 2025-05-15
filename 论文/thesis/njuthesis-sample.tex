@@ -60,6 +60,7 @@
 \usepackage[dvipsnames]{xcolor}
 % \usepackage{algorithm,algorithmic} % 展示算法伪代码
 \usepackage{float}
+\usepackage{subcaption}
 % 在导言区随意定制所需命令
 % \DeclareMathOperator{\spn}{span}
 % \NewDocumentCommand\mathbi{m}{\textbf{\em #1}}
@@ -264,7 +265,7 @@ SimpleNet\cite{[13]} 是中国科学技术大学提出的一个用于检测和�
 
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=0.88\textwidth]{images/SimpleNet概述.png}
+    \includegraphics[width=\textwidth]{images/SimpleNet概述.png}
     \caption{SimpleNet 概述}
     \label{SimpleNet}
 \end{figure}
@@ -336,7 +337,13 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
 
 \section{需求分析}
 
+理论上来说，需求分析是开发者理解用户需求，建立分析模型并创建解决方案，最终与用户达成共同理解的过程。但由于非正式环境，本课题仅通过市场调研模拟用户，以进行相应的功能性与非功能性需求分析。
+
+功能性需求定义了系统的具体功能和行为，即“系统能为用户做什么”；非功能性需求定义了系统的性能需求、质量特性、对外接口和约束条件，即“系统应该满足哪些标准，做得如何好”。
+
 \subsection{功能性需求}
+
+功能性需求是在不考虑物理约束的情况下，⽤户希望系统所能够执⾏的活动，这些活动可以帮助⽤户完成任务。本系统的具体功能需求如下：
 
 （1）项目管理功能。用户可以创建、打开和管理缺陷检测项目，保存项目的元数据和配置信息。此外，系统还提供快速访问历史项目的功能，支持项目导航和拖放打开项目等操作，方便用户快速恢复之前的工作状态。
 
@@ -350,7 +357,9 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
 
 （6）检测结果报告功能。用户可查看对缺陷数据进行统计与分析的结果，包括位置分布、聚类分析等多维度信息，以及对工艺改进的建议。系统自动生成检测报告，集成各类可视化图表，并支持导出为 PDF 格式，便于用户分享和存档。
 
-系统用例图如图 \ref{系统用例图} 所示。
+\subsection{用例描述}
+
+用例是用户和系统之间的交互行为序列的集合，是需求的组织和表现的方法之一。用例图是以用例为基本单位建立的一个系统功能展示模型，由用例、参与者、关系和系统边界这四个基本元素组成。本系统的用例图如图 \ref{系统用例图} 所示。用例描述，即用文本的方式将用例的参与者、目标、场景等信息描述出来。
 
 \begin{figure}[H]
     \centering
@@ -358,8 +367,6 @@ DBSCAN 是一种基于密度的聚类方法，该算法能够将给定的数据�
     \caption{系统用例图}
     \label{系统用例图}
 \end{figure}
-
-\subsection{用例描述}
 
 （1）用户使用缺陷检测系统进行项目管理的用例描述如下表 \ref{usecase_project_management} 所示。
 
@@ -710,44 +717,7 @@ Kruchten 在 1995 年提出了软件体系结构的 “4+1” 视图模型，如
 
 \subsection{核心表结构}
 
-（1）样本组表 (sample\_group) 如图 \ref{样本组表} 所示。
-
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.88\textwidth}
-    {\linespread{1.2}
-    \begin{lstlisting}[language=sql]
-sample_group(
-  id INT PRIMARY KEY AUTO_INCREMENT,  -- 样本组ID，主键
-  name VARCHAR(100) NOT NULL          -- 样本组名称
-)
-    \end{lstlisting}}
-    \end{minipage}
-    \caption{样本组表}
-    \label{样本组表}
-\end{figure}
-
-（2）样本表(sample) 如图 \ref{样本表} 所示。
-
-\begin{figure}[H]
-    \centering
-    \begin{minipage}{0.88\textwidth}
-    {\linespread{1.2}
-    \begin{lstlisting}[language=sql]
-sample(
-  id INT PRIMARY KEY AUTO_INCREMENT,  -- 样本ID，主键
-  name VARCHAR(100) NOT NULL,         -- 样本名称
-  group_id INT NOT NULL,              -- 所属样本组ID，外键
-  path VARCHAR(255) NOT NULL,         -- 样本文件路径
-  FOREIGN KEY (group_id) REFERENCES sample_group(id)
-)
-    \end{lstlisting}}
-    \end{minipage}
-    \caption{样本表}
-    \label{样本表}
-\end{figure}
-
-（3）模型表(model) 如图 \ref{模型表} 所示。
+（1）模型表(model) 如图 \ref{模型表} 所示。
 
 \begin{figure}[H]
     \centering
@@ -770,6 +740,43 @@ model(
     \end{minipage}
     \caption{模型表}
     \label{模型表}
+\end{figure}
+
+（2）样本表(sample) 如图 \ref{样本表} 所示。
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.88\textwidth}
+    {\linespread{1.2}
+    \begin{lstlisting}[language=sql]
+sample(
+  id INT PRIMARY KEY AUTO_INCREMENT,  -- 样本ID，主键
+  name VARCHAR(100) NOT NULL,         -- 样本名称
+  group_id INT NOT NULL,              -- 所属样本组ID，外键
+  path VARCHAR(255) NOT NULL,         -- 样本文件路径
+  FOREIGN KEY (group_id) REFERENCES sample_group(id)
+)
+    \end{lstlisting}}
+    \end{minipage}
+    \caption{样本表}
+    \label{样本表}
+\end{figure}
+
+（3）样本组表 (sample\_group) 如图 \ref{样本组表} 所示。
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.88\textwidth}
+    {\linespread{1.2}
+    \begin{lstlisting}[language=sql]
+sample_group(
+  id INT PRIMARY KEY AUTO_INCREMENT,  -- 样本组ID，主键
+  name VARCHAR(100) NOT NULL          -- 样本组名称
+)
+    \end{lstlisting}}
+    \end{minipage}
+    \caption{样本组表}
+    \label{样本组表}
 \end{figure}
 
 （4）检测结果表(detection\_result) 如图 \ref{检测结果表} 所示。
@@ -830,7 +837,7 @@ model_inference_sample(
   score FLOAT NOT NULL,               -- 异常分数
   FOREIGN KEY (model_id) REFERENCES model(model_id),
   FOREIGN KEY (sample_id) REFERENCES sample(sample_id),
-  UNIQUE KEY (model_id, sample_id)    -- 确保一个样本在一个模型中只被记录一次
+  UNIQUE KEY (model_id, sample_id)
 )
     \end{lstlisting}}
     \end{minipage}
@@ -840,7 +847,7 @@ model_inference_sample(
 
 \subsection{数据关系与完整性}
 
-系统采用外键约束维护表间关系，确保数据的引用完整性：（1）样本表引用 group\_id，关联到样本组表。（2）检测结果表、模型训练样本关联表、模型推理样本关联表均引用 sample\_id 和 model\_id，关联到模型表和样本表。
+系统采用外键约束维护表间关系，确保数据的引用完整性：样本表引用 group\_id，关联到样本组表；检测结果表、模型训练样本关联表、模型推理样本关联表均引用 sample\_id 和 model\_id，关联到模型表和样本表。
 
 数据库操作采用适当的级联规则，例如：删除样本组时，关联的样本记录自动删除；删除模型时，相关的检测结果仍然保留以便历史查询。
 
@@ -1062,96 +1069,75 @@ AI 辅助分析模块是缺陷检测模块的增强组件，融合了大型视�
 
 \subsection{API 接口}
 
-缺陷检测系统通过 HTTP 接口与远程服务器通信，实现模型训练、推理和数据管理等功能，具体 API 如下：
+缺陷检测系统通过 HTTP 协议与远程服务器通信，实现模型训练、推理和数据管理等功能，具体 API 如下：
 
-(1) 大型视觉语言模型交互的 API 如表 \ref{AI_API} 所示。
+(1) 大型视觉语言模型交互的 API 如表 \ref{AI_API} 所示，支持同时对多个样本进行多轮对话分析。
 
 \begin{table}[H]
     \centering
     \caption{大型视觉语言模型交互的 API 接口说明}
     \label{AI_API}
-    \renewcommand\arraystretch{0.5}
+    \renewcommand\arraystretch{0.8}
     \begin{tabular}{p{2.5cm}p{3.5cm}p{4cm}p{2.5cm}}
-    \toprule[1.5pt]
+    \toprule
     API方法 & 功能描述 & 主要参数 & 返回结果 \\
-    \midrule[1pt]
+    \midrule
     anomaly\_gpt\_infer & 使用 AnomalyGPT 分析缺陷图像 & img\_list, question, normal\_img\_list, history & 图像分析结果的文本列表 \\
-    \bottomrule[1.5pt]
+    \bottomrule
     \end{tabular}
 \end{table}
 
-(2) 缺陷检测模型相关 API 如表 \ref{model_API} 所示。
+(2) 缺陷检测模型相关 API 如表 \ref{model_API} 所示，包含了模型的增删改查，以及训练、推理、进度获取等操作。
 
 \begin{table}[H]
     \centering
     \caption{缺陷检测模型相关 API 接口说明}
     \label{model_API}
-    \renewcommand\arraystretch{0.5}
+    \renewcommand\arraystretch{0.8}
     \begin{tabular}{p{2.5cm}p{3.5cm}p{4cm}p{2.5cm}}
-    \toprule[1.5pt]
+    \toprule
     API方法 & 功能描述 & 主要参数 & 返回结果 \\
-    \midrule[1pt]
+    \midrule
     add\_model & 创建新模型 & name, input\_h, input\_w, end\_acc, layers, patchsize, embed\_dimension & 模型ID \\
-    \midrule[0.5pt]
     delete\_model & 删除指定模型 & model\_id & 操作结果 \\
-    \midrule[0.5pt]
     update\_model & 更新模型参数 & model\_id, model参数 & 操作结果 \\
-    \midrule[0.5pt]
     list\_model & 获取所有模型信息 & 无 & 模型列表 \\
-    \midrule[0.5pt]
     get\_model\_id & 根据名称获取模型ID & model\_name & 模型ID \\
-    \midrule[0.5pt]
     get\_model & 获取模型完整信息 & model\_name & 模型信息 \\
-    \midrule[0.5pt]
     get\_model\_status & 获取模型状态 & model\_name & 状态码(0-3) \\
-    \midrule[0.5pt]
     train\_model & 启动模型训练 & model\_id, group\_id & 训练任务信息 \\
-    \midrule[0.5pt]
     finish\_model & 手动终止训练 & model\_id & 操作结果 \\
-    \midrule[0.5pt]
     train\_info & 获取已训练图像列表 & model\_id & 图像名称列表 \\
-    \midrule[0.5pt]
     train\_process & 获取训练实时数据 & model\_id & 训练曲线数据 \\
-    \midrule[0.5pt]
     infer\_model & 启动模型推理 & model\_id, group\_id & 推理任务信息 \\
-    \midrule[0.5pt]
     infer\_info & 获取已推理图像列表 & model\_id & 图像信息列表 \\
-    \midrule[0.5pt]
     infer\_process & 获取推理实时进度 & model\_id & 推理进度信息 \\
-    \bottomrule[1.5pt]
+    \bottomrule
     \end{tabular}
 \end{table}
 
-(3) 样本及样本组相关 API 如表 \ref{sample_API} 所示。
+(3) 样本及样本组相关 API 如表 \ref{sample_API} 所示，包含样本组的增删改查，以及样本的上传、下载等操作。
 
 \begin{table}[H]
     \centering
     \caption{样本及样本组相关 API 接口说明}
     \label{sample_API}
-    \renewcommand\arraystretch{0.5}
+    \renewcommand\arraystretch{0.8}
     \begin{tabular}{p{2.5cm}p{3.5cm}p{4cm}p{2.5cm}}
-    \toprule[1.5pt]
+    \toprule
     API方法 & 功能描述 & 主要参数 & 返回结果 \\
-    \midrule[1pt]
+    \midrule
     upload\_sample & 上传单个样本 & file\_path, group\_id & 服务器文件名 \\
-    \midrule[0.5pt]
-    download\_sample & 下载样本文件 & filename & 二进制图像数据 \\
-    \midrule[0.5pt]
+    download\_sample & 下载样本文件 & filename & 二进制图像 \\
     get\_sample\_list & 获取组内样本列表 & group\_id & 样本名称列表 \\
-    \midrule[0.5pt]
     add\_group & 创建新样本组 & group\_name & 组ID \\
-    \midrule[0.5pt]
     delete\_group & 删除样本组 & group\_id & 操作结果 \\
-    \midrule[0.5pt]
     clear\_group & 清空样本组内容 & group\_id & 操作结果 \\
-    \midrule[0.5pt]
     get\_group\_list & 获取所有样本组 & 无 & 样本组列表 \\
-    \midrule[0.5pt]
     get\_group\_id & 根据名称获取组ID & group\_name & 组ID \\
-    \bottomrule[1.5pt]
+    \bottomrule
     \end{tabular}
 \end{table}
-
 
 \subsection{其他}
 
@@ -1179,7 +1165,26 @@ LoadingAnimation 类基于 GIF 动图实现，支持文本提示和动画显示�
 
 \subsubsection{（2）事件过滤器处理点击事件}
 
-系统采用 Qt 的事件过滤器（Event Filter）组件处理点击事件。例如 AI 分析模块中的交互式图像查看，用户点击当前图像即可无缝切换原图和结果图，方便进行直观地对比。事件过滤器可以对特定组件的事件流进行拦截，进而实现自定义处理。这种非侵入式的设计将处理逻辑与 ui 组件解耦，增强了系统的可扩展性。
+系统采用 Qt 的事件过滤器（Event Filter）组件处理点击事件。例如 AI 分析模块中的交互式图像查看，用户点击当前图像即可无缝切换原图和结果图，详见图 \ref{样本原图与结果热图}。事件过滤器可以对特定组件的事件流进行拦截，进而实现自定义处理。这种非侵入式的设计将处理逻辑与 ui 组件解耦，增强了系统的可扩展性。
+
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/检测样本原图.png}
+        \caption{检测样本原图}
+        \label{样本原图}
+    \end{subfigure}
+    \hspace{2cm}
+    \begin{subfigure}{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/检测结果热图.png}
+        \caption{检测结果热图}
+        \label{结果热图}
+    \end{subfigure}
+    \caption{检测样本原图与结果热图对比}
+    \label{样本原图与结果热图}
+\end{figure}
 
 \subsubsection{（3）点击空白处完成编辑}
 
@@ -1187,7 +1192,7 @@ LoadingAnimation 类基于 GIF 动图实现，支持文本提示和动画显示�
 
 \subsubsection{（4）流程引导}
 
-流程引导是系统的一项辅助功能，简单介绍了系统的各个功能模块和操作流程，以帮助非专业用户了解无监督缺陷检测系统的整体工作流程，达到快速上手的目的。在用户创建或打开项目后就可进入流程引导界面，如图 \ref{流程引导界面} 所示。引导界面采用分流式设计，清晰地展示了系统的两种使用路径：其一是采集样本并对其执行预处理操作，然后创建新的检测模型进行训练，训练完成后对指定的检测样本执行检测；其二是直接使用已有的无监督检测模型进行检测，然后使用大型视觉语言模型执行辅助分析，最后统计、分析缺陷检测的结果并生成相应的检测报告。
+流程引导是系统的一项辅助功能，简单介绍了系统的各个功能模块和操作流程，以帮助非专业用户了解系统的整体工作流程，达到快速上手的目的。在用户创建或打开项目后就可进入流程引导界面，如图 \ref{流程引导界面} 所示。引导界面采用分流式设计，清晰地展示了系统的两种使用路径：其一是采集样本并对其执行预处理操作，然后创建新模型进行训练，训练完成后执行检测；其二是直接使用已有模型进行检测，然后使用大型视觉语言模型执行辅助分析，最后统计、分析缺陷检测的结果并生成相应的检测报告。
 
 \begin{figure}[H]
     \centering
@@ -1250,23 +1255,21 @@ I-AUROC(Image-level AUROC) 和 P-AUROC(Pixel-level AUROC) 是工业缺陷检测�
 
 \subsection{SimpleNet 异常检测}
 
-缺陷检测结果如表 \ref{acc_level_comparison} 所示，ACC\_LEVEL 为所选精度级别，TIME 为单张样本检测耗时。可以看出，选择精度越高，I-AUROC 越高，但检测每个样本耗时越长。P-AUROC 在精度选择为中等时达到最高，这是由于过高精度模型可能在特征提取时过度关注局部细节，导致在像素级别上产生的误判更多，即对细微纹理的变化过度敏感。另外，高精度模型的处理速度明显下降(0.1s/个)，这表明精度选择高时模型复杂度显著增加，但检测精度提升有限。而在工业场景中，要平衡检测速度和检测精度，所以一般默认选择中等精度即可。如表 \ref{speed_level_comparison} 所示，SPEED\_LEVEL 为所选速度级别。在默认中等精度的情况下，I-AUROC 随着速度等级的提高而降低，由于速度选择是对原来的参数配置做的细微调整，因此 I-AUROC 和样本检测耗时变化不大。另外，P-AUROC 的变化再次验证了前文的结论。
+缺陷检测结果如表 \ref{acc_level_comparison} 所示，ACC\_LEVEL 为所选精度级别，TIME 为单张样本检测耗时。可以看出，选择精度越高，I-AUROC 越高，但检测每个样本耗时越长。P-AUROC 在精度选择为中等时达到最高，这是由于过高精度模型可能在特征提取时过度关注局部细节，导致在像素级别上产生的误判更多，即对细微纹理的变化过度敏感。另外，高精度模型的处理速度明显下降(0.1s/个)，这表明精度选择高时模型复杂度显著增加，但检测精度提升有限。而在工业场景中，要平衡检测速度和检测精度，所以一般默认选择中等精度即可。如表 \ref{speed_level_comparison} 所示，SPEED\_LEVEL 为所选速度级别。在默认中等精度下，I-AUROC 随着速度等级的提高而降低，由于速度选择是对原来的参数配置做的细微调整，因此 I-AUROC 和样本检测耗时变化不大。另外，P-AUROC 的变化再次验证了前文的结论。
 
 \begin{table}[H]
     \centering
     \caption{不同精度级别下异常检测的性能对比。}
     \label{acc_level_comparison}
-    \renewcommand\arraystretch{0.5}
-    \begin{tabular}{c|c|c|c}
-    \toprule[1.5pt]
+    \renewcommand\arraystretch{0.8}
+    \begin{tabular}{cccc}
+    \toprule
     ACC\_LEVEL & I-AUROC & P-AUROC & TIME(ms) \\
-    \midrule[1pt]
+    \midrule
     LOW & 90.35\% & 98.38\% & 16.55 \\
-    \midrule[0.5pt]
     MEDIUM & 98.40\% & 98.83\% & 21.91 \\
-    \midrule[0.5pt]
     HIGH & 99.48\% & 98.07\% & 102.77 \\
-    \bottomrule[1.5pt]
+    \bottomrule
     \end{tabular}
 \end{table}
 
@@ -1274,20 +1277,17 @@ I-AUROC(Image-level AUROC) 和 P-AUROC(Pixel-level AUROC) 是工业缺陷检测�
     \centering
     \caption{不同速度级别下异常检测的性能对比。}
     \label{speed_level_comparison}
-    \renewcommand\arraystretch{0.5}
-    \begin{tabular}{c|c|c|c}
-    \toprule[1.5pt]
+    \renewcommand\arraystretch{0.8}
+    \begin{tabular}{cccc}
+    \toprule
     SPEED\_LEVEL & I-AUROC & P-AUROC & TIME(ms) \\
-    \midrule[1pt]
+    \midrule
     HIGH & 96.85\% & 98.55\% & 21.79 \\
-    \midrule[0.5pt]
     MEDIUM & 98.40\% & 98.83\% & 21.91 \\
-    \midrule[0.5pt]
     LOW & 99.16\% & 98.78\% & 23.12 \\
-    \bottomrule[1.5pt]
+    \bottomrule
     \end{tabular}
 \end{table}
-
 
 \subsection{AnomalyGPT 辅助分析}
 
@@ -1297,17 +1297,15 @@ I-AUROC(Image-level AUROC) 和 P-AUROC(Pixel-level AUROC) 是工业缺陷检测�
     \centering
     \caption{不同缺陷类别下 AI 辅助判定缺陷存在性与定位缺陷的性能。}
     \label{AI_detection_accuracy}
-    \renewcommand\arraystretch{0.5}
-    \begin{tabular}{c|c|c}
-    \toprule[1.5pt]
+    \renewcommand\arraystretch{0.8}
+    \begin{tabular}{ccc}
+    \toprule
     DEFECT\_CLASS & EXISTANCE\_ACC & POSITION\_ACC \\
-    \midrule[1pt]
+    \midrule
     GOOD & 100\% & - \\
-    \midrule[0.5pt]
     SMALL\_DEFECT & 100\% & 86.3\% \\
-    \midrule[0.5pt]
     BIG\_DEFECT & 100\% & 70\% \\
-    \bottomrule[1.5pt]
+    \bottomrule
     \end{tabular}
 \end{table}
 

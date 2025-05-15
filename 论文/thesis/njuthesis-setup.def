@@ -22,7 +22,7 @@
     author = {聂尔聪},
     % 作者姓名
     %
-    author* = {Nie Ercong},
+    author* = {Ercong Nie},
     % 作者英文姓名
     % 一般使用拼音
     %
@@ -54,12 +54,12 @@
     % 研究生专业型学位可能遇到两处内容不一致的情况
     %
     supervisor = {邬向前,教授},
-    supervisor*= {Professor Wu Xiangqian},
+    supervisor*= {Professor Xiangqian Wu},
     % 导师全称
     % 使用英文半角逗号(,)分隔中文姓名和职称
     %
     supervisor-ii = {葛季栋,副教授},
-    supervisor-ii* = {Associate Professor Ge Jidong},
+    supervisor-ii* = {Associate Professor Jidong Ge},
     % 第二导师全称
     % 如果确实没有第二导师，不填写即可
     %
