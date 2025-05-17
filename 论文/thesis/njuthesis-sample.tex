@@ -213,12 +213,12 @@ Unsupervised learning relies only on normal samples, identifying defects by mini
 本课题围绕基于无监督学习的工业缺陷检测系统的设计与实现展开，应用了无监督深度学习检测方法 SimpleNet 和融合了工业异常检测的大型视觉语言模型 AnomalyGPT，旨在解决现有系统在用户可用性及易用性、工程落地效益等方面的不足。本课题的主要工作分为以下六个部分：  
 
 \begin{enumerate}
-    \item 基于 SimpleNet 构建无监督缺陷检测框架，实现模型训练与检测的核心功能。
+    \item 基于 SimpleNet 构建缺陷检测框架，实现模型训练与检测的核心功能。
     \item 基于 AnomalyGPT 实现视觉语言模型辅助判定与分析功能。
     \item 实现裁剪、缩小域、数据增强等针对训练样本的预处理操作。
     \item 实现对样本组和模型的管理，包括模型参数的动态配置。
     \item 实现对检测结果分析与报告的功能，完善检测流程。
-    \item 在实现上述功能的基础上，根据人机交互启发式原则，设计一个用户友好的系统。
+    \item 在实现上述功能的基础上，根据人机交互启发式原则设计用户友好的系统。
 \end{enumerate}
 
 \section{论文组织结构}
@@ -975,7 +975,7 @@ ResizableRectItem 类是仿照安卓手机的相片编辑功能对 Qt 的 QGraph
 
 \subsection{缺陷检测模块}
 
-缺陷检测模块是整个缺陷检测系统中最重要的组件，负责配置检测样本与检测模型，对样本进行缺陷识别、可视化、AI辅助分析，最后生成统计报告这一完整流程。
+缺陷检测模块是整个检测系统中最重要的组件，负责配置检测样本与检测模型，识别样本缺陷、可视化、AI辅助分析，最后生成统计报告这一完整流程。
 
 \subsubsection{（1）检测管理模块}
 
@@ -1007,7 +1007,7 @@ AI 辅助分析模块是缺陷检测模块的增强组件，融合了大型视�
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.58\textwidth]{images/AI对话.png}
+    \includegraphics[width=0.8\textwidth]{images/AI对话.png}
     \caption{AI对话}
     \label{AI对话}
 \end{figure}
@@ -1259,7 +1259,7 @@ I-AUROC(Image-level AUROC) 和 P-AUROC(Pixel-level AUROC) 是工业缺陷检测�
 
 \begin{table}[H]
     \centering
-    \caption{不同精度级别下异常检测的性能对比。}
+    \caption{不同精度级别下异常检测的性能对比}
     \label{acc_level_comparison}
     \renewcommand\arraystretch{0.8}
     \begin{tabular}{cccc}
@@ -1275,7 +1275,7 @@ I-AUROC(Image-level AUROC) 和 P-AUROC(Pixel-level AUROC) 是工业缺陷检测�
 
 \begin{table}[H]
     \centering
-    \caption{不同速度级别下异常检测的性能对比。}
+    \caption{不同速度级别下异常检测的性能对比}
     \label{speed_level_comparison}
     \renewcommand\arraystretch{0.8}
     \begin{tabular}{cccc}
@@ -1295,7 +1295,7 @@ I-AUROC(Image-level AUROC) 和 P-AUROC(Pixel-level AUROC) 是工业缺陷检测�
 
 \begin{table}[H]
     \centering
-    \caption{不同缺陷类别下 AI 辅助判定缺陷存在性与定位缺陷的性能。}
+    \caption{不同缺陷类别下 AI 辅助判定缺陷存在性与定位缺陷的性能}
     \label{AI_detection_accuracy}
     \renewcommand\arraystretch{0.8}
     \begin{tabular}{ccc}
